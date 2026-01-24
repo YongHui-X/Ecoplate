@@ -2,6 +2,52 @@
 
 A sustainability-focused food management platform that helps reduce food waste through smart inventory tracking, community marketplace, and gamification.
 
+## System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["Client Layer"]
+        WEB["Web Browser"]
+        IOS["iOS App"]
+        ANDROID["Android App"]
+    end
+
+    subgraph Frontend["Frontend (React + Vite)"]
+        REACT["React 18 + TypeScript"]
+        CAPACITOR["Capacitor"]
+        TAILWIND["Tailwind CSS + shadcn/ui"]
+    end
+
+    subgraph Backend["Backend (Bun)"]
+        API["REST API Server"]
+        AUTH["JWT Auth Middleware"]
+        ROUTES["Route Handlers"]
+    end
+
+    subgraph Services["External Services"]
+        OPENAI["OpenAI API"]
+        RECOMMEND["Recommendation Engine"]
+    end
+
+    subgraph Database["Database Layer"]
+        SQLITE["SQLite"]
+        DRIZZLE["Drizzle ORM"]
+    end
+
+    WEB --> REACT
+    IOS --> CAPACITOR
+    ANDROID --> CAPACITOR
+    CAPACITOR --> REACT
+    REACT --> TAILWIND
+    REACT -->|HTTP/REST| API
+    API --> AUTH
+    AUTH --> ROUTES
+    ROUTES --> DRIZZLE
+    DRIZZLE --> SQLITE
+    ROUTES -->|Receipt Scan| OPENAI
+    ROUTES -->|Price Suggestion| RECOMMEND
+```
+
 ## Features
 
 ### MyFridge
@@ -23,6 +69,123 @@ A sustainability-focused food management platform that helps reduce food waste t
 - View CO2 savings and waste reduction rate
 - Community leaderboard
 
+## User Flow
+
+```mermaid
+flowchart TD
+    START((Start)) --> AUTH{Authenticated?}
+    AUTH -->|No| LOGIN[Login/Register]
+    LOGIN --> DASHBOARD
+    AUTH -->|Yes| DASHBOARD[Dashboard]
+
+    DASHBOARD --> FRIDGE[MyFridge]
+    DASHBOARD --> MARKET[Marketplace]
+    DASHBOARD --> ECO[EcoBoard]
+
+    subgraph MyFridge["MyFridge Module"]
+        FRIDGE --> ADD[Add Product]
+        FRIDGE --> SCAN[Scan Receipt]
+        FRIDGE --> VIEW[View Items]
+        ADD --> POINTS1[+2 Points]
+        SCAN -->|AI Processing| PARSE[Parse Items]
+        PARSE --> ADD
+        VIEW --> CONSUME{Action?}
+        CONSUME -->|Consumed| POINTS2[+5 Points]
+        CONSUME -->|Shared| POINTS3[+10 Points]
+        CONSUME -->|Sold| POINTS4[+8 Points]
+        CONSUME -->|Wasted| POINTS5[-2 Points]
+    end
+
+    subgraph Marketplace["Marketplace Module"]
+        MARKET --> BROWSE[Browse Listings]
+        MARKET --> CREATE[Create Listing]
+        BROWSE --> RESERVE[Reserve Item]
+        RESERVE --> MESSAGE[Message Seller]
+        CREATE --> PRICE[Get AI Price]
+        CREATE --> PUBLISH[Publish]
+    end
+
+    subgraph Gamification["Gamification Module"]
+        ECO --> STATS[View Stats]
+        ECO --> BADGES[View Badges]
+        ECO --> LEADER[Leaderboard]
+        POINTS1 & POINTS2 & POINTS3 & POINTS4 --> STATS
+        STATS --> UNLOCK{Badge Unlock?}
+        UNLOCK -->|Yes| BADGES
+    end
+```
+
+## Database Schema
+
+```mermaid
+erDiagram
+    users ||--o{ products : owns
+    users ||--o{ marketplace_listings : sells
+    users ||--o{ messages : sends
+    users ||--|| user_points : has
+    users ||--|| user_sustainability_metrics : has
+    users ||--o{ user_badges : earns
+
+    products ||--o{ consumption_logs : tracks
+    products ||--o{ marketplace_listings : listed_as
+
+    marketplace_listings ||--o{ listing_images : has
+    marketplace_listings ||--o{ messages : contains
+
+    badges ||--o{ user_badges : awarded_to
+
+    users {
+        int id PK
+        string email UK
+        string password_hash
+        string name
+        timestamp created_at
+    }
+
+    products {
+        int id PK
+        int user_id FK
+        string name
+        string category
+        float quantity
+        date expiry_date
+        string storage_location
+        boolean is_consumed
+    }
+
+    marketplace_listings {
+        int id PK
+        int seller_id FK
+        string title
+        float price
+        string status
+        int view_count
+    }
+
+    user_points {
+        int id PK
+        int user_id FK
+        int total_points
+        int current_streak
+    }
+
+    badges {
+        int id PK
+        string code UK
+        string name
+        int points_awarded
+    }
+
+    user_sustainability_metrics {
+        int id PK
+        int user_id FK
+        int items_consumed
+        int items_wasted
+        float co2_saved
+        float waste_reduction_rate
+    }
+```
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -37,6 +200,64 @@ A sustainability-focused food management platform that helps reduce food waste t
 | Mobile | [Capacitor](https://capacitorjs.com) (iOS & Android) |
 | Auth | JWT (jose library) |
 | Validation | [Zod](https://zod.dev) |
+
+## API Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API Server
+    participant DB as Database
+
+    Note over C,DB: Registration
+    C->>A: POST /auth/register
+    A->>DB: Create user + hash password
+    DB-->>A: User created
+    A->>A: Generate JWT tokens
+    A-->>C: { accessToken, refreshToken }
+
+    Note over C,DB: Login
+    C->>A: POST /auth/login
+    A->>DB: Verify credentials
+    DB-->>A: User data
+    A->>A: Generate JWT tokens
+    A-->>C: { accessToken, refreshToken }
+
+    Note over C,DB: Protected Request
+    C->>A: GET /myfridge/products<br/>Authorization: Bearer {token}
+    A->>A: Verify JWT
+    A->>DB: Query products
+    DB-->>A: Products list
+    A-->>C: [products]
+
+    Note over C,DB: Token Refresh
+    C->>A: POST /auth/refresh
+    A->>DB: Verify refresh token
+    A->>A: Generate new tokens
+    A-->>C: { accessToken, refreshToken }
+```
+
+## Receipt Scanning Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant B as Backend
+    participant AI as OpenAI Vision
+
+    U->>F: Upload receipt image
+    F->>F: Convert to Base64
+    F->>B: POST /myfridge/receipt/scan
+    B->>AI: Analyze image
+    AI-->>B: Extracted items JSON
+    B-->>F: { items: [...] }
+    F->>U: Show parsed items
+    U->>F: Confirm items
+    F->>B: POST /myfridge/products (batch)
+    B-->>F: Products created
+    F->>U: Success + points awarded
+```
 
 ## Project Structure
 

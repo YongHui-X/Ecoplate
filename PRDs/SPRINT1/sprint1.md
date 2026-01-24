@@ -57,7 +57,56 @@ EcoPlate is a sustainability-focused mobile and web application that combines fo
 
 ## 5. Technical Stack
 
-### 5.1 Technology Specifications
+### 5.1 System Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph Clients["Client Applications"]
+        WEB["Web Browser<br/>(React + Vite)"]
+        IOS["iOS App<br/>(Capacitor)"]
+        ANDROID["Android App<br/>(Capacitor)"]
+    end
+
+    subgraph Frontend["Frontend Layer"]
+        REACT["React 18<br/>TypeScript"]
+        TAILWIND["Tailwind CSS<br/>shadcn/ui"]
+        CAPACITOR["Capacitor<br/>Native Bridge"]
+    end
+
+    subgraph Backend["Backend Layer (Bun)"]
+        API["REST API<br/>Port 3000"]
+        AUTH["JWT Auth<br/>Middleware"]
+        ROUTES["Route Handlers"]
+        SERVICES["Business Logic"]
+    end
+
+    subgraph External["External Services"]
+        OPENAI["OpenAI API<br/>GPT-4 Vision"]
+        RECOMMEND["Recommendation<br/>Engine"]
+    end
+
+    subgraph Database["Database Layer"]
+        ORM["Drizzle ORM"]
+        SQLITE["SQLite<br/>(Dev)"]
+        MYSQL["MySQL 8.0<br/>(Production)"]
+    end
+
+    WEB & IOS & ANDROID --> REACT
+    REACT --> TAILWIND
+    IOS & ANDROID --> CAPACITOR
+    CAPACITOR --> REACT
+    REACT -->|HTTP/REST| API
+    API --> AUTH
+    AUTH --> ROUTES
+    ROUTES --> SERVICES
+    SERVICES --> ORM
+    ORM --> SQLITE
+    ORM -.->|Production| MYSQL
+    SERVICES -->|Receipt Scan| OPENAI
+    SERVICES -->|Price Suggestion| RECOMMEND
+```
+
+### 5.2 Technology Specifications
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
@@ -172,51 +221,158 @@ EcoPlate is a sustainability-focused mobile and web application that combines fo
 
 ### 7.1 Entity-Relationship Diagram
 
-```
-┌─────────────┐         ┌──────────────────┐         ┌─────────────────────┐
-│   users     │────────<│  products        │────────<│ consumption_logs    │
-└─────────────┘    1:n  └──────────────────┘    1:n  └─────────────────────┘
-       │                        │
-       │ 1:n                    │ 1:1
-       │                        ▼
-       │                ┌────────────────────────┐
-       │                │ marketplace_listings   │
-       │                └────────────────────────┘
-       │                        │ 1:n
-       │                        ▼
-       │                ┌──────────────────┐
-       │                │ listing_images   │
-       │                └──────────────────┘
-       │
-       │ 1:n            ┌──────────────┐
-       ├───────────────>│  messages    │
-       │                └──────────────┘
-       │
-       │ 1:1            ┌──────────────────────────┐
-       ├───────────────>│ user_points              │
-       │                └──────────────────────────┘
-       │                        │ 1:n
-       │                        ▼
-       │                ┌──────────────────────────┐
-       │                │ point_transactions       │
-       │                └──────────────────────────┘
-       │
-       │ 1:1            ┌────────────────────────────────┐
-       ├───────────────>│ user_sustainability_metrics    │
-       │                └────────────────────────────────┘
-       │                        │ 1:n
-       │                        ▼
-       │                ┌─────────────────────────────────┐
-       │                │ daily_sustainability_snapshots  │
-       │                └─────────────────────────────────┘
-       │
-       │ n:m            ┌──────────────┐
-       └───────────────>│ user_badges  │<───────┐
-                        └──────────────┘        │
-                                                 │ n:m
-                                         ┌───────────┐
-                                         │  badges   │
-                                         └───────────┘
+```mermaid
+erDiagram
+    users ||--o{ products : "owns"
+    users ||--o{ marketplace_listings : "sells"
+    users ||--o{ messages : "sends"
+    users ||--|| user_points : "has"
+    users ||--|| user_sustainability_metrics : "has"
+    users ||--o{ user_badges : "earns"
+    users ||--o{ consumption_logs : "logs"
+    users ||--o{ daily_sustainability_snapshots : "records"
+
+    products ||--o{ consumption_logs : "tracked_in"
+    products ||--o| marketplace_listings : "listed_as"
+
+    marketplace_listings ||--o{ listing_images : "has"
+    marketplace_listings ||--o{ messages : "contains"
+
+    badges ||--o{ user_badges : "awarded_as"
+
+    user_points ||--o{ point_transactions : "records"
+
+    users {
+        int id PK
+        string email UK
+        string password_hash
+        string name
+        string avatar_url
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    products {
+        int id PK
+        int user_id FK
+        string name
+        string category
+        float quantity
+        string unit
+        date purchase_date
+        date expiry_date
+        string storage_location
+        string notes
+        string barcode
+        boolean is_consumed
+        timestamp created_at
+    }
+
+    marketplace_listings {
+        int id PK
+        int seller_id FK
+        int product_id FK
+        string title
+        string description
+        string category
+        float quantity
+        float price
+        float original_price
+        date expiry_date
+        string pickup_location
+        string status
+        int reserved_by FK
+        int view_count
+        timestamp created_at
+    }
+
+    listing_images {
+        int id PK
+        int listing_id FK
+        string image_url
+        int sort_order
+    }
+
+    messages {
+        int id PK
+        int listing_id FK
+        int sender_id FK
+        int receiver_id FK
+        string content
+        boolean is_read
+        timestamp created_at
+    }
+
+    consumption_logs {
+        int id PK
+        int user_id FK
+        int product_id FK
+        string action
+        float quantity
+        string notes
+        timestamp created_at
+    }
+
+    user_points {
+        int id PK
+        int user_id FK
+        int total_points
+        int available_points
+        int lifetime_points
+        int current_streak
+        int longest_streak
+        date last_activity_date
+    }
+
+    point_transactions {
+        int id PK
+        int user_id FK
+        int amount
+        string type
+        string action
+        string reference_type
+        int reference_id
+        timestamp created_at
+    }
+
+    badges {
+        int id PK
+        string code UK
+        string name
+        string description
+        string category
+        int points_awarded
+        int sort_order
+    }
+
+    user_badges {
+        int id PK
+        int user_id FK
+        int badge_id FK
+        timestamp earned_at
+    }
+
+    user_sustainability_metrics {
+        int id PK
+        int user_id FK
+        int total_items_consumed
+        int total_items_wasted
+        int total_items_shared
+        int total_items_sold
+        float estimated_money_saved
+        float estimated_co2_saved
+        float waste_reduction_rate
+    }
+
+    daily_sustainability_snapshots {
+        int id PK
+        int user_id FK
+        date date
+        int items_consumed
+        int items_wasted
+        int items_shared
+        int points_earned
+    }
 ```
 
 ### 7.2 Database Performance Considerations
@@ -359,31 +515,56 @@ EcoPlate is a sustainability-focused mobile and web application that combines fo
 
 ### 9.4 Navigation Structure (React Router)
 
-```
-Bottom Navigation Bar (Mobile-Responsive)
-├─ /myfridge
-│  ├─ /myfridge              (product list)
-│  ├─ /myfridge/scan         (scan receipt)
-│  ├─ /myfridge/add          (add product)
-│  └─ /myfridge/:productId   (product details)
-├─ /marketplace
-│  ├─ /marketplace           (browse listings)
-│  ├─ /marketplace/:id       (listing details)
-│  ├─ /marketplace/create    (create listing)
-│  └─ /marketplace/messages  (messages)
-├─ /ecoboard
-│  ├─ /ecoboard              (dashboard overview)
-│  ├─ /ecoboard/badges       (badges)
-│  └─ /ecoboard/redeem       (points redemption)
-└─ /account
-   ├─ /account               (profile)
-   ├─ Settings
-   └─ About
+```mermaid
+flowchart TB
+    subgraph Auth["Auth Stack (Pre-login)"]
+        LOGIN["/login"]
+        REGISTER["/register"]
+        RESET["/password-reset"]
+    end
 
-Auth Stack (Pre-login)
-├─ Login
-├─ Register
-└─ Password Reset
+    subgraph Main["Main App (Post-login)"]
+        subgraph BottomNav["Bottom Navigation Bar"]
+            direction TB
+            FRIDGE["/myfridge"]
+            MARKET["/marketplace"]
+            ECO["/ecoboard"]
+            ACCOUNT["/account"]
+        end
+
+        subgraph MyFridge["MyFridge Routes"]
+            F1["/myfridge<br/>(product list)"]
+            F2["/myfridge/scan<br/>(scan receipt)"]
+            F3["/myfridge/add<br/>(add product)"]
+            F4["/myfridge/:productId<br/>(product details)"]
+        end
+
+        subgraph Marketplace["Marketplace Routes"]
+            M1["/marketplace<br/>(browse listings)"]
+            M2["/marketplace/:id<br/>(listing details)"]
+            M3["/marketplace/create<br/>(create listing)"]
+            M4["/marketplace/messages<br/>(messages)"]
+        end
+
+        subgraph EcoBoard["EcoBoard Routes"]
+            E1["/ecoboard<br/>(dashboard)"]
+            E2["/ecoboard/badges<br/>(badges)"]
+            E3["/ecoboard/redeem<br/>(points)"]
+        end
+
+        subgraph Account["Account Routes"]
+            A1["/account<br/>(profile)"]
+            A2["/account/settings"]
+            A3["/account/about"]
+        end
+    end
+
+    LOGIN --> Main
+    REGISTER --> Main
+    FRIDGE --> F1 & F2 & F3 & F4
+    MARKET --> M1 & M2 & M3 & M4
+    ECO --> E1 & E2 & E3
+    ACCOUNT --> A1 & A2 & A3
 ```
 
 ---
@@ -528,14 +709,26 @@ jobs:
 
 ### 12.1 Testing Pyramid
 
+```mermaid
+graph TB
+    subgraph Testing Pyramid
+        E2E["E2E Tests<br/>10%"]
+        INT["Integration Tests<br/>30%"]
+        UNIT["Unit Tests<br/>60%"]
+    end
+
+    E2E --> INT --> UNIT
+
+    style E2E fill:#ff6b6b,stroke:#333,stroke-width:2px
+    style INT fill:#ffd93d,stroke:#333,stroke-width:2px
+    style UNIT fill:#6bcb77,stroke:#333,stroke-width:2px
 ```
-         /\
-        /  \  E2E Tests (10%)
-       /────\
-      /      \  Integration Tests (30%)
-     /────────\
-    /          \  Unit Tests (60%)
-   /────────────\
+
+```mermaid
+pie title Test Coverage Distribution
+    "Unit Tests" : 60
+    "Integration Tests" : 30
+    "E2E Tests" : 10
 ```
 
 ### 12.2 Sprint 1 Testing Requirements
