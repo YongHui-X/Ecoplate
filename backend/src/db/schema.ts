@@ -18,6 +18,22 @@ export const users = sqliteTable("users", {
     .$defaultFn(() => new Date()),
 });
 
+// ==================== Products ====================
+
+export const products = sqliteTable("products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  productName: text("product_name").notNull(),
+  category: text("category"),
+  quantity: real("quantity").notNull().default(1),
+  unitPrice: real("unit_price"),
+  purchaseDate: integer("purchase_date", { mode: "timestamp" }),
+  description: text("description"),
+  co2Emission: real("co2_emission"),
+});
+
 // ==================== Marketplace ====================
 
 export const marketplaceListings = sqliteTable("marketplace_listings", {
@@ -63,7 +79,15 @@ export const listingImages = sqliteTable("listing_images", {
 // ==================== Relations ====================
 
 export const usersRelations = relations(users, ({ many }) => ({
+  products: many(products),
   listings: many(marketplaceListings),
+}));
+
+export const productsRelations = relations(products, ({ one }) => ({
+  user: one(users, {
+    fields: [products.userId],
+    references: [users.id],
+  }),
 }));
 
 export const marketplaceListingsRelations = relations(

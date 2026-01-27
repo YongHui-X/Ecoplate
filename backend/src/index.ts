@@ -4,6 +4,7 @@ import { Router, json, error } from "./utils/router";
 import { authMiddleware } from "./middleware/auth";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerMarketplaceRoutes } from "./routes/marketplace";
+import { registerMyFridgeRoutes } from "./routes/myfridge";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -23,6 +24,7 @@ protectedRouter.use(authMiddleware);
 // Register routes
 registerAuthRoutes(publicRouter);
 registerMarketplaceRoutes(protectedRouter);
+registerMyFridgeRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));
