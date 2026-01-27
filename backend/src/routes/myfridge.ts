@@ -4,14 +4,16 @@ import { products, productInteraction, userPoints } from "../db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
-import OpenAI from "openai";
 
 const productSchema = z.object({
   productName: z.string().min(1).max(200),
   category: z.string().optional(),
   quantity: z.number().positive().default(1),
   unitPrice: z.number().optional(),
+  unitPrice: z.number().optional(),
   purchaseDate: z.string().optional(),
+  description: z.string().optional(),
+  co2Emission: z.number().optional(),
   description: z.string().optional(),
   co2Emission: z.number().optional(),
 });
@@ -32,7 +34,7 @@ const POINTS = {
 };
 
 export function registerMyFridgeRoutes(router: Router) {
-  // Get all products
+  // Get all products for the authenticated user
   router.get("/api/v1/myfridge/products", async (req) => {
     const user = getUser(req);
 
@@ -44,7 +46,7 @@ export function registerMyFridgeRoutes(router: Router) {
     return json(userProducts);
   });
 
-  // Add product
+  // Add a new product
   router.post("/api/v1/myfridge/products", async (req) => {
     try {
       const user = getUser(req);
@@ -121,8 +123,8 @@ export function registerMyFridgeRoutes(router: Router) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);
       }
-      console.error("Update product error:", e);
-      return error("Failed to update product", 500);
+      console.error("Create product error:", e);
+      return error("Failed to create product", 500);
     }
   });
 
@@ -153,7 +155,10 @@ export function registerMyFridgeRoutes(router: Router) {
       const data = interactionSchema.parse(body);
 
       const product = await db.query.products.findFirst({
-        where: and(eq(products.id, productId), eq(products.userId, user.id)),
+        where: and(
+          eq(products.id, productId),
+          eq(products.userId, user.id)
+        ),
       });
 
       if (!product) {

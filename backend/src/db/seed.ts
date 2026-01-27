@@ -1,112 +1,144 @@
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import * as schema from "./schema";
+import { hashPassword } from "../middleware/auth";
 
 const sqlite = new Database("ecoplate.db");
 const db = drizzle(sqlite, { schema });
 
-console.log("Seeding database...");
+console.log("Seeding database...\n");
 
-// Seed badges
-const badgesData = [
+// Demo users
+const demoUsers = [
   {
-    code: "first-item",
-    name: "First Step",
-    description: "Added your first item to the fridge",
-    category: "milestones",
-    pointsAwarded: 10,
-    sortOrder: 1,
+    email: "alice@demo.com",
+    password: "demo123",
+    name: "Alice Wong",
+    userLocation: "Queenstown, Singapore 169648",
   },
   {
-    code: "no-waste-week",
-    name: "Zero Waste Week",
-    description: "Went a whole week without wasting any food",
-    category: "waste-reduction",
-    pointsAwarded: 50,
-    sortOrder: 2,
-  },
-  {
-    code: "first-share",
-    name: "Sharing is Caring",
-    description: "Shared your first item with the community",
-    category: "sharing",
-    pointsAwarded: 25,
-    sortOrder: 3,
-  },
-  {
-    code: "first-sale",
-    name: "Eco Entrepreneur",
-    description: "Made your first sale on the marketplace",
-    category: "sharing",
-    pointsAwarded: 30,
-    sortOrder: 4,
-  },
-  {
-    code: "streak-7",
-    name: "Week Warrior",
-    description: "Maintained a 7-day activity streak",
-    category: "streaks",
-    pointsAwarded: 25,
-    sortOrder: 5,
-  },
-  {
-    code: "streak-30",
-    name: "Monthly Master",
-    description: "Maintained a 30-day activity streak",
-    category: "streaks",
-    pointsAwarded: 100,
-    sortOrder: 6,
-  },
-  {
-    code: "items-consumed-10",
-    name: "Smart Consumer",
-    description: "Consumed 10 items before they expired",
-    category: "waste-reduction",
-    pointsAwarded: 20,
-    sortOrder: 7,
-  },
-  {
-    code: "items-consumed-50",
-    name: "Waste Warrior",
-    description: "Consumed 50 items before they expired",
-    category: "waste-reduction",
-    pointsAwarded: 75,
-    sortOrder: 8,
-  },
-  {
-    code: "items-consumed-100",
-    name: "Eco Champion",
-    description: "Consumed 100 items before they expired",
-    category: "waste-reduction",
-    pointsAwarded: 150,
-    sortOrder: 9,
-  },
-  {
-    code: "co2-saved-1kg",
-    name: "Climate Helper",
-    description: "Saved 1kg of CO2 emissions",
-    category: "milestones",
-    pointsAwarded: 40,
-    sortOrder: 10,
-  },
-  {
-    code: "co2-saved-10kg",
-    name: "Planet Protector",
-    description: "Saved 10kg of CO2 emissions",
-    category: "milestones",
-    pointsAwarded: 200,
-    sortOrder: 11,
+    email: "bob@demo.com",
+    password: "demo123",
+    name: "Bob Tan",
+    userLocation: "Clementi, Singapore 129588",
   },
 ];
 
-for (const badge of badgesData) {
-  await db
-    .insert(schema.badges)
-    .values(badge)
-    .onConflictDoNothing({ target: schema.badges.code });
+// Sample listings
+const sampleListings = [
+  {
+    title: "Fresh Organic Apples",
+    description: "Sweet and crispy organic apples from local farm.",
+    category: "produce",
+    quantity: 2,
+    unit: "kg",
+    price: 5.0,
+    originalPrice: 12.0,
+    expiryDays: 5,
+    location: "Queenstown MRT Station, Singapore 149305|1.2943,103.8016",
+  },
+  {
+    title: "Whole Wheat Bread",
+    description: "Freshly baked whole wheat bread.",
+    category: "bakery",
+    quantity: 2,
+    unit: "loaf",
+    price: null,
+    originalPrice: 4.5,
+    expiryDays: 2,
+    location: "Clementi Mall, Singapore 129588|1.3149,103.7651",
+  },
+  {
+    title: "Fresh Milk (2L)",
+    description: "Full cream fresh milk, unopened.",
+    category: "dairy",
+    quantity: 2,
+    unit: "l",
+    price: 3.5,
+    originalPrice: 6.0,
+    expiryDays: 3,
+    location: "Buona Vista MRT, Singapore 138600|1.3073,103.7897",
+  },
+  {
+    title: "Mixed Vegetables Pack",
+    description: "Assorted fresh vegetables - carrots, broccoli, lettuce.",
+    category: "produce",
+    quantity: 1,
+    unit: "pack",
+    price: 4.0,
+    originalPrice: 8.0,
+    expiryDays: 4,
+    location: "Commonwealth MRT, Singapore 149732|1.3025,103.7981",
+  },
+];
+
+async function seed() {
+  try {
+    // Clear existing data
+    console.log("Clearing existing data...");
+    sqlite.exec("DELETE FROM listing_images");
+    sqlite.exec("DELETE FROM marketplace_listings");
+    sqlite.exec("DELETE FROM users");
+    sqlite.exec("DELETE FROM sqlite_sequence");
+
+    // Create users
+    console.log("Creating demo users...");
+    const createdUsers: { id: number; name: string }[] = [];
+
+    for (const user of demoUsers) {
+      const passwordHash = await hashPassword(user.password);
+      const [created] = await db
+        .insert(schema.users)
+        .values({
+          email: user.email,
+          passwordHash,
+          name: user.name,
+          userLocation: user.userLocation,
+        })
+        .returning();
+
+      createdUsers.push({ id: created.id, name: created.name });
+      console.log(`  ✓ ${user.email}`);
+    }
+
+    // Create listings
+    console.log("\nCreating sample listings...");
+    for (let i = 0; i < sampleListings.length; i++) {
+      const listing = sampleListings[i];
+      const seller = createdUsers[i % createdUsers.length];
+
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + listing.expiryDays);
+
+      await db.insert(schema.marketplaceListings).values({
+        sellerId: seller.id,
+        title: listing.title,
+        description: listing.description,
+        category: listing.category,
+        quantity: listing.quantity,
+        unit: listing.unit,
+        price: listing.price,
+        originalPrice: listing.originalPrice,
+        expiryDate,
+        pickupLocation: listing.location,
+        status: "active",
+      });
+
+      console.log(`  ✓ "${listing.title}" by ${seller.name}`);
+    }
+
+    console.log("\n========================================");
+    console.log("Done! Demo accounts (password: demo123):");
+    console.log("  - alice@demo.com");
+    console.log("  - bob@demo.com");
+    console.log("========================================\n");
+
+  } catch (error) {
+    console.error("Seeding failed:", error);
+    process.exit(1);
+  }
+
+  sqlite.close();
 }
 
-console.log("Seeded badges!");
-console.log("Database seeding complete!");
-
-sqlite.close();
+seed();

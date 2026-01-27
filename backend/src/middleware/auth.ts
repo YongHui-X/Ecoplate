@@ -5,8 +5,7 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "ecoplate-development-secret-change-in-production"
 );
 
-const ACCESS_TOKEN_EXPIRY = "15m";
-const REFRESH_TOKEN_EXPIRY = "7d";
+const TOKEN_EXPIRY = "7d"; // 7 days
 
 export interface JWTPayload {
   sub: string;
@@ -23,19 +22,11 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-export async function generateAccessToken(payload: JWTPayload): Promise<string> {
+export async function generateToken(payload: JWTPayload): Promise<string> {
   return new jose.SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(ACCESS_TOKEN_EXPIRY)
-    .sign(JWT_SECRET);
-}
-
-export async function generateRefreshToken(payload: JWTPayload): Promise<string> {
-  return new jose.SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(REFRESH_TOKEN_EXPIRY)
+    .setExpirationTime(TOKEN_EXPIRY)
     .sign(JWT_SECRET);
 }
 
@@ -79,7 +70,6 @@ export async function authMiddleware(
     return error("Unauthorized: Invalid or expired token", 401);
   }
 
-  // Attach user info to request
   (req as AuthenticatedRequest).user = {
     id: parseInt(payload.sub, 10),
     email: payload.email,

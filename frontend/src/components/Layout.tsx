@@ -10,7 +10,6 @@ import {
   LogOut,
   Menu,
   X,
-  Package,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
@@ -19,7 +18,6 @@ const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
   { to: "/myfridge", icon: Refrigerator, label: "MyFridge" },
   { to: "/marketplace", icon: Store, label: "Marketplace" },
-  { to: "/vending-machine", icon: Package, label: "Vending" },
   { to: "/messages", icon: MessageCircle, label: "Messages" },
   { to: "/ecoboard", icon: Trophy, label: "EcoBoard" },
   { to: "/badges", icon: Award, label: "Badges" },
@@ -73,13 +71,50 @@ export default function Layout() {
                 {item.label}
               </NavLink>
             ))}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 w-full"
-            >
-              <LogOut size={20} />
-              Logout
-            </button>
+            <div className="border-t pt-2 mt-2">
+              <NavLink
+                to="/account"
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg",
+                    isActive
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-gray-700 hover:bg-gray-100"
+                  )
+                }
+              >
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-lg">
+                  {user?.avatarUrl && user.avatarUrl.startsWith('avatar')
+                    ? (() => {
+                        const avatarMap: Record<string, string> = {
+                          'avatar1': '🌱',
+                          'avatar2': '🌿',
+                          'avatar3': '🍃',
+                          'avatar4': '🌾',
+                          'avatar5': '🥬',
+                          'avatar6': '🥕',
+                          'avatar7': '🍎',
+                          'avatar8': '🥑',
+                        };
+                        return avatarMap[user.avatarUrl] || user.name.charAt(0).toUpperCase();
+                      })()
+                    : user?.name.charAt(0).toUpperCase()
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user?.name}</p>
+                  <p className="text-xs text-gray-500 truncate">View Profile</p>
+                </div>
+              </NavLink>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 w-full"
+              >
+                <LogOut size={20} />
+                Logout
+              </button>
+            </div>
           </nav>
         </div>
       )}
@@ -112,16 +147,41 @@ export default function Layout() {
             ))}
           </nav>
 
-          <div className="p-4 border-t">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                {user?.name.charAt(0).toUpperCase()}
+          <div className="p-4 border-t space-y-2">
+            <NavLink
+              to="/account"
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 px-4 py-2 rounded-lg text-sm",
+                  isActive
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-gray-700 hover:bg-gray-100"
+                )
+              }
+            >
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-lg">
+                {user?.avatarUrl && user.avatarUrl.startsWith('avatar')
+                  ? (() => {
+                      const avatarMap: Record<string, string> = {
+                        'avatar1': '🌱',
+                        'avatar2': '🌿',
+                        'avatar3': '🍃',
+                        'avatar4': '🌾',
+                        'avatar5': '🥬',
+                        'avatar6': '🥕',
+                        'avatar7': '🍎',
+                        'avatar8': '🥑',
+                      };
+                      return avatarMap[user.avatarUrl] || user.name.charAt(0).toUpperCase();
+                    })()
+                  : user?.name.charAt(0).toUpperCase()
+                }
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{user?.name}</p>
                 <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
-            </div>
+            </NavLink>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg w-full"
@@ -133,7 +193,7 @@ export default function Layout() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 flex flex-col min-h-0">
           <Outlet />
         </main>
       </div>

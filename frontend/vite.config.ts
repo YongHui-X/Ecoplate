@@ -16,7 +16,6 @@ export default defineConfig(({ mode }) => {
       __IS_MOBILE__: isMobile,
     },
     build: {
-      // Mobile builds go to dist for Capacitor, web builds go to backend/public
       outDir: isMobile ? "dist" : "../backend/public",
       emptyOutDir: true,
     },

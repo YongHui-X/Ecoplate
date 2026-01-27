@@ -1,11 +1,10 @@
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Router, json, error } from "./utils/router";
-import { authMiddleware, type AuthenticatedRequest } from "./middleware/auth";
+import { authMiddleware } from "./middleware/auth";
 import { registerAuthRoutes } from "./routes/auth";
-import { registerMyFridgeRoutes } from "./routes/myfridge";
 import { registerMarketplaceRoutes } from "./routes/marketplace";
-import { registerGamificationRoutes } from "./routes/gamification";
+import { registerMyFridgeRoutes } from "./routes/myfridge";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -24,9 +23,8 @@ protectedRouter.use(authMiddleware);
 
 // Register routes
 registerAuthRoutes(publicRouter);
-registerMyFridgeRoutes(protectedRouter);
 registerMarketplaceRoutes(protectedRouter);
-registerGamificationRoutes(protectedRouter);
+registerMyFridgeRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));
@@ -54,6 +52,20 @@ function getMimeType(path: string): string {
 
 async function serveStatic(path: string): Promise<Response | null> {
   const publicDir = join(import.meta.dir, "../public");
+  const uploadsDir = join(import.meta.dir, "../uploads");
+
+  // Handle uploads directory
+  if (path.startsWith("/uploads/")) {
+    const uploadPath = join(uploadsDir, path.replace("/uploads/", ""));
+    if (existsSync(uploadPath)) {
+      const file = Bun.file(uploadPath);
+      return new Response(file, {
+        headers: { "Content-Type": getMimeType(uploadPath) },
+      });
+    }
+    return null;
+  }
+
   let filePath = join(publicDir, path);
 
   // Default to index.html for root or non-existent files (SPA routing)

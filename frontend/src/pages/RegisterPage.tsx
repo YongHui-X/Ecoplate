@@ -6,12 +6,27 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { cn } from "../lib/utils";
+
+// Predefined avatar options
+const AVATAR_OPTIONS = [
+  { id: "avatar1", emoji: "🌱", label: "Sprout" },
+  { id: "avatar2", emoji: "🌿", label: "Herb" },
+  { id: "avatar3", emoji: "🍃", label: "Leaf" },
+  { id: "avatar4", emoji: "🌾", label: "Grain" },
+  { id: "avatar5", emoji: "🥬", label: "Veggie" },
+  { id: "avatar6", emoji: "🥕", label: "Carrot" },
+  { id: "avatar7", emoji: "🍎", label: "Apple" },
+  { id: "avatar8", emoji: "🥑", label: "Avocado" },
+];
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [userLocation, setUserLocation] = useState("");
+  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_OPTIONS[0].id);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const { addToast } = useToast();
@@ -33,7 +48,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await register(email, password, name);
+      await register(email, password, name, userLocation || undefined, selectedAvatar);
       addToast("Welcome to EcoPlate!", "success");
       navigate("/");
     } catch (error) {
@@ -98,6 +113,37 @@ export default function RegisterPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="userLocation">Location (Optional)</Label>
+              <Input
+                id="userLocation"
+                type="text"
+                placeholder="e.g., Singapore 119076"
+                value={userLocation}
+                onChange={(e) => setUserLocation(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Choose Your Avatar</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {AVATAR_OPTIONS.map((avatar) => (
+                  <button
+                    key={avatar.id}
+                    type="button"
+                    onClick={() => setSelectedAvatar(avatar.id)}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:scale-105",
+                      selectedAvatar === avatar.id
+                        ? "border-primary bg-primary/10"
+                        : "border-gray-200 hover:border-primary/50"
+                    )}
+                  >
+                    <span className="text-2xl mb-1">{avatar.emoji}</span>
+                    <span className="text-xs text-gray-600">{avatar.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating account..." : "Create account"}

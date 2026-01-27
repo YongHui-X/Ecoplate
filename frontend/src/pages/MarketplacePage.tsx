@@ -5,8 +5,10 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, MapPin, Clock, Eye } from "lucide-react";
+import { Plus, Search, MapPin, Clock, Eye, List, Map } from "lucide-react";
 import { getDaysUntilExpiry } from "../lib/utils";
+import MarketplaceMap from "./Marketplace/MarketplaceMap";
+import type { MarketplaceListing } from "./Marketplace/MarketplaceMap";
 
 interface Listing {
   id: number;
@@ -19,9 +21,14 @@ interface Listing {
   originalPrice: number | null;
   expiryDate: string | null;
   pickupLocation: string | null;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
   status: string;
   viewCount: number;
   createdAt: string;
+  sellerId: number;
   seller: {
     id: number;
     name: string;
@@ -47,6 +54,7 @@ export default function MarketplacePage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
   useEffect(() => {
     loadListings();
@@ -55,7 +63,23 @@ export default function MarketplacePage() {
   const loadListings = async () => {
     try {
       const data = await api.get<Listing[]>("/marketplace/listings");
-      setListings(data);
+
+      // Parse coordinates from pickupLocation if stored as "address|lat,lng"
+      const parsedListings = data.map(listing => {
+        if (listing.pickupLocation && listing.pickupLocation.includes('|')) {
+          const [address, coords] = listing.pickupLocation.split('|');
+          const [lat, lng] = coords.split(',').map(parseFloat);
+
+          return {
+            ...listing,
+            pickupLocation: address,
+            coordinates: { latitude: lat, longitude: lng }
+          };
+        }
+        return listing;
+      });
+
+      setListings(parsedListings);
     } catch (error) {
       console.error("Failed to load listings:", error);
     } finally {
@@ -81,62 +105,97 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 h-full flex flex-col">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Marketplace</h1>
           <p className="text-gray-600">Find great deals on near-expiry food</p>
         </div>
-        <Button asChild>
-          <Link to="/marketplace/create">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Listing
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex items-center border rounded-lg overflow-hidden">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="rounded-none"
+            >
+              <List className="h-4 w-4 mr-2" />
+              List View
+            </Button>
+            <Button
+              variant={viewMode === "map" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("map")}
+              className="rounded-none"
+            >
+              <Map className="h-4 w-4 mr-2" />
+              Map View
+            </Button>
+          </div>
+          <Button asChild>
+            <Link to="/marketplace/create">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Listing
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Search and filters */}
-      <div className="space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search listings..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+      {/* Map View */}
+      {viewMode === "map" ? (
+        <div className="flex-1">
+          <MarketplaceMap
+            listings={filteredListings as MarketplaceListing[]}
+            loading={loading}
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {categories.map((cat) => (
-            <Button
-              key={cat}
-              variant={selectedCategory === cat ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedCategory(cat)}
-              className="whitespace-nowrap"
-            >
-              {cat === "All" ? cat : cat.charAt(0).toUpperCase() + cat.slice(1)}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Listings grid */}
-      {filteredListings.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-gray-500 mb-4">No listings found</p>
-            <Button asChild>
-              <Link to="/marketplace/create">Create the first listing</Link>
-            </Button>
-          </CardContent>
-        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredListings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
-          ))}
-        </div>
+        <>
+          {/* Search and filters */}
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search listings..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {categories.map((cat) => (
+                <Button
+                  key={cat}
+                  variant={selectedCategory === cat ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedCategory(cat)}
+                  className="whitespace-nowrap"
+                >
+                  {cat === "All" ? cat : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Listings grid */}
+          {filteredListings.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <p className="text-gray-500 mb-4">No listings found</p>
+                <Button asChild>
+                  <Link to="/marketplace/create">Create the first listing</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredListings.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
