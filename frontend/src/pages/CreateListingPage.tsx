@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { useToast } from "../contexts/ToastContext";
@@ -6,7 +6,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ImagePlus, X } from "lucide-react";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
 
 export default function CreateListingPage() {
@@ -22,14 +22,85 @@ export default function CreateListingPage() {
   const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | undefined>();
   const [pickupInstructions, setPickupInstructions] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { addToast } = useToast();
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + selectedImages.length > 5) {
+      addToast("Maximum 5 images allowed", "error");
+      return;
+    }
+
+    const validFiles = files.filter(file => {
+      if (!file.type.startsWith("image/")) {
+        addToast(`${file.name} is not an image`, "error");
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        addToast(`${file.name} is too large (max 5MB)`, "error");
+        return false;
+      }
+      return true;
+    });
+
+    setSelectedImages(prev => [...prev, ...validFiles]);
+
+    // Create previews
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreviews(prev => [...prev, e.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (selectedImages.length === 0) return [];
+
+    setUploadingImages(true);
+    try {
+      const formData = new FormData();
+      selectedImages.forEach(file => formData.append("images", file));
+
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch("/api/v1/marketplace/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload images");
+      }
+
+      const data = await response.json();
+      return data.urls;
+    } finally {
+      setUploadingImages(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // Upload images first
+      const imageUrls = await uploadImages();
+
       const listing = await api.post<{ id: number }>("/marketplace/listings", {
         title,
         description: description || undefined,
@@ -42,6 +113,7 @@ export default function CreateListingPage() {
         pickupLocation: pickupLocation || undefined,
         coordinates: coordinates,
         pickupInstructions: pickupInstructions || undefined,
+        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       });
 
       addToast("Listing created successfully!", "success");
@@ -90,6 +162,51 @@ export default function CreateListingPage() {
                 placeholder="Describe your item..."
                 className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Product Images (Max 5)</Label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                multiple
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+
+              <div className="grid grid-cols-5 gap-2">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative aspect-square">
+                    <img
+                      src={preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-full object-cover rounded-md border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+
+                {selectedImages.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center hover:border-primary hover:bg-gray-50 transition-colors"
+                  >
+                    <ImagePlus className="h-6 w-6 text-gray-400" />
+                    <span className="text-xs text-gray-500 mt-1">Add</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">
+                Add up to 5 images. First image will be the cover photo.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -211,11 +328,12 @@ export default function CreateListingPage() {
                 variant="outline"
                 onClick={() => navigate("/marketplace")}
                 className="flex-1"
+                disabled={loading || uploadingImages}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? "Creating..." : "Create Listing"}
+              <Button type="submit" disabled={loading || uploadingImages} className="flex-1">
+                {uploadingImages ? "Uploading images..." : loading ? "Creating..." : "Create Listing"}
               </Button>
             </div>
           </form>

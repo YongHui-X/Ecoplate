@@ -6,6 +6,15 @@ import { z } from "zod";
 import { getUser } from "../middleware/auth";
 import OpenAI from "openai";
 import { calculateDistance, parseCoordinates, type Coordinates } from "../utils/distance";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { existsSync } from "node:fs";
+
+// Ensure uploads directory exists
+const UPLOADS_DIR = join(import.meta.dir, "../../uploads/listings");
+if (!existsSync(UPLOADS_DIR)) {
+  await mkdir(UPLOADS_DIR, { recursive: true });
+}
 
 const listingSchema = z.object({
   title: z.string().min(1).max(200),
@@ -23,6 +32,7 @@ const listingSchema = z.object({
   }).optional(),
   pickupInstructions: z.string().optional(),
   productId: z.number().optional(),
+  imageUrls: z.array(z.string()).optional(), // Array of uploaded image URLs
 });
 
 const messageSchema = z.object({
@@ -30,6 +40,54 @@ const messageSchema = z.object({
 });
 
 export function registerMarketplaceRoutes(router: Router) {
+  // Upload image(s) for listing
+  router.post("/api/v1/marketplace/upload", async (req) => {
+    try {
+      const user = getUser(req);
+      const formData = await req.formData();
+      const files = formData.getAll("images") as File[];
+
+      if (!files || files.length === 0) {
+        return error("No images provided", 400);
+      }
+
+      if (files.length > 5) {
+        return error("Maximum 5 images allowed", 400);
+      }
+
+      const uploadedUrls: string[] = [];
+
+      for (const file of files) {
+        // Validate file type
+        if (!file.type.startsWith("image/")) {
+          return error("Only image files are allowed", 400);
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          return error("Image size must be less than 5MB", 400);
+        }
+
+        // Generate unique filename
+        const ext = file.name.split(".").pop() || "jpg";
+        const filename = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+        const filepath = join(UPLOADS_DIR, filename);
+
+        // Save file
+        const buffer = await file.arrayBuffer();
+        await Bun.write(filepath, buffer);
+
+        // Return URL path (will be served statically)
+        uploadedUrls.push(`/uploads/listings/${filename}`);
+      }
+
+      return json({ urls: uploadedUrls });
+    } catch (e) {
+      console.error("Upload error:", e);
+      return error("Failed to upload images", 500);
+    }
+  });
+
   // Get all listings (excludes user's own)
   router.get("/api/v1/marketplace/listings", async (req) => {
     const user = getUser(req);
@@ -203,7 +261,26 @@ export function registerMarketplaceRoutes(router: Router) {
         })
         .returning();
 
-      return json(listing);
+      // Save images if provided
+      if (data.imageUrls && data.imageUrls.length > 0) {
+        for (let i = 0; i < data.imageUrls.length; i++) {
+          await db.insert(listingImages).values({
+            listingId: listing.id,
+            imageUrl: data.imageUrls[i],
+            sortOrder: i,
+          });
+        }
+      }
+
+      // Return listing with images
+      const listingWithImages = await db.query.marketplaceListings.findFirst({
+        where: eq(marketplaceListings.id, listing.id),
+        with: {
+          images: true,
+        },
+      });
+
+      return json(listingWithImages);
     } catch (e) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);

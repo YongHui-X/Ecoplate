@@ -5,7 +5,7 @@ import { authMiddleware, type AuthenticatedRequest } from "./middleware/auth";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerMyFridgeRoutes } from "./routes/myfridge";
 import { registerMarketplaceRoutes } from "./routes/marketplace";
-import { registerConversationRoutes } from "./routes/conversations";
+// import { registerConversationRoutes } from "./routes/conversations"; // Disabled: uses incompatible schema
 import { registerGamificationRoutes } from "./routes/gamification";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
@@ -27,7 +27,7 @@ protectedRouter.use(authMiddleware);
 registerAuthRoutes(publicRouter);
 registerMyFridgeRoutes(protectedRouter);
 registerMarketplaceRoutes(protectedRouter);
-registerConversationRoutes(protectedRouter);
+// registerConversationRoutes(protectedRouter); // Disabled: uses incompatible schema
 registerGamificationRoutes(protectedRouter);
 
 // Health check
@@ -56,6 +56,20 @@ function getMimeType(path: string): string {
 
 async function serveStatic(path: string): Promise<Response | null> {
   const publicDir = join(import.meta.dir, "../public");
+  const uploadsDir = join(import.meta.dir, "../uploads");
+
+  // Handle uploads directory
+  if (path.startsWith("/uploads/")) {
+    const uploadPath = join(uploadsDir, path.replace("/uploads/", ""));
+    if (existsSync(uploadPath)) {
+      const file = Bun.file(uploadPath);
+      return new Response(file, {
+        headers: { "Content-Type": getMimeType(uploadPath) },
+      });
+    }
+    return null;
+  }
+
   let filePath = join(publicDir, path);
 
   // Default to index.html for root or non-existent files (SPA routing)

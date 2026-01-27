@@ -315,10 +315,10 @@ async function awardPoints(
   });
 
   if (currentPoints) {
-    const newTotal = Math.max(0, currentPoints.totalPoints + amount);
-    const newAvailable = Math.max(0, currentPoints.availablePoints + amount);
+    const newTotal = Math.max(0, (currentPoints.totalPoints ?? 0) + amount);
+    const newAvailable = Math.max(0, (currentPoints.availablePoints ?? 0) + amount);
     const newLifetime =
-      amount > 0 ? currentPoints.lifetimePoints + amount : currentPoints.lifetimePoints;
+      amount > 0 ? (currentPoints.lifetimePoints ?? 0) + amount : (currentPoints.lifetimePoints ?? 0);
 
     await db
       .update(userPoints)
@@ -348,19 +348,19 @@ async function updateSustainabilityMetrics(
 
   switch (action) {
     case "consumed":
-      updates.totalItemsConsumed = metrics.totalItemsConsumed + quantity;
-      updates.estimatedCo2Saved = metrics.estimatedCo2Saved + quantity * CO2_PER_KG_FOOD * 0.1;
+      updates.totalItemsConsumed = (metrics.totalItemsConsumed ?? 0) + quantity;
+      updates.estimatedCo2Saved = (metrics.estimatedCo2Saved ?? 0) + quantity * CO2_PER_KG_FOOD * 0.1;
       break;
     case "wasted":
-      updates.totalItemsWasted = metrics.totalItemsWasted + quantity;
+      updates.totalItemsWasted = (metrics.totalItemsWasted ?? 0) + quantity;
       break;
     case "shared":
-      updates.totalItemsShared = metrics.totalItemsShared + quantity;
-      updates.estimatedCo2Saved = metrics.estimatedCo2Saved + quantity * CO2_PER_KG_FOOD * 0.2;
+      updates.totalItemsShared = (metrics.totalItemsShared ?? 0) + quantity;
+      updates.estimatedCo2Saved = (metrics.estimatedCo2Saved ?? 0) + quantity * CO2_PER_KG_FOOD * 0.2;
       break;
     case "sold":
-      updates.totalItemsSold = metrics.totalItemsSold + quantity;
-      updates.estimatedCo2Saved = metrics.estimatedCo2Saved + quantity * CO2_PER_KG_FOOD * 0.15;
+      updates.totalItemsSold = (metrics.totalItemsSold ?? 0) + quantity;
+      updates.estimatedCo2Saved = (metrics.estimatedCo2Saved ?? 0) + quantity * CO2_PER_KG_FOOD * 0.15;
       break;
   }
 

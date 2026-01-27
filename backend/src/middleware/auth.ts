@@ -12,6 +12,7 @@ export interface JWTPayload {
   sub: string;
   email: string;
   name: string;
+  [key: string]: unknown; // Index signature for jose compatibility
 }
 
 export interface AuthenticatedRequest extends Request {
