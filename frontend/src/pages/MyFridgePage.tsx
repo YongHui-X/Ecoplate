@@ -615,20 +615,10 @@ function ScanReceiptModal({
           </div>
         )}
 
-        {/* Loading */}
-        {camera.isLoading && !camera.error && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4" />
-              <p className="text-white">Opening camera...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Web: Live webcam preview */}
-        {camera.isStreaming && !camera.capturedImage && (
+        {/* Web: Live webcam preview (video always mounted so ref is available) */}
+        {!camera.capturedImage && !camera.error && (
           <>
-            <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
+            <div className="flex-1 flex items-center justify-center bg-black overflow-hidden relative">
               <video
                 ref={camera.videoRef}
                 autoPlay
@@ -636,14 +626,25 @@ function ScanReceiptModal({
                 muted
                 className="max-w-full max-h-full object-contain"
               />
+              {/* Loading overlay */}
+              {camera.isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4" />
+                    <p className="text-white">Opening camera...</p>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="p-6 bg-black/80 flex justify-center">
-              <button
-                onClick={camera.capture}
-                className="w-16 h-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/40 transition-colors"
-                aria-label="Take photo"
-              />
-            </div>
+            {camera.isStreaming && (
+              <div className="p-6 bg-black/80 flex justify-center">
+                <button
+                  onClick={camera.capture}
+                  className="w-16 h-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/40 transition-colors"
+                  aria-label="Take photo"
+                />
+              </div>
+            )}
           </>
         )}
 
