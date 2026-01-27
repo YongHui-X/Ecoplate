@@ -7,7 +7,9 @@ import DashboardPage from "./pages/DashboardPage";
 import MyFridgePage from "./pages/MyFridgePage";
 import MarketplacePage from "./pages/MarketplacePage";
 import CreateListingPage from "./pages/CreateListingPage";
+import EditListingPage from "./pages/EditListingPage";
 import ListingDetailPage from "./pages/ListingDetailPage";
+import MyListingsPage from "./pages/MyListingsPage";
 import MessagesPage from "./pages/MessagesPage";
 import EcoBoardPage from "./pages/EcoBoardPage";
 import BadgesPage from "./pages/BadgesPage";
@@ -48,7 +50,9 @@ function App() {
         <Route path="myfridge" element={<MyFridgePage />} />
         <Route path="marketplace" element={<MarketplacePage />} />
         <Route path="marketplace/create" element={<CreateListingPage />} />
+        <Route path="marketplace/my-listings" element={<MyListingsPage />} />
         <Route path="marketplace/:id" element={<ListingDetailPage />} />
+        <Route path="marketplace/:id/edit" element={<EditListingPage />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="ecoboard" element={<EcoBoardPage />} />
         <Route path="badges" element={<BadgesPage />} />

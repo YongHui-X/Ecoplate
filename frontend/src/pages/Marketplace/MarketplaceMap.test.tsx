@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import MarketplaceMap, { type MarketplaceListing } from './MarketplaceMap';
+import MarketplaceMap from './MarketplaceMap';
+import type { MarketplaceListingWithDistance } from '../../types/marketplace';
 import * as useGeolocationHook from '../../hooks/useGeolocation';
 
 // Mock react-leaflet and related libraries
@@ -35,37 +36,42 @@ vi.mock('leaflet', () => ({
 }));
 
 describe('MarketplaceMap', () => {
-  const mockListings: MarketplaceListing[] = [
+  const mockListings: MarketplaceListingWithDistance[] = [
     {
       id: 1,
+      sellerId: 1,
+      buyerId: null,
+      productId: null,
       title: 'Fresh Apples',
       description: 'Organic apples',
-      category: 'Fruits',
+      category: 'produce',
       quantity: 5,
-      unit: 'kg',
       price: 10,
       originalPrice: 15,
       expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
       pickupLocation: 'NUS',
       coordinates: { latitude: 1.2966, longitude: 103.7764 },
       status: 'active',
-      sellerId: 1,
-      images: [{ id: 1, imageUrl: '/test-image.jpg' }],
+      createdAt: new Date().toISOString(),
+      completedAt: null,
     },
     {
       id: 2,
+      sellerId: 2,
+      buyerId: null,
+      productId: null,
       title: 'Bread',
       description: 'Fresh bread',
-      category: 'Bakery',
+      category: 'bakery',
       quantity: 2,
-      unit: 'loaf',
       price: null,
       originalPrice: null,
       expiryDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
       pickupLocation: 'City Center',
       coordinates: { latitude: 1.3521, longitude: 103.8198 },
       status: 'active',
-      sellerId: 2,
+      createdAt: new Date().toISOString(),
+      completedAt: null,
     },
   ];
 
@@ -230,7 +236,7 @@ describe('MarketplaceMap', () => {
   });
 
   it('should not render markers for listings without coordinates', () => {
-    const listingsWithoutCoords: MarketplaceListing[] = [
+    const listingsWithoutCoords: MarketplaceListingWithDistance[] = [
       {
         ...mockListings[0],
         coordinates: undefined,

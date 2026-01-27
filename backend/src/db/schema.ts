@@ -18,72 +18,76 @@ export const users = sqliteTable("users", {
     .$defaultFn(() => new Date()),
 });
 
-// ==================== Marketplace ====================
+// ==================== Products (MyFridge) ====================
+
+export const products = sqliteTable("products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  productName: text("product_name").notNull(),
+  category: text("category"),
+  quantity: real("quantity").notNull(),
+  unitPrice: real("unit_price"),
+  purchaseDate: integer("purchase_date", { mode: "timestamp" }),
+  description: text("description"),
+  co2Emission: real("co2_emission"),
+});
+
+// ==================== Marketplace Listings ====================
 
 export const marketplaceListings = sqliteTable("marketplace_listings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   sellerId: integer("seller_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  buyerId: integer("buyer_id").references(() => users.id),
+  productId: integer("product_id").references(() => products.id),
   title: text("title").notNull(),
   description: text("description"),
   category: text("category"),
-  quantity: real("quantity").notNull().default(1),
-  unit: text("unit").default("item"),
+  quantity: real("quantity").notNull(),
   price: real("price"),
   originalPrice: real("original_price"),
   expiryDate: integer("expiry_date", { mode: "timestamp" }),
   pickupLocation: text("pickup_location"),
-  pickupInstructions: text("pickup_instructions"),
-  status: text("status").default("active"),
-  reservedBy: integer("reserved_by").references(() => users.id),
-  reservedAt: integer("reserved_at", { mode: "timestamp" }),
-  soldAt: integer("sold_at", { mode: "timestamp" }),
-  viewCount: integer("view_count").default(0),
+  status: text("status").notNull().default("active"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
-
-export const listingImages = sqliteTable("listing_images", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  listingId: integer("listing_id")
-    .notNull()
-    .references(() => marketplaceListings.id, { onDelete: "cascade" }),
-  imageUrl: text("image_url").notNull(),
-  sortOrder: integer("sort_order").default(0),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
 });
 
 // ==================== Relations ====================
 
 export const usersRelations = relations(users, ({ many }) => ({
+  products: many(products),
+  listings: many(marketplaceListings),
+  purchases: many(marketplaceListings),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  user: one(users, {
+    fields: [products.userId],
+    references: [users.id],
+  }),
   listings: many(marketplaceListings),
 }));
 
 export const marketplaceListingsRelations = relations(
   marketplaceListings,
-  ({ one, many }) => ({
+  ({ one }) => ({
     seller: one(users, {
       fields: [marketplaceListings.sellerId],
       references: [users.id],
     }),
-    reservedByUser: one(users, {
-      fields: [marketplaceListings.reservedBy],
+    buyer: one(users, {
+      fields: [marketplaceListings.buyerId],
       references: [users.id],
     }),
-    images: many(listingImages),
+    product: one(products, {
+      fields: [marketplaceListings.productId],
+      references: [products.id],
+    }),
   })
 );
-
-export const listingImagesRelations = relations(listingImages, ({ one }) => ({
-  listing: one(marketplaceListings, {
-    fields: [listingImages.listingId],
-    references: [marketplaceListings.id],
-  }),
-}));

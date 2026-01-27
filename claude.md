@@ -7,8 +7,47 @@
 This is a monorepo with three main components:
 
 - `backend/` - Bun API server
-- `frontend/` - React application with Capacitor
+- `frontend/` - React application with Capacitor (Web + Android only)
 - `recommendation-engine/` - Python Flask API for ML recommendations
+
+## Database Schema
+
+The project uses SQLite with Drizzle ORM. Schema is defined in `backend/src/db/schema.ts`.
+
+**Core Tables (matching ERD):**
+- `users` - User accounts and profiles
+- `products` - MyFridge inventory items
+- `marketplace_listings` - Marketplace listings
+
+**CRITICAL: Database Migration Process**
+
+To prevent database drift and ensure consistency across all developers:
+
+1. **Never modify the database directly** - Always modify `schema.ts`
+2. **Never commit `.db` files** - Already in .gitignore
+3. **When pulling changes that modify schema:**
+   ```bash
+   cd backend
+   bun run db:reset    # Deletes DB, runs migration, seeds data
+   ```
+
+4. **To reset your local database:**
+   ```bash
+   cd backend
+   bun run db:reset    # Full reset (delete + migrate + seed)
+   # OR step-by-step:
+   rm -f ecoplate.db   # Delete existing database
+   bun run db:migrate  # Apply schema
+   bun run db:seed     # Add demo data
+   ```
+
+5. **When modifying schema:**
+   - Edit `backend/src/db/schema.ts`
+   - Delete old migration: `rm -rf backend/src/db/migrations`
+   - Generate new migration: `cd backend && bunx drizzle-kit generate:sqlite`
+   - Update `migrate.ts` to reference new migration file name
+   - Test locally with `bun run db:reset`
+   - Commit schema.ts and migration files (NOT .db files)
 
 ## Backend (Bun API Server)
 
@@ -91,7 +130,6 @@ frontend/
 │   ├── App.tsx             # Root component
 │   └── main.tsx            # React entry point
 ├── android/                # Capacitor Android project
-├── ios/                    # Capacitor iOS project
 ├── capacitor.config.ts     # Capacitor configuration
 ├── tailwind.config.js      # Tailwind CSS configuration
 ├── components.json         # shadcn/ui configuration
@@ -107,7 +145,6 @@ bun run dev        # Development with hot reload
 bun run build      # Production build
 bun run preview    # Preview production build
 npx cap sync       # Sync Capacitor native projects
-npx cap open ios   # Open iOS project in Xcode
 npx cap open android  # Open Android project in Android Studio
 ```
 

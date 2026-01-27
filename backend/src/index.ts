@@ -10,8 +10,9 @@ import { join } from "path";
 
 // Initialize database
 const sqlite = new Database("ecoplate.db");
-sqlite.exec("PRAGMA journal_mode = WAL;");
 export const db = drizzle(sqlite, { schema });
+
+
 
 // Create routers
 const publicRouter = new Router();

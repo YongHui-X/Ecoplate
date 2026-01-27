@@ -11,7 +11,7 @@ export interface Coordinates {
 export interface ListingWithDistance {
   id: number;
   title: string;
-  pickupLocation: string;
+  pickupLocation: string | null;
   coordinates?: Coordinates;
   distance?: number; // in kilometers
   [key: string]: any;
@@ -62,11 +62,11 @@ function toRadians(degrees: number): number {
  * @param radiusKm Radius in kilometers
  * @returns Filtered listings with distance added
  */
-export function filterListingsByRadius(
-  listings: ListingWithDistance[],
+export function filterListingsByRadius<T extends ListingWithDistance>(
+  listings: T[],
   userLocation: Coordinates,
   radiusKm: number
-): ListingWithDistance[] {
+): T[] {
   return listings
     .map((listing) => {
       // Skip if listing doesn't have coordinates
@@ -88,7 +88,7 @@ export function filterListingsByRadius(
       // Sort by distance (closest first), undefined distances go last
       if (a.distance === undefined) return 1;
       if (b.distance === undefined) return -1;
-      return a.distance - b.distance;
+      return a.distance! - b.distance!;
     });
 }
 

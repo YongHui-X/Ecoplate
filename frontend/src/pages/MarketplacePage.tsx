@@ -1,56 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../services/api";
+import { marketplaceService } from "../services/marketplace";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, MapPin, Clock, Eye, List, Map } from "lucide-react";
+import { Plus, Search, MapPin, Clock, List, Map, Package } from "lucide-react";
 import { getDaysUntilExpiry } from "../lib/utils";
 import MarketplaceMap from "./Marketplace/MarketplaceMap";
-import type { MarketplaceListing } from "./Marketplace/MarketplaceMap";
+import type { MarketplaceListing, MarketplaceListingWithDistance } from "../types/marketplace";
+import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
 
-interface Listing {
-  id: number;
-  title: string;
-  description: string | null;
-  category: string | null;
-  quantity: number;
-  unit: string;
-  price: number | null;
-  originalPrice: number | null;
-  expiryDate: string | null;
-  pickupLocation: string | null;
-  coordinates?: {
-    latitude: number;
-    longitude: number;
-  };
-  status: string;
-  viewCount: number;
-  createdAt: string;
-  sellerId: number;
-  seller: {
-    id: number;
-    name: string;
-    avatarUrl: string | null;
-  };
-  images: Array<{ id: number; imageUrl: string }>;
-}
-
-const categories = [
-  "All",
-  "produce",
-  "dairy",
-  "meat",
-  "bakery",
-  "frozen",
-  "beverages",
-  "pantry",
-  "other",
-];
+const categories = ["All", ...MARKETPLACE_CATEGORIES];
 
 export default function MarketplacePage() {
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -62,18 +26,18 @@ export default function MarketplacePage() {
 
   const loadListings = async () => {
     try {
-      const data = await api.get<Listing[]>("/marketplace/listings");
+      const data = await marketplaceService.getListings();
 
       // Parse coordinates from pickupLocation if stored as "address|lat,lng"
-      const parsedListings = data.map(listing => {
-        if (listing.pickupLocation && listing.pickupLocation.includes('|')) {
-          const [address, coords] = listing.pickupLocation.split('|');
-          const [lat, lng] = coords.split(',').map(parseFloat);
+      const parsedListings = data.map((listing) => {
+        if (listing.pickupLocation && listing.pickupLocation.includes("|")) {
+          const [address, coords] = listing.pickupLocation.split("|");
+          const [lat, lng] = coords.split(",").map(parseFloat);
 
           return {
             ...listing,
             pickupLocation: address,
-            coordinates: { latitude: lat, longitude: lng }
+            coordinates: { latitude: lat, longitude: lng },
           };
         }
         return listing;
@@ -111,7 +75,7 @@ export default function MarketplacePage() {
           <h1 className="text-2xl font-bold">Marketplace</h1>
           <p className="text-gray-600">Find great deals on near-expiry food</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* View Toggle */}
           <div className="flex items-center border rounded-lg overflow-hidden">
             <Button
@@ -133,6 +97,12 @@ export default function MarketplacePage() {
               Map View
             </Button>
           </div>
+          <Button variant="outline" asChild>
+            <Link to="/marketplace/my-listings">
+              <Package className="h-4 w-4 mr-2" />
+              My Listings
+            </Link>
+          </Button>
           <Button asChild>
             <Link to="/marketplace/create">
               <Plus className="h-4 w-4 mr-2" />
@@ -146,7 +116,7 @@ export default function MarketplacePage() {
       {viewMode === "map" ? (
         <div className="flex-1">
           <MarketplaceMap
-            listings={filteredListings as MarketplaceListing[]}
+            listings={filteredListings as MarketplaceListingWithDistance[]}
             loading={loading}
           />
         </div>
@@ -201,7 +171,7 @@ export default function MarketplacePage() {
   );
 }
 
-function ListingCard({ listing }: { listing: Listing }) {
+function ListingCard({ listing }: { listing: MarketplaceListing }) {
   const daysUntil = getDaysUntilExpiry(listing.expiryDate);
   const discount =
     listing.originalPrice && listing.price
@@ -211,18 +181,8 @@ function ListingCard({ listing }: { listing: Listing }) {
   return (
     <Link to={`/marketplace/${listing.id}`}>
       <Card className="hover:shadow-md transition-shadow overflow-hidden">
-        <div className="aspect-video bg-gray-100 relative">
-          {listing.images[0] ? (
-            <img
-              src={listing.images[0].imageUrl}
-              alt={listing.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              No image
-            </div>
-          )}
+        <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b">
+          <div className="text-gray-400 text-4xl">📦</div>
           {discount && (
             <Badge className="absolute top-2 right-2 bg-red-500">
               -{discount}%
@@ -240,30 +200,28 @@ function ListingCard({ listing }: { listing: Listing }) {
           </div>
 
           <div className="mt-2 space-y-1 text-sm text-gray-600">
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {daysUntil !== null ? (
-                daysUntil < 0 ? (
-                  <span className="text-red-600">Expired</span>
-                ) : daysUntil === 0 ? (
-                  <span className="text-yellow-600">Expires today</span>
+            {listing.expiryDate && (
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {daysUntil !== null ? (
+                  daysUntil < 0 ? (
+                    <span className="text-red-600">Expired</span>
+                  ) : daysUntil === 0 ? (
+                    <span className="text-yellow-600">Expires today</span>
+                  ) : (
+                    <span>{daysUntil} days left</span>
+                  )
                 ) : (
-                  <span>{daysUntil} days left</span>
-                )
-              ) : (
-                <span>No expiry set</span>
-              )}
-            </div>
+                  <span>No expiry set</span>
+                )}
+              </div>
+            )}
             {listing.pickupLocation && (
               <div className="flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
                 <span className="line-clamp-1">{listing.pickupLocation}</span>
               </div>
             )}
-            <div className="flex items-center gap-1">
-              <Eye className="h-3 w-3" />
-              <span>{listing.viewCount} views</span>
-            </div>
           </div>
 
           <div className="mt-3 flex items-center justify-between">
@@ -272,26 +230,28 @@ function ListingCard({ listing }: { listing: Listing }) {
                 <span className="text-lg font-bold text-green-600">Free</span>
               ) : (
                 <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-bold">${listing.price}</span>
+                  <span className="text-lg font-bold">${listing.price.toFixed(2)}</span>
                   {listing.originalPrice && (
                     <span className="text-sm text-gray-400 line-through">
-                      ${listing.originalPrice}
+                      ${listing.originalPrice.toFixed(2)}
                     </span>
                   )}
                 </div>
               )}
             </div>
             <div className="text-sm text-gray-500">
-              {listing.quantity} {listing.unit}
+              Qty: {listing.quantity}
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-medium">
-              {listing.seller.name.charAt(0).toUpperCase()}
+          {listing.seller && (
+            <div className="mt-3 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-medium">
+                {listing.seller.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm text-gray-600">{listing.seller.name}</span>
             </div>
-            <span className="text-sm text-gray-600">{listing.seller.name}</span>
-          </div>
+          )}
         </CardContent>
       </Card>
     </Link>

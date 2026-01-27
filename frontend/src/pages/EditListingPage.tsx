@@ -1,19 +1,21 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
 
-export default function CreateListingPage() {
+export default function EditListingPage() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -30,6 +32,41 @@ export default function CreateListingPage() {
     { latitude: number; longitude: number } | undefined
   >();
 
+  useEffect(() => {
+    loadListing();
+  }, [id]);
+
+  const loadListing = async () => {
+    try {
+      const listing = await marketplaceService.getListing(Number(id));
+
+      // Parse expiry date
+      let expiryDateStr = "";
+      if (listing.expiryDate) {
+        const date = new Date(listing.expiryDate);
+        expiryDateStr = date.toISOString().split("T")[0];
+      }
+
+      setFormData({
+        title: listing.title,
+        description: listing.description || "",
+        category: listing.category || "",
+        quantity: String(listing.quantity),
+        price: listing.price !== null ? String(listing.price) : "",
+        originalPrice: listing.originalPrice
+          ? String(listing.originalPrice)
+          : "",
+        expiryDate: expiryDateStr,
+        pickupLocation: listing.pickupLocation || "",
+      });
+    } catch (error: any) {
+      addToast(error.message || "Failed to load listing", "error");
+      navigate("/marketplace");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -41,19 +78,19 @@ export default function CreateListingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
 
     try {
       // Validate required fields
       if (!formData.title.trim()) {
         addToast("Please enter a title", "error");
-        setLoading(false);
+        setSaving(false);
         return;
       }
 
       if (!formData.quantity || parseFloat(formData.quantity) <= 0) {
         addToast("Please enter a valid quantity", "error");
-        setLoading(false);
+        setSaving(false);
         return;
       }
 
@@ -72,31 +109,39 @@ export default function CreateListingPage() {
         coordinates: coordinates,
       };
 
-      const listing = await marketplaceService.createListing(data);
-      addToast("Listing created successfully!", "success");
-      navigate(`/marketplace/${listing.id}`);
+      await marketplaceService.updateListing(Number(id), data);
+      addToast("Listing updated successfully!", "success");
+      navigate(`/marketplace/${id}`);
     } catch (error: any) {
-      console.error("Failed to create listing:", error);
-      addToast(error.message || "Failed to create listing", "error");
+      console.error("Failed to update listing:", error);
+      addToast(error.message || "Failed to update listing", "error");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
       <Button
         variant="ghost"
         className="mb-4"
-        onClick={() => navigate("/marketplace")}
+        onClick={() => navigate(`/marketplace/${id}`)}
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Marketplace
+        Back to Listing
       </Button>
 
       <Card>
         <CardHeader>
-          <CardTitle>Create Listing</CardTitle>
+          <CardTitle>Edit Listing</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -230,19 +275,19 @@ export default function CreateListingPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate("/marketplace")}
+                onClick={() => navigate(`/marketplace/${id}`)}
                 className="flex-1"
-                disabled={loading}
+                disabled={saving}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? (
-                  "Creating..."
+              <Button type="submit" disabled={saving} className="flex-1">
+                {saving ? (
+                  "Saving..."
                 ) : (
                   <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Listing
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
                   </>
                 )}
               </Button>
