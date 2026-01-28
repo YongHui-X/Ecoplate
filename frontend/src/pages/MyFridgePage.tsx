@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { useToast } from "../contexts/ToastContext";
 import { useCamera } from "../hooks/useCamera";
@@ -7,6 +8,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Progress } from "../components/ui/progress";
 import {
   Plus,
   Camera,
@@ -19,6 +21,11 @@ import {
   Upload,
   RotateCcw,
   AlertCircle,
+  Leaf,
+  TrendingDown,
+  ChevronRight,
+  ChevronLeft,
+  UtensilsCrossed,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -35,11 +42,55 @@ interface Product {
 
 type ConsumeAction = "consumed" | "wasted" | "shared" | "sold";
 
+interface IdentifiedIngredient {
+  id: string;
+  productId: number;
+  name: string;
+  matchedProductName: string;
+  estimatedQuantity: number;
+  category: string;
+  unitPrice: number;
+  co2Emission: number;
+  confidence: "high" | "medium" | "low";
+}
+
+interface WasteAnalysisResult {
+  metrics: {
+    totalCO2Wasted: number;
+    totalCO2Saved: number;
+    disposalCO2: number;
+    totalEconomicWaste: number;
+    totalEconomicConsumed: number;
+    wastePercentage: number;
+    sustainabilityScore: number;
+    sustainabilityRating: string;
+    itemBreakdown: Array<{
+      productId: number;
+      productName: string;
+      quantityUsed: number;
+      quantityWasted: number;
+      co2Wasted: number;
+      co2Saved: number;
+      economicWaste: number;
+      emissionFactor: number;
+    }>;
+  };
+  wasteAnalysis: {
+    wasteItems: Array<{
+      productName: string;
+      quantityWasted: number;
+      productId: number;
+    }>;
+    overallObservation: string;
+  };
+}
+
 export default function MyFridgePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [showTrackConsumption, setShowTrackConsumption] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { addToast } = useToast();
 
@@ -121,6 +172,10 @@ export default function MyFridgePage() {
             <Camera className="h-4 w-4 mr-2" />
             Scan Receipt
           </Button>
+          <Button variant="outline" onClick={() => setShowTrackConsumption(true)}>
+            <UtensilsCrossed className="h-4 w-4 mr-2" />
+            Track Consumption
+          </Button>
           <Button onClick={() => setShowAddForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Item
@@ -180,6 +235,17 @@ export default function MyFridgePage() {
           onClose={() => setShowScanModal(false)}
           onScanned={() => {
             setShowScanModal(false);
+            loadProducts();
+          }}
+        />
+      )}
+
+      {/* Track Consumption Modal */}
+      {showTrackConsumption && (
+        <TrackConsumptionModal
+          onClose={() => setShowTrackConsumption(false)}
+          onComplete={() => {
+            setShowTrackConsumption(false);
             loadProducts();
           }}
         />
@@ -903,4 +969,738 @@ function ScanReceiptModal({
       </Card>
     </div>
   );
+}
+
+type TrackConsumptionStep = "raw-input" | "raw-review" | "waste-input" | "waste-review";
+
+function TrackConsumptionModal({
+  onClose,
+  onComplete,
+}: {
+  onClose: () => void;
+  onComplete: () => void;
+}) {
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  const camera = useCamera();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [step, setStep] = useState<TrackConsumptionStep>("raw-input");
+  const [rawPhoto, setRawPhoto] = useState<string | null>(null);
+  const [wastePhoto, setWastePhoto] = useState<string | null>(null);
+  const [ingredients, setIngredients] = useState<IdentifiedIngredient[]>([]);
+  const [wasteResult, setWasteResult] = useState<WasteAnalysisResult | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [disposalMethod, setDisposalMethod] = useState("landfill");
+  const [showCamera, setShowCamera] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const SUPPORTED_FORMATS = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+  const stepNumber = step === "raw-input" ? 1 : step === "raw-review" ? 2 : step === "waste-input" ? 3 : 4;
+
+  // Guard: waste steps require rawPhoto
+  useEffect(() => {
+    if ((step === "waste-input" || step === "waste-review") && !rawPhoto) {
+      setStep("raw-input");
+    }
+  }, [step, rawPhoto]);
+
+  const handleClose = () => {
+    if (rawPhoto) {
+      if (!confirm("Are you sure you want to close? Your progress will be lost.")) return;
+    }
+    camera.stopCamera();
+    onClose();
+  };
+
+  const processFile = async (file: File, handler: (base64: string) => void) => {
+    if (!SUPPORTED_FORMATS.includes(file.type)) {
+      addToast("Unsupported format. Please use PNG, JPEG, GIF, or WebP.", "error");
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      addToast("Image is too large. Maximum size is 10MB.", "error");
+      return;
+    }
+    const base64 = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+    handler(base64);
+  };
+
+  // --- Raw Photo Processing ---
+  const processRawPhoto = useCallback(
+    async (base64: string) => {
+      setRawPhoto(base64);
+      setProcessing(true);
+      setShowCamera(false);
+      try {
+        const response = await api.post<{
+          ingredients: Array<{
+            productId: number;
+            name: string;
+            matchedProductName: string;
+            estimatedQuantity: number;
+            category: string;
+            unitPrice: number;
+            co2Emission: number;
+            confidence: "high" | "medium" | "low";
+          }>;
+        }>("/consumption/identify", { imageBase64: base64 });
+
+        const mapped = response.ingredients.map((ing) => ({
+          ...ing,
+          id: Math.random().toString(36).slice(2),
+        }));
+        setIngredients(mapped);
+        setStep("raw-review");
+        if (mapped.length === 0) {
+          addToast("No ingredients identified in photo", "info");
+        }
+      } catch {
+        addToast("Failed to identify ingredients", "error");
+        setRawPhoto(null);
+      } finally {
+        setProcessing(false);
+      }
+    },
+    [addToast]
+  );
+
+  // --- Waste Photo Processing ---
+  const processWastePhoto = useCallback(
+    async (base64: string) => {
+      setWastePhoto(base64);
+      setProcessing(true);
+      setShowCamera(false);
+      try {
+        const ingredientPayload = ingredients.map((ing) => ({
+          productId: ing.productId,
+          productName: ing.matchedProductName,
+          quantityUsed: ing.estimatedQuantity,
+          category: ing.category,
+          unitPrice: ing.unitPrice,
+          co2Emission: ing.co2Emission,
+        }));
+        const response = await api.post<WasteAnalysisResult>(
+          "/consumption/analyze-waste",
+          { imageBase64: base64, ingredients: ingredientPayload, disposalMethod }
+        );
+        setWasteResult(response);
+        setStep("waste-review");
+      } catch {
+        addToast("Failed to analyze waste", "error");
+        setWastePhoto(null);
+      } finally {
+        setProcessing(false);
+      }
+    },
+    [addToast, ingredients, disposalMethod]
+  );
+
+  const handleConfirmPhoto = () => {
+    if (!camera.capturedImage) return;
+    const handler = step === "raw-input" ? processRawPhoto : processWastePhoto;
+    handler(camera.capturedImage);
+    camera.stopCamera();
+  };
+
+  const handleOpenCamera = () => {
+    setShowCamera(true);
+    camera.startCamera();
+  };
+
+  const handleCloseCamera = () => {
+    camera.stopCamera();
+    setShowCamera(false);
+  };
+
+  const updateIngredient = (id: string, field: keyof IdentifiedIngredient, value: string | number) => {
+    setIngredients((prev) =>
+      prev.map((ing) => (ing.id === id ? { ...ing, [field]: value } : ing))
+    );
+  };
+
+  const removeIngredient = (id: string) => {
+    setIngredients((prev) => prev.filter((ing) => ing.id !== id));
+  };
+
+  const handleDone = () => {
+    addToast("Consumption tracked successfully!", "success");
+    onComplete();
+    navigate("/");
+  };
+
+  // --- Camera View (shared for raw + waste) ---
+  if (showCamera) {
+    const cameraTitle = step === "raw-input" ? "Photo of Ingredients" : "Photo of Leftovers";
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col z-50">
+        <div className="flex items-center justify-between p-4 bg-black/80">
+          <h2 className="text-white font-semibold">{cameraTitle}</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleCloseCamera}
+            className="text-white hover:bg-white/20"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {camera.error && (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 mx-auto text-red-400 mb-4" />
+              <p className="text-white mb-4">{camera.error}</p>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  variant="outline"
+                  onClick={handleCloseCamera}
+                  className="border-white/30 text-white hover:bg-white/10"
+                >
+                  Go Back
+                </Button>
+                <Button
+                  onClick={() => {
+                    camera.clearError();
+                    camera.startCamera();
+                  }}
+                  className="bg-white text-black hover:bg-gray-200"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!camera.capturedImage && !camera.error && (
+          <>
+            <div className="flex-1 flex items-center justify-center bg-black overflow-hidden relative">
+              <video
+                ref={camera.videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="max-w-full max-h-full object-contain"
+              />
+              {camera.isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-4" />
+                    <p className="text-white">Opening camera...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            {camera.isStreaming && (
+              <div className="p-6 bg-black/80 flex justify-center">
+                <button
+                  onClick={camera.capture}
+                  className="w-16 h-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/40 transition-colors"
+                  aria-label="Take photo"
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {camera.capturedImage && (
+          <>
+            <div className="flex-1 flex items-center justify-center bg-black overflow-hidden p-4">
+              <img
+                src={camera.capturedImage}
+                alt="Captured photo"
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            </div>
+            <div className="p-4 bg-black/80 flex gap-3 justify-center">
+              <Button
+                variant="outline"
+                onClick={camera.retake}
+                className="flex-1 max-w-[160px] border-white/30 text-white hover:bg-white/10"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Retake
+              </Button>
+              <Button
+                onClick={handleConfirmPhoto}
+                className="flex-1 max-w-[160px] bg-white text-black hover:bg-gray-200"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Confirm
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // --- Step Progress Bar ---
+  const StepIndicator = () => (
+    <div className="flex items-center gap-2 mt-2">
+      {[1, 2, 3, 4].map((s) => (
+        <div
+          key={s}
+          className={cn(
+            "h-2 flex-1 rounded-full",
+            stepNumber >= s ? "bg-primary" : "bg-gray-200"
+          )}
+        />
+      ))}
+    </div>
+  );
+
+  // --- Photo Input UI (shared for raw + waste) ---
+  const PhotoInputView = ({
+    title,
+    subtitle,
+    cameraLabel,
+    onFileProcess,
+    backButton,
+  }: {
+    title: string;
+    subtitle: string;
+    cameraLabel: string;
+    onFileProcess: (base64: string) => void;
+    backButton?: React.ReactNode;
+  }) => (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            {title}
+            <Button variant="ghost" size="icon" onClick={handleClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </CardTitle>
+          <p className="text-sm text-gray-500">{subtitle}</p>
+          <StepIndicator />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              onClick={handleOpenCamera}
+            >
+              <Camera className="h-8 w-8 text-gray-500" />
+              <span className="font-medium">Take Photo</span>
+              <span className="text-xs text-gray-400">{cameraLabel}</span>
+            </Button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 border-t border-gray-200" />
+              <span className="text-xs text-gray-400">or</span>
+              <div className="flex-1 border-t border-gray-200" />
+            </div>
+
+            <div
+              className={cn(
+                "border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer text-center",
+                isDragging
+                  ? "border-primary bg-primary/5"
+                  : "border-gray-300 hover:border-gray-400"
+              )}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                const file = e.dataTransfer.files[0];
+                if (file) processFile(file, onFileProcess);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+              <p className="text-gray-600 font-medium text-sm">
+                {isDragging ? "Drop your photo here" : "Upload from files"}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Drag and drop, or click to browse
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) processFile(file, onFileProcess);
+              }}
+              className="hidden"
+            />
+
+            {step === "waste-input" && (
+              <div className="pt-2">
+                <label className="text-xs text-gray-500">Disposal method</label>
+                <select
+                  value={disposalMethod}
+                  onChange={(e) => setDisposalMethod(e.target.value)}
+                  className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="landfill">Landfill</option>
+                  <option value="composting">Composting</option>
+                  <option value="incineration">Incineration</option>
+                  <option value="anaerobic_digestion">Anaerobic Digestion</option>
+                  <option value="sewer">Sewer</option>
+                </select>
+              </div>
+            )}
+
+            {backButton}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // --- Processing Spinner ---
+  if (processing) {
+    const processingText = step === "raw-input" || step === "raw-review"
+      ? "Identifying ingredients..."
+      : "Analyzing waste...";
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="py-12 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
+            <p className="text-gray-600 font-medium">{processingText}</p>
+            <p className="text-sm text-gray-400 mt-1">This may take a few moments</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // --- PAGE 1: Raw Photo Input ---
+  if (step === "raw-input") {
+    return (
+      <PhotoInputView
+        title="Track Consumption"
+        subtitle="Step 1 of 4 — Capture raw ingredients"
+        cameraLabel="Capture your raw ingredients"
+        onFileProcess={processRawPhoto}
+      />
+    );
+  }
+
+  // --- PAGE 2: Review Raw Details ---
+  if (step === "raw-review") {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              Review Ingredients
+              <Button variant="ghost" size="icon" onClick={handleClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+            <p className="text-sm text-gray-500">Step 2 of 4 — Edit identified ingredients</p>
+            <StepIndicator />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {rawPhoto && (
+                <img
+                  src={rawPhoto}
+                  alt="Raw ingredients"
+                  className="w-20 h-20 object-cover rounded-lg"
+                />
+              )}
+
+              <p className="text-sm text-gray-600">
+                Found {ingredients.length} ingredient{ingredients.length !== 1 ? "s" : ""}. Review and edit:
+              </p>
+
+              <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                {ingredients.map((ing) => (
+                  <div key={ing.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Input
+                        value={ing.name}
+                        onChange={(e) => updateIngredient(ing.id, "name", e.target.value)}
+                        className="h-8 text-sm font-medium"
+                        placeholder="Ingredient name"
+                      />
+                      <Badge
+                        variant={
+                          ing.confidence === "high"
+                            ? "default"
+                            : ing.confidence === "medium"
+                            ? "secondary"
+                            : "destructive"
+                        }
+                        className="shrink-0 text-xs"
+                      >
+                        {ing.confidence}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        onClick={() => removeIngredient(ing.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Matched: {ing.matchedProductName}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-500">Qty</label>
+                        <Input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={ing.estimatedQuantity}
+                          onChange={(e) =>
+                            updateIngredient(ing.id, "estimatedQuantity", parseFloat(e.target.value) || 0)
+                          }
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">Price ($)</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={ing.unitPrice}
+                          onChange={(e) =>
+                            updateIngredient(ing.id, "unitPrice", parseFloat(e.target.value) || 0)
+                          }
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500">CO2 (kg)</label>
+                        <Input
+                          type="number"
+                          value={ing.co2Emission}
+                          readOnly
+                          disabled
+                          className="h-8 text-sm bg-gray-100"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Category</label>
+                      <select
+                        value={ing.category}
+                        onChange={(e) => updateIngredient(ing.id, "category", e.target.value)}
+                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                      >
+                        <option value="produce">Produce</option>
+                        <option value="dairy">Dairy</option>
+                        <option value="meat">Meat</option>
+                        <option value="bakery">Bakery</option>
+                        <option value="frozen">Frozen</option>
+                        <option value="beverages">Beverages</option>
+                        <option value="pantry">Pantry</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setRawPhoto(null);
+                    setIngredients([]);
+                    setStep("raw-input");
+                  }}
+                  className="flex-1"
+                >
+                  Scan Again
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                    setStep("waste-input");
+                  }}
+                  disabled={ingredients.length === 0}
+                  className="flex-1"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // --- PAGE 3: Waste Photo Input ---
+  if (step === "waste-input") {
+    return (
+      <PhotoInputView
+        title="Capture Leftovers"
+        subtitle="Step 3 of 4 — Photo your plate after eating"
+        cameraLabel="Capture your plate after eating"
+        onFileProcess={processWastePhoto}
+        backButton={
+          <Button
+            variant="ghost"
+            onClick={() => setStep("raw-review")}
+            className="w-full mt-2"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back to ingredients
+          </Button>
+        }
+      />
+    );
+  }
+
+  // --- PAGE 4: Review Waste Details ---
+  if (step === "waste-review" && wasteResult) {
+    const { metrics, wasteAnalysis } = wasteResult;
+    const ratingColor =
+      metrics.sustainabilityRating === "Excellent"
+        ? "bg-green-100 text-green-800"
+        : metrics.sustainabilityRating === "Good"
+        ? "bg-emerald-100 text-emerald-800"
+        : metrics.sustainabilityRating === "Moderate"
+        ? "bg-yellow-100 text-yellow-800"
+        : metrics.sustainabilityRating === "Poor"
+        ? "bg-orange-100 text-orange-800"
+        : "bg-red-100 text-red-800";
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              Consumption Summary
+              <Button variant="ghost" size="icon" onClick={handleClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+            <p className="text-sm text-gray-500">Step 4 of 4 — Review results</p>
+            <StepIndicator />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {wastePhoto && (
+                <img
+                  src={wastePhoto}
+                  alt="Waste photo"
+                  className="w-20 h-20 object-cover rounded-lg"
+                />
+              )}
+
+              {/* Sustainability Rating */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Sustainability Rating</p>
+                  <p className="text-xs text-gray-500">Score: {metrics.sustainabilityScore}/100</p>
+                </div>
+                <span className={cn("px-3 py-1 rounded-full text-sm font-medium", ratingColor)}>
+                  {metrics.sustainabilityRating}
+                </span>
+              </div>
+
+              {/* Summary Metrics */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-3 bg-green-50 rounded-lg">
+                  <div className="flex items-center gap-1 text-green-700 mb-1">
+                    <Leaf className="h-4 w-4" />
+                    <span className="text-xs font-medium">CO2 Saved</span>
+                  </div>
+                  <p className="text-lg font-bold text-green-800">{metrics.totalCO2Saved} kg</p>
+                </div>
+                <div className="p-3 bg-red-50 rounded-lg">
+                  <div className="flex items-center gap-1 text-red-700 mb-1">
+                    <TrendingDown className="h-4 w-4" />
+                    <span className="text-xs font-medium">CO2 Wasted</span>
+                  </div>
+                  <p className="text-lg font-bold text-red-800">{metrics.totalCO2Wasted} kg</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Waste %</p>
+                  <p className="text-lg font-bold">{metrics.wastePercentage}%</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Economic Waste</p>
+                  <p className="text-lg font-bold">${metrics.totalEconomicWaste.toFixed(2)}</p>
+                </div>
+              </div>
+
+              {/* Observation */}
+              {wasteAnalysis.overallObservation && (
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-600 font-medium mb-1">Observation</p>
+                  <p className="text-sm text-blue-800">{wasteAnalysis.overallObservation}</p>
+                </div>
+              )}
+
+              {/* Per-Item Breakdown */}
+              {metrics.itemBreakdown.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Item Breakdown</p>
+                  <div className="space-y-2">
+                    {metrics.itemBreakdown.map((item) => {
+                      const wasteRatio =
+                        item.quantityUsed > 0
+                          ? (item.quantityWasted / item.quantityUsed) * 100
+                          : 0;
+                      return (
+                        <div key={item.productId} className="p-2 bg-gray-50 rounded-lg">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium">{item.productName}</span>
+                            <span className="text-xs text-gray-500">
+                              Used: {item.quantityUsed} | Wasted: {item.quantityWasted}
+                            </span>
+                          </div>
+                          <Progress
+                            value={wasteRatio}
+                            className={cn(
+                              "h-2",
+                              wasteRatio >= 50
+                                ? "[&>div]:bg-red-500"
+                                : wasteRatio >= 20
+                                ? "[&>div]:bg-yellow-500"
+                                : "[&>div]:bg-green-500"
+                            )}
+                          />
+                          <div className="flex justify-between mt-1 text-xs text-gray-500">
+                            <span>CO2 Saved: {item.co2Saved} kg</span>
+                            <span>CO2 Wasted: {item.co2Wasted} kg</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleDone} className="w-full">
+                <Check className="h-4 w-4 mr-2" />
+                Done
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return null;
 }
