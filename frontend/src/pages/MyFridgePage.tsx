@@ -24,7 +24,7 @@ import { cn } from "../lib/utils";
 
 interface Product {
   id: number;
-  name: string;
+  productName: string;
   category: string | null;
   quantity: number;
   unitPrice: number | null;
@@ -61,7 +61,7 @@ export default function MyFridgePage() {
   const handleConsume = async (product: Product, action: ConsumeAction) => {
     try {
       await api.post(`/myfridge/products/${product.id}/consume`, {
-        action,
+        type: action,
         quantity: product.quantity,
       });
       addToast(
@@ -91,7 +91,7 @@ export default function MyFridgePage() {
   };
 
   const filteredProducts = products.filter((p) => {
-    return p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return p.productName.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   // Sort by purchase date (most recent first)
@@ -204,7 +204,7 @@ function ProductCard({
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold">{product.name}</h3>
+              <h3 className="font-semibold">{product.productName}</h3>
               {product.category && (
                 <Badge variant="secondary">{product.category}</Badge>
               )}
@@ -317,7 +317,7 @@ function AddProductModal({
 
     try {
       await api.post("/myfridge/products", {
-        name,
+        productName: name,
         category: category || undefined,
         quantity,
         unitPrice: unitPrice ? parseFloat(unitPrice) : undefined,
@@ -445,6 +445,7 @@ interface ScannedItem {
   name: string;
   quantity: number;
   category: string;
+  co2Emission: number;
 }
 
 function ScanReceiptModal({
@@ -472,7 +473,7 @@ function ScanReceiptModal({
 
       try {
         const response = await api.post<{
-          items: Array<{ name: string; quantity: number; category: string }>;
+          items: Array<{ name: string; quantity: number; category: string; co2Emission: number }>;
         }>("/myfridge/receipt/scan", { imageBase64: base64 });
 
         setScannedItems(
@@ -547,9 +548,10 @@ function ScanReceiptModal({
     try {
       for (const item of scannedItems) {
         await api.post("/myfridge/products", {
-          name: item.name,
+          productName: item.name,
           quantity: item.quantity,
           category: item.category,
+          co2Emission: item.co2Emission,
         });
         addedCount++;
       }

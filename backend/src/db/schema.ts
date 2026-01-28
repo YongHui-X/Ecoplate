@@ -97,19 +97,11 @@ export const usersRelations = relations(users, ({ many }) => ({
   products: many(products),
   productInteractions: many(productInteraction),
   listings: many(marketplaceListings, { relationName: "seller" }),
-  sentMessages: many(messages, { relationName: "sender" }),
-  receivedMessages: many(messages, { relationName: "receiver" }),
-  points: one(userPoints),
-  pointTransactions: many(pointTransactions),
-  badges: many(userBadges),
-  sustainabilityMetrics: one(userSustainabilityMetrics),
-  dailySnapshots: many(dailySustainabilitySnapshots),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
   user: one(users, { fields: [products.userId], references: [users.id] }),
   interactions: many(productInteraction),
-  listings: many(marketplaceListings),
 }));
 
 export const productInteractionRelations = relations(productInteraction, ({ one }) => ({

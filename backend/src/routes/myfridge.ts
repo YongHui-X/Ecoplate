@@ -1,9 +1,10 @@
 import { Router, json, error, parseBody } from "../utils/router";
 import { db } from "../index";
-import { products, productInteraction, userPoints } from "../db/schema";
+import { products, productInteraction } from "../db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
+import OpenAI from "openai";
 
 const productSchema = z.object({
   productName: z.string().min(1).max(200),
@@ -35,22 +36,12 @@ export function registerMyFridgeRoutes(router: Router) {
   router.get("/api/v1/myfridge/products", async (req) => {
     const user = getUser(req);
 
-    const result = await db.query.products.findMany({
+    const userProducts = await db.query.products.findMany({
       where: eq(products.userId, user.id),
+      orderBy: [desc(products.id)],
     });
 
-    return json(
-      result.map((p) => ({
-        id: p.id,
-        name: p.productName,
-        category: p.category,
-        quantity: p.quantity,
-        unitPrice: p.unitPrice,
-        purchaseDate: p.purchaseDate ? p.purchaseDate.toISOString() : null,
-        description: p.description,
-        co2Emission: p.co2Emission,
-      }))
-    );
+    return json(userProducts);
   });
 
   // Add a new product
@@ -74,18 +65,6 @@ export function registerMyFridgeRoutes(router: Router) {
         })
         .returning();
 
-      return json({
-        id: product.id,
-        name: product.productName,
-        category: product.category,
-        quantity: product.quantity,
-        unitPrice: product.unitPrice,
-        purchaseDate: product.purchaseDate
-          ? product.purchaseDate.toISOString()
-          : null,
-        description: product.description,
-        co2Emission: product.co2Emission,
-      });
       // Award points for adding a product
       await awardPoints(user.id, POINTS.addProduct);
 
@@ -166,7 +145,6 @@ export function registerMyFridgeRoutes(router: Router) {
   });
 
   // Log product interaction (consume, waste, share, sell)
-  // Consume / share / sell / waste a product
   router.post("/api/v1/myfridge/products/:id/consume", async (req, params) => {
     try {
       const user = getUser(req);
@@ -199,20 +177,6 @@ export function registerMyFridgeRoutes(router: Router) {
       await awardPoints(user.id, pointsChange);
 
       return json({ message: "Product interaction logged", pointsChange });
-      // Remove the product
-      await db.delete(products).where(eq(products.id, productId));
-
-      const points: Record<string, number> = {
-        consumed: 5,
-        shared: 10,
-        sold: 8,
-        wasted: 0,
-      };
-
-      return json({
-        message: `Product ${data.action}`,
-        pointsEarned: points[data.action] || 0,
-      });
     } catch (e) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);
@@ -247,7 +211,17 @@ export function registerMyFridgeRoutes(router: Router) {
             content: [
               {
                 type: "text",
-                text: "Analyze this grocery receipt image and extract the food items. Only include food items. Ignore non-food items like bags, taxes, totals, etc. If no food items are found, return an empty items array.",
+                text: `Analyze this grocery receipt image and extract the food items. Only include food items. Ignore non-food items like bags, taxes, totals, etc. If no food items are found, return an empty items array.
+
+For each item, determine its eco-focused sub-category (Ruminant meat, Non-ruminant meat, Seafood, Dairy, Eggs, Grains & cereals, Legumes & pulses, Vegetables, Fruits, Nuts & seeds, Oils & fats, Sugar & sweeteners, Processed plant-based foods) and use it to:
+1. Map to the corresponding simple category:
+   - Ruminant meat, Non-ruminant meat, Seafood → "meat"
+   - Dairy, Eggs → "dairy"
+   - Vegetables, Fruits, Legumes & pulses → "produce"
+   - Grains & cereals, Nuts & seeds, Oils & fats, Sugar & sweeteners → "pantry"
+   - Processed plant-based foods → "other"
+2. Estimate co2Emission in kg CO2e per unit based on the eco-focused sub-category.
+3. Determine the unit of measurement for the quantity (e.g. kg, g, ml, L, pcs, pack, loaf, dozen, bottle, can).`,
               },
               {
                 type: "image_url",
@@ -277,26 +251,19 @@ export function registerMyFridgeRoutes(router: Router) {
                       quantity: { type: "number", description: "Number of items" },
                       category: {
                         type: "string",
-                        enum: [
-                                "Ruminant meat",
-                                "Non-ruminant meat",
-                                "Seafood",
-                                "Dairy",
-                                "Eggs",
-                                "Grains & cereals",
-                                "Legumes & pulses",
-                                "Vegetables",
-                                "Fruits",
-                                "Nuts & seeds",
-                                "Oils & fats",
-                                "Sugar & sweeteners",
-                                "Processed plant-based foods"
-                              ]
-,
-                        description: "Food category",
+                        enum: ["produce", "dairy", "meat", "bakery", "frozen", "beverages", "pantry", "other"],
+                        description: "Simple food category",
+                      },
+                      unit: {
+                        type: "string",
+                        description: "Unit of measurement for the quantity (e.g. kg, g, ml, L, pcs, pack, loaf, dozen, bottle, can)",
+                      },
+                      co2Emission: {
+                        type: "number",
+                        description: "Estimated kg CO2e per unit based on eco-focused sub-category",
                       },
                     },
-                    required: ["name", "quantity", "price", "category"],
+                    required: ["name", "quantity", "category", "unit", "co2Emission"],
                     additionalProperties: false,
                   },
                 },
@@ -309,7 +276,12 @@ export function registerMyFridgeRoutes(router: Router) {
       });
 
       const content = response.choices[0]?.message?.content || '{"items":[]}';
-      const parsed = JSON.parse(content) as { items: Array<{ name: string; quantity: number; category: string }> };
+      console.log("OpenAI raw response:", content);
+      console.log("Finish reason:", response.choices[0]?.finish_reason);
+      console.log("Refusal:", response.choices[0]?.message?.refusal);
+      const parsed = JSON.parse(content) as {
+        items: Array<{ name: string; quantity: number; category: string; unit: string; co2Emission: number }>;
+      };
 
       return json({ items: parsed.items });
     } catch (e) {
@@ -319,37 +291,7 @@ export function registerMyFridgeRoutes(router: Router) {
   });
 }
 
-async function awardPoints(userId: number, amount: number) {
-  const currentPoints = await db.query.userPoints.findFirst({
-    where: eq(userPoints.userId, userId),
-  });
-
-  if (currentPoints) {
-    const newTotal = Math.max(0, (currentPoints.totalPoints ?? 0) + amount);
-    await db
-      .update(userPoints)
-      .set({ totalPoints: newTotal })
-      .where(eq(userPoints.userId, userId));
-  }
-}
-  // Delete a product
-  router.delete("/api/v1/myfridge/products/:id", async (req, params) => {
-    const user = getUser(req);
-    const productId = parseInt(params.id, 10);
-
-    const product = await db.query.products.findFirst({
-      where: and(
-        eq(products.id, productId),
-        eq(products.userId, user.id)
-      ),
-    });
-
-    if (!product) {
-      return error("Product not found", 404);
-    }
-
-    await db.delete(products).where(eq(products.id, productId));
-
-    return json({ message: "Product deleted" });
-  });
+// TODO: Implement points system once gamification is confirmed
+async function awardPoints(_userId: number, _amount: number) {
+  // No-op until userPoints table is implemented
 }
