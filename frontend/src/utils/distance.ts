@@ -11,7 +11,7 @@ export interface Coordinates {
 export interface ListingWithDistance {
   id: number;
   title: string;
-  pickupLocation: string;
+  pickupLocation: string | null;
   coordinates?: Coordinates;
   distance?: number; // in kilometers
   [key: string]: any;
@@ -62,11 +62,11 @@ function toRadians(degrees: number): number {
  * @param radiusKm Radius in kilometers
  * @returns Filtered listings with distance added
  */
-export function filterListingsByRadius(
-  listings: ListingWithDistance[],
+export function filterListingsByRadius<T extends ListingWithDistance>(
+  listings: T[],
   userLocation: Coordinates,
   radiusKm: number
-): ListingWithDistance[] {
+): T[] {
   return listings
     .map((listing) => {
       // Skip if listing doesn't have coordinates
@@ -88,33 +88,45 @@ export function filterListingsByRadius(
       // Sort by distance (closest first), undefined distances go last
       if (a.distance === undefined) return 1;
       if (b.distance === undefined) return -1;
-      return a.distance - b.distance;
+      return a.distance! - b.distance!;
     });
 }
 
 /**
- * Parse coordinates from Google Maps URL or address string
- * Format: "lat,lng" or attempts to extract from Google Maps URL
+ * Parse coordinates from location string
+ * Supports formats: "lat,lng", "address|lat,lng", or Google Maps URL
  */
-export function parseCoordinates(locationString: string): Coordinates | null {
+export function parseCoordinates(locationString: string | null): Coordinates | null {
+  if (!locationString) return null;
+
+  // Check for "address|lat,lng" format (stored by backend)
+  if (locationString.includes("|")) {
+    const parts = locationString.split("|");
+    if (parts.length === 2) {
+      locationString = parts[1];
+    }
+  }
+
   // Try to parse "lat,lng" format
   const coordMatch = locationString.match(
     /^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/
   );
   if (coordMatch) {
-    return {
-      latitude: parseFloat(coordMatch[1]),
-      longitude: parseFloat(coordMatch[2]),
-    };
+    const lat = parseFloat(coordMatch[1]);
+    const lng = parseFloat(coordMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { latitude: lat, longitude: lng };
+    }
   }
 
   // Try to extract from Google Maps URL
   const urlMatch = locationString.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
   if (urlMatch) {
-    return {
-      latitude: parseFloat(urlMatch[1]),
-      longitude: parseFloat(urlMatch[2]),
-    };
+    const lat = parseFloat(urlMatch[1]);
+    const lng = parseFloat(urlMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { latitude: lat, longitude: lng };
+    }
   }
 
   return null;

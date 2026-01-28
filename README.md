@@ -1,6 +1,10 @@
 # EcoPlate
 
-A sustainability-focused food management platform that helps reduce food waste through smart inventory tracking, community marketplace, and gamification.
+EcoPlate is a sustainability-focused food management platform that helps reduce food waste through smart inventory tracking, community marketplace, and gamification. We address the global food waste crisis by transforming how households manage their food consumption, turning sustainability into an engaging, rewarding experience.
+
+Our platform combines AI-powered receipt scanning for effortless food tracking, a peer-to-peer marketplace for redistributing surplus food locally, and a gamified reward system that turns eco-friendly actions into points, badges, and leaderboard achievements. By providing real-time visibility into food inventory, expiration alerts, and CO₂ emission tracking, we empower users to make informed decisions that reduce waste and environmental impact.
+
+EcoPlate goes beyond individual benefits—it builds community-driven sustainability networks where neighbors can share resources, rescue food, and collectively reduce waste. Whether you're scanning grocery receipts, listing near-expiry items, or tracking your environmental savings, every action contributes to a larger movement toward zero-waste living and meaningful climate action.
 
 ## System Architecture
 
@@ -8,12 +12,11 @@ A sustainability-focused food management platform that helps reduce food waste t
 flowchart TB
     subgraph Client["Client Layer"]
         WEB["Web Browser"]
-        IOS["iOS App"]
         ANDROID["Android App"]
     end
 
     subgraph Frontend["Frontend (React + Vite)"]
-        REACT["React 18 + TypeScript"]
+        REACT["React 19 + TypeScript"]
         CAPACITOR["Capacitor"]
         TAILWIND["Tailwind CSS + shadcn/ui"]
     end
@@ -35,7 +38,6 @@ flowchart TB
     end
 
     WEB --> REACT
-    IOS --> CAPACITOR
     ANDROID --> CAPACITOR
     CAPACITOR --> REACT
     REACT --> TAILWIND
@@ -45,24 +47,23 @@ flowchart TB
     ROUTES --> DRIZZLE
     DRIZZLE --> SQLITE
     ROUTES -->|Receipt Scan| OPENAI
-    ROUTES -->|Price Suggestion| RECOMMEND
+    ROUTES -->|Product Suggestion| RECOMMEND
 ```
 
 ## Features
 
 ### MyFridge
-- Track food items with expiry dates
-- Receive expiry warnings and notifications
+- Track food items with CO2 emission data
 - Scan grocery receipts with AI (OpenAI Vision)
-- Log consumption, sharing, and waste
+- Log consumption, waste, and extract image data via OpenAI Vision
 
 ### Marketplace
 - List near-expiry food items for sale or free
 - Browse and reserve listings from others
-- AI-powered price recommendations
+- AI-powered product recommendations
 - In-app messaging between buyers and sellers
 
-### Gamification (EcoBoard)
+### EcoBoard & EcoPoints
 - Earn points for sustainable actions
 - Track streaks and sustainability metrics
 - Unlock badges for achievements
@@ -70,7 +71,6 @@ flowchart TB
 - Community leaderboard
 
 ## User Flow
-
 ```mermaid
 flowchart TD
     START((Start)) --> AUTH{Authenticated?}
@@ -85,24 +85,25 @@ flowchart TD
     subgraph MyFridge["MyFridge Module"]
         FRIDGE --> ADD[Add Product]
         FRIDGE --> SCAN[Scan Receipt]
-        FRIDGE --> VIEW[View Items]
+        FRIDGE --> VIEW[Track Comsumption Waste]
+        FRIDGE --> |Sell Product| POINTS5[+5 Points]
         ADD --> POINTS1[+2 Points]
         SCAN -->|AI Processing| PARSE[Parse Items]
         PARSE --> ADD
         VIEW --> CONSUME{Action?}
-        CONSUME -->|Consumed| POINTS2[+5 Points]
-        CONSUME -->|Shared| POINTS3[+10 Points]
-        CONSUME -->|Sold| POINTS4[+8 Points]
-        CONSUME -->|Wasted| POINTS5[-2 Points]
+        CONSUME -->|Detect Products From Image| POINTS2[+5 Points]
+        CONSUME -->|Scan Food Waste| POINTS3[+10 Points]
+        CONSUME -->|Waste Analysis & Breakdown| POINTS4[+8 Points]
     end
 
     subgraph Marketplace["Marketplace Module"]
         MARKET --> BROWSE[Browse Listings]
         MARKET --> CREATE[Create Listing]
-        BROWSE --> RESERVE[Reserve Item]
-        RESERVE --> MESSAGE[Message Seller]
-        CREATE --> PRICE[Get AI Price]
-        CREATE --> PUBLISH[Publish]
+        MARKET --> EDIT[Edit Listing]
+        MARKET --> Delete[Delete Listing]
+        MARKET --> MapView[Geolocation]
+        CONTACT --> MESSAGE[Message Seller]
+        CREATE --> PRODUCT[Get Product Recommendation]
     end
 
     subgraph Gamification["Gamification Module"]
@@ -119,133 +120,99 @@ flowchart TD
 
 ```mermaid
 erDiagram
-    users ||--o{ products : has
-    users ||--o{ marketplace_listings : sells
-    users ||--o| user_points : has
-    users ||--o{ user_badges : earns
-    users ||--o{ conversation : participates
+   Badges {
+      int id PK
+      string code FK
+      string name
+      string description
+      string category
+      int awarded
+   }
 
-    products ||--o{ product_interaction : records
-    products ||--o| marketplace_listings : "listed as"
+   UserBadges {
+      int id PK
+      int userid FK
+      int badge_id FK
+      timestamp earned_at
+   }
 
-    marketplace_listings ||--o{ image_listing : has
-    marketplace_listings ||--o{ conversation : "belongs to"
+   Products {
+      int id PK
+      int userid FK
+      string productName
+      string category
+      float quantity
+      float unit_price
+      date purchase_date
+      string description
+      float co2_emission
+   }
 
-    conversation ||--o{ message : contains
+   User {
+      int id PK
+      string email
+      string password_hash
+      string name
+      string avatar_url
+      timestamp created_at
+      timestamp updated_at
+      string user_location
+   }
 
-    badges ||--o{ user_badges : "awarded as"
+   ImageListing {
+      int id PK
+      string description
+      string category
+      float price
+      int has
+      float original_price
+      date expiry_date
+      string pickup_location
+      string status
+      timestamp created_at
+      timestamp completed_at
+   }
 
-    users {
-        int id PK
-        string email UK
-        string password_hash
-        string name
-        string avatar_url
-        timestamp created_at
-        timestamp updated_at
-        string user_location
-    }
+   Conversation {
+      int id PK
+      int listing_id
+      int seller_id FK
+      int buyer_id FK
+   }
 
-    products {
-        int id PK
-        int userId FK
-        string productName
-        string category
-        float quantity
-        float unit_price
-        date purchase_date
-        string description
-        float co2_emission
-    }
+   Message {
+      int id PK
+      int conversation_id
+      int user_id FK
+      string message_text
+      timestamp created_at
+   }
 
-    marketplace_listings {
-        int id PK
-        int seller_id FK
-        int buyer_id
-        int product_id FK
-        string title
-        string description
-        string category
-        float quantity
-        float price
-        float original_price
-        date expiry_date
-        string pickup_location
-        string status
-        timestamp created_at
-        timestamp completed_at
-    }
-
-    image_listing {
-        int id PK
-        int listing_id FK
-        string image_url
-    }
-
-    conversation {
-        int id PK
-        int listing_id
-        int seller_id FK
-        int buyer_id FK
-    }
-
-    message {
-        int id PK
-        int conversation_id
-        int user_id FK
-        string message_text
-        timestamp created_at
-    }
-
-    product_interaction {
-        int id PK
-        int product_id FK
-        int user_id FK
-        date today_date
-        float quantity
-        string type
-    }
-
-    user_points {
-        int id PK
-        int userId FK
-        int total_points
-        int current_streak
-    }
-
-    badges {
-        int id PK
-        string code
-        string name
-        string description
-        string category
-        int points_awarded
-        int sort_order
-        string badge_image_url
-    }
-
-    user_badges {
-        int id PK
-        int userId FK
-        int badge_id FK
-        timestamp earned_at
-    }
+   User ||--o{ UserBadges : "has badges"
+   Badges ||--o{ UserBadges : "awarded to users"
+   User ||--o{ Products : "owns"
+   User ||--o{ Conversation : "sells as seller"
+   User ||--o{ Conversation : "buys as buyer"
+   Conversation ||--o{ Message : "contains"
+   User ||--o{ Message : "writes"
+   ImageListing ||--o{ Conversation : "listed in"
+   ImageListing ||--|| User : "belongs to (has)"
 ```
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Runtime | [Bun](https://bun.sh) |
-| Database | SQLite (via `bun:sqlite`) |
-| ORM | [Drizzle ORM](https://orm.drizzle.team) |
-| Backend | Bun native HTTP server |
-| Frontend | React 18 + TypeScript |
-| Build Tool | [Vite](https://vitejs.dev) |
+| Layer | Technology                                                                   |
+|-------|------------------------------------------------------------------------------|
+| Runtime | [Bun](https://bun.sh)                                                        |
+| Database | SQLite (via `bun:sqlite`)                                                    |
+| ORM | [Drizzle ORM](https://orm.drizzle.team)                                      |
+| Backend | Bun native HTTP server                                                       |
+| Frontend | React 19 + TypeScript                                                        |
+| Build Tool | [Vite](https://vitejs.dev)                                                   |
 | Styling | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
-| Mobile | [Capacitor](https://capacitorjs.com) (iOS & Android) |
-| Auth | JWT (jose library) |
-| Validation | [Zod](https://zod.dev) |
+| Mobile | [Capacitor](https://capacitorjs.com) (iOS & Android)                         |
+| Auth | JWT (jose library)                                                           |
+| Validation | [Zod](https://zod.dev)                                                       |
 
 ## API Authentication Flow
 
@@ -324,6 +291,7 @@ sequenceDiagram
 │   │   └── utils/             # Utilities
 │   ├── public/                # Built frontend assets
 │   └── package.json
+│   └── .env                  # Web env variables
 ├── frontend/
 │   ├── src/
 │   │   ├── components/        # React components
@@ -332,14 +300,19 @@ sequenceDiagram
 │   │   ├── services/          # API client + Capacitor utils
 │   │   ├── hooks/             # Custom hooks
 │   │   └── lib/               # Utilities
-│   ├── ios/                   # iOS native project (after cap add)
 │   ├── android/               # Android native project (after cap add)
 │   ├── capacitor.config.ts    # Capacitor configuration
 │   ├── vite.config.ts
 │   └── package.json
+│   └── .env.mobile            # Mobile env variables
 ├── scripts/                   # Start/stop/build scripts
 ├── package.json               # Root workspace
 └── .env.example               # Environment template
+├── recommendation-engine/
+│   ├── app.py                # Recommendation engine (Flask or FastAPI)
+│   ├── Dockerfile            # Dockerfile for deployment
+│   └── requirements.txt      # Python dependencies
+│   └── .env.ml               # ML env variables
 ```
 
 ## Prerequisites
@@ -377,8 +350,7 @@ sequenceDiagram
 
 2. **Set up environment:**
    ```bash
-   cp .env.example .env
-   # Edit .env with your settings
+   cp .env.ml .env.ml
    ```
 
 3. **Run database migrations:**
@@ -420,13 +392,12 @@ bun run src/index.ts
 
 The server will serve both the API and the built frontend on http://localhost:3000.
 
-## Mobile Apps (iOS & Android)
+## Mobile Apps (Android)
 
-The app uses [Capacitor](https://capacitorjs.com) to build native iOS and Android apps.
+The app uses [Capacitor](https://capacitorjs.com) to build native Android apps.
 
 ### Prerequisites
 
-- **iOS**: macOS with Xcode 14+ and CocoaPods
 - **Android**: Android Studio with SDK 33+
 
 ### Building for Android
@@ -450,7 +421,7 @@ cd frontend/android && ./gradlew assembleDebug
 
 APK location: `frontend/android/app/build/outputs/apk/debug/app-debug.apk`
 
-### Building for iOS (macOS only)
+### Optional - Building for iOS (macOS only)
 
 ```bash
 ./scripts/build-ios.sh
@@ -522,17 +493,14 @@ bun run build:android     # Build and copy to Android
 ### Marketplace
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/marketplace/listings` | Browse listings |
-| POST | `/api/v1/marketplace/listings` | Create listing |
-| GET | `/api/v1/marketplace/listings/:id` | Get listing |
-| PATCH | `/api/v1/marketplace/listings/:id` | Update listing |
+| GET | `/api/v1/marketplace/listings` | Browse active listings |
+| GET | `/api/v1/marketplace/listings/nearby` | Get nearby map listings |
+| GET | `/api/v1/marketplace/my-listings` | Get user's own listings |
+| GET | `/api/v1/marketplace/listings/:id` | Get single listing details |
+| POST | `/api/v1/marketplace/listings` | Create new listing |
+| PATCH | `/api/v1/marketplace/listings/:id` | Update existing listing |
 | DELETE | `/api/v1/marketplace/listings/:id` | Delete listing |
-| POST | `/api/v1/marketplace/listings/:id/reserve` | Reserve listing |
-| POST | `/api/v1/marketplace/listings/:id/sold` | Mark as sold |
-| POST | `/api/v1/marketplace/listings/:id/price-recommendation` | Get AI price suggestion |
-| GET | `/api/v1/marketplace/listings/:id/messages` | Get messages |
-| POST | `/api/v1/marketplace/listings/:id/messages` | Send message |
-| GET | `/api/v1/marketplace/messages` | Get all conversations |
+| POST | `/api/v1/marketplace/listings/:id/complete` | Mark as sold/completed |
 
 ### Gamification
 | Method | Endpoint | Description |

@@ -310,12 +310,12 @@ gcloud run deploy backend --source .
 ### Environment Variables
 
 ```bash
-# Frontend (.env.local)
+# Frontend (.env.ml.local)
 NEXT_PUBLIC_API_URL=https://api.example.com
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 
-# Backend (.env)
+# Backend (.env.ml)
 DATABASE_URL=postgresql://...
 ANTHROPIC_API_KEY=sk-ant-...
 SUPABASE_URL=https://xxx.supabase.co

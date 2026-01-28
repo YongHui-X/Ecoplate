@@ -39,12 +39,12 @@ EcoPlate is a sustainability-focused mobile and web application that combines fo
 
 ### 4.1 Feature Teams
 
-| Feature Package | Engineers | Primary Responsibilities |
-|-----------------|-----------|--------------------------|
-| **MyFridge** | Nithvin, Aung Kyaw Kyaw | Receipt scanning, inventory management, consumption tracking |
-| **Marketplace** | Glenn, Thae Thae Hsu | Product listings, messaging, price recommendations |
+| Feature Package | Engineers                           | Primary Responsibilities |
+|-----------------|-------------------------------------|--------------------------|
+| **MyFridge** | Nithvin, Aung Kyaw Kyaw             | Receipt scanning, inventory management, consumption tracking |
+| **Marketplace** | Glenn, Thae Thae Hsu                | Product listings, messaging, price recommendations |
 | **Sustainability Gamification** | Yong Hui, Song Jiaqi, Zhou Jiasheng | Dashboards, points system, badges, achievements |
-| **Infrastructure & DevOps** | Tek Sheng Qi | Database setup, API architecture, CI/CD |
+| **Infrastructure & DevOps** | TBC                                 | Database setup, API architecture, CI/CD |
 
 ### 4.2 Cross-Functional Roles
 
@@ -63,12 +63,11 @@ EcoPlate is a sustainability-focused mobile and web application that combines fo
 flowchart TB
     subgraph Clients["Client Applications"]
         WEB["Web Browser<br/>(React + Vite)"]
-        IOS["iOS App<br/>(Capacitor)"]
         ANDROID["Android App<br/>(Capacitor)"]
     end
 
     subgraph Frontend["Frontend Layer"]
-        REACT["React 18<br/>TypeScript"]
+        REACT["React 19<br/>TypeScript"]
         TAILWIND["Tailwind CSS<br/>shadcn/ui"]
         CAPACITOR["Capacitor<br/>Native Bridge"]
     end
@@ -91,9 +90,9 @@ flowchart TB
         MYSQL["MySQL 8.0<br/>(Production)"]
     end
 
-    WEB & IOS & ANDROID --> REACT
+    WEB & ANDROID --> REACT
     REACT --> TAILWIND
-    IOS & ANDROID --> CAPACITOR
+    ANDROID --> CAPACITOR
     CAPACITOR --> REACT
     REACT -->|HTTP/REST| API
     API --> AUTH
@@ -110,7 +109,7 @@ flowchart TB
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Frontend** | React Native | Cross-platform mobile (iOS/Android) + Web |
+| **Frontend** | React Native | Cross-platform mobile (Android) + Web |
 | **Backend** | Bun | High-performance JavaScript runtime |
 | **Database** | MySQL 8.0+ | Relational data storage |
 | **LLM** | OpenAI GPT-4 | Receipt extraction, recommendations |
@@ -164,13 +163,15 @@ flowchart TB
 - UC-MP-004: Create Product Listing
 - UC-MP-005: Update/Delete Product Listing
 - UC-MP-006: Send/Receive Messages
-- UC-MP-007: Receive Price Recommendation
+- UC-MP-007: Receive Product Recommendation
 
 **Sprint 1 Key Deliverables:**
-- Marketplace browse/search with filters
-- Listing CRUD operations
-- In-app messaging system
-- AI-powered price recommendations
+- Marketplace browse/search with filters (title, category)
+- Location-based browsing with geolocation and radius filtering
+- Listing CRUD operations (create, read, update, delete)
+- User-specific listings view (`/my-listings`)
+- Mark listings as completed/sold
+- Basic messaging system (conversation creation and message sending)
 
 ---
 
@@ -220,120 +221,85 @@ flowchart TB
 ## 7. Database Design - Sprint 1
 
 ### 7.1 Entity-Relationship Diagram
-
 ```mermaid
 erDiagram
-    users ||--o{ products : "has"
-    users ||--o{ marketplace_listings : "sells"
-    users ||--o| user_points : "has"
-    users ||--o{ user_badges : "earns"
-    users ||--o{ conversation : "participates"
+   Badges {
+      int id PK
+      string code FK
+      string name
+      string description
+      string category
+      int awarded
+   }
 
-    products ||--o{ product_interaction : "records"
-    products ||--o| marketplace_listings : "listed as"
+   UserBadges {
+      int id PK
+      int userid FK
+      int badge_id FK
+      timestamp earned_at
+   }
 
-    marketplace_listings ||--o{ image_listing : "has"
-    marketplace_listings ||--o{ conversation : "belongs to"
+   Products {
+      int id PK
+      int userid FK
+      string productName
+      string category
+      float quantity
+      float unit_price
+      date purchase_date
+      string description
+      float co2_emission
+   }
 
-    conversation ||--o{ message : "contains"
+   User {
+      int id PK
+      string email
+      string password_hash
+      string name
+      string avatar_url
+      timestamp created_at
+      timestamp updated_at
+      string user_location
+   }
 
-    badges ||--o{ user_badges : "awarded as"
+   ImageListing {
+      int id PK
+      string description
+      string category
+      float price
+      int has
+      float original_price
+      date expiry_date
+      string pickup_location
+      string status
+      timestamp created_at
+      timestamp completed_at
+   }
 
-    users {
-        int id PK
-        string email UK
-        string password_hash
-        string name
-        string avatar_url
-        timestamp created_at
-        timestamp updated_at
-        string user_location
-    }
+   Conversation {
+      int id PK
+      int listing_id
+      int seller_id FK
+      int buyer_id FK
+   }
 
-    products {
-        int id PK
-        int userId FK
-        string productName
-        string category
-        float quantity
-        float unit_price
-        date purchase_date
-        string description
-        float co2_emission
-    }
+   Message {
+      int id PK
+      int conversation_id
+      int user_id FK
+      string message_text
+      timestamp created_at
+   }
 
-    marketplace_listings {
-        int id PK
-        int seller_id FK
-        int buyer_id
-        int product_id FK
-        string title
-        string description
-        string category
-        float quantity
-        float price
-        float original_price
-        date expiry_date
-        string pickup_location
-        string status
-        timestamp created_at
-        timestamp completed_at
-    }
-
-    image_listing {
-        int id PK
-        int listing_id FK
-        string image_url
-    }
-
-    conversation {
-        int id PK
-        int listing_id
-        int seller_id FK
-        int buyer_id FK
-    }
-
-    message {
-        int id PK
-        int conversation_id
-        int user_id FK
-        string message_text
-        timestamp created_at
-    }
-
-    product_interaction {
-        int id PK
-        int product_id FK
-        int user_id FK
-        date today_date
-        float quantity
-        string type
-    }
-
-    user_points {
-        int id PK
-        int userId FK
-        int total_points
-        int current_streak
-    }
-
-    badges {
-        int id PK
-        string code
-        string name
-        string description
-        string category
-        int points_awarded
-        int sort_order
-        string badge_image_url
-    }
-
-    user_badges {
-        int id PK
-        int userId FK
-        int badge_id FK
-        timestamp earned_at
-    }
+   User ||--o{ UserBadges : "has badges"
+   Badges ||--o{ UserBadges : "awarded to users"
+   User ||--o{ Products : "owns"
+   User ||--o{ Conversation : "sells as seller"
+   User ||--o{ Conversation : "buys as buyer"
+   Conversation ||--o{ Message : "contains"
+   User ||--o{ Message : "writes"
+   ImageListing ||--o{ Conversation : "listed in"
+   ImageListing ||--|| User : "belongs to (has)"
 ```
 
 ### 7.2 Database Performance Considerations
@@ -361,7 +327,7 @@ erDiagram
 ### 7.3 Data Migration & Seeding Plan
 
 **Sprint 1 Tasks:**
-1. **Day 1-2:** Schema creation scripts (Tek Sheng Qi lead)
+1. **Day 1-2:** Schema creation scripts
 2. **Day 3:** Seed data generation for testing
    - 50 dummy users
    - 200 dummy products across categories
@@ -448,8 +414,7 @@ erDiagram
     /lib              # shadcn/ui utilities (cn function)
     /constants        # Theme, colors, strings
     /hooks            # Custom React hooks
-  /android            # Capacitor Android project
-  /ios                # Capacitor iOS project
+    /android            # Capacitor Android project
   capacitor.config.ts # Capacitor configuration
   tailwind.config.js  # Tailwind CSS configuration
   components.json     # shadcn/ui configuration
@@ -968,14 +933,18 @@ A user story is considered "Done" when:
 
 **Marketplace (9 endpoints)**
 - GET /api/v1/marketplace/listings
+- GET /api/v1/marketplace/listings/nearby
+- GET /api/v1/marketplace/my-listings
 - GET /api/v1/marketplace/listings/{listingId}
 - POST /api/v1/marketplace/listings
 - PATCH /api/v1/marketplace/listings/{listingId}
 - DELETE /api/v1/marketplace/listings/{listingId}
-- POST /api/v1/marketplace/listings/{listingId}/price-recommendation
+- POST /api/v1/marketplace/listings/{listingId}/complete 
+- POST /api/v1/marketplace/listings/{listingId}/product-recommendation
+- GET /api/v1/marketplace/listings/{listingId}/messages
+- POST /api/v1/marketplace/listings/{listingId}/messages
+- GET /api/v1/marketplace/messages
 - POST /api/v1/marketplace/messages
-- GET /api/v1/marketplace/messages/conversations
-- GET /api/v1/marketplace/messages/{listingId}
 
 **Gamification (10 endpoints)**
 - GET /api/v1/gamification/dashboard

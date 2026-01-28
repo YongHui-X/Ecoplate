@@ -24,60 +24,56 @@ const demoUsers = [
   },
 ];
 
-// Sample listings
+// Sample products (MyFridge items)
+const sampleProducts = [
+  {
+    productName: "Fresh Organic Apples",
+    category: "produce",
+    quantity: 5.0,
+    unitPrice: 6.0,
+    description: "Sweet and crispy organic apples from local farm",
+    daysAgo: 2,
+  },
+  {
+    productName: "Whole Wheat Bread",
+    category: "bakery",
+    quantity: 2.0,
+    unitPrice: 2.25,
+    description: "Freshly baked whole wheat bread",
+    daysAgo: 1,
+  },
+];
+
+// Sample marketplace listings
 const sampleListings = [
   {
     title: "Fresh Organic Apples",
-    description: "Sweet and crispy organic apples from local farm.",
+    description: "Sweet and crispy organic apples from local farm. Selling half my stock!",
     category: "produce",
-    quantity: 2,
-    unit: "kg",
+    quantity: 2.0,
     price: 5.0,
     originalPrice: 12.0,
     expiryDays: 5,
-    location: "Queenstown MRT Station, Singapore 149305|1.2943,103.8016",
+    location: "Queenstown MRT Station, Singapore 149305",
   },
   {
     title: "Whole Wheat Bread",
-    description: "Freshly baked whole wheat bread.",
+    description: "Freshly baked whole wheat bread. Free to good home!",
     category: "bakery",
-    quantity: 2,
-    unit: "loaf",
-    price: null,
+    quantity: 2.0,
+    price: 0,
     originalPrice: 4.5,
     expiryDays: 2,
-    location: "Clementi Mall, Singapore 129588|1.3149,103.7651",
-  },
-  {
-    title: "Fresh Milk (2L)",
-    description: "Full cream fresh milk, unopened.",
-    category: "dairy",
-    quantity: 2,
-    unit: "l",
-    price: 3.5,
-    originalPrice: 6.0,
-    expiryDays: 3,
-    location: "Buona Vista MRT, Singapore 138600|1.3073,103.7897",
-  },
-  {
-    title: "Mixed Vegetables Pack",
-    description: "Assorted fresh vegetables - carrots, broccoli, lettuce.",
-    category: "produce",
-    quantity: 1,
-    unit: "pack",
-    price: 4.0,
-    originalPrice: 8.0,
-    expiryDays: 4,
-    location: "Commonwealth MRT, Singapore 149732|1.3025,103.7981",
+    location: "Clementi Mall, Singapore 129588",
   },
 ];
 
 async function seed() {
   try {
-    // Clear existing data
+    // Clear existing data in correct order (respecting foreign keys)
     console.log("Clearing existing data...");
-    sqlite.exec("DELETE FROM listing_images");
     sqlite.exec("DELETE FROM marketplace_listings");
+    sqlite.exec("DELETE FROM products");
     sqlite.exec("DELETE FROM users");
     sqlite.exec("DELETE FROM sqlite_sequence");
 
@@ -101,22 +97,51 @@ async function seed() {
       console.log(`  ✓ ${user.email}`);
     }
 
-    // Create listings
-    console.log("\nCreating sample listings...");
+    // Create products (MyFridge items)
+    console.log("\nCreating sample products (MyFridge)...");
+    const createdProducts: { id: number; productName: string }[] = [];
+
+    for (let i = 0; i < sampleProducts.length; i++) {
+      const product = sampleProducts[i];
+      const owner = createdUsers[i % createdUsers.length];
+
+      const purchaseDate = new Date();
+      purchaseDate.setDate(purchaseDate.getDate() - product.daysAgo);
+
+      const [created] = await db
+        .insert(schema.products)
+        .values({
+          userId: owner.id,
+          productName: product.productName,
+          category: product.category,
+          quantity: product.quantity,
+          unitPrice: product.unitPrice,
+          purchaseDate,
+          description: product.description,
+        })
+        .returning();
+
+      createdProducts.push({ id: created.id, productName: created.productName });
+      console.log(`  ✓ "${product.productName}" owned by ${owner.name}`);
+    }
+
+    // Create marketplace listings
+    console.log("\nCreating sample marketplace listings...");
     for (let i = 0; i < sampleListings.length; i++) {
       const listing = sampleListings[i];
       const seller = createdUsers[i % createdUsers.length];
+      const product = createdProducts[i % createdProducts.length];
 
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + listing.expiryDays);
 
       await db.insert(schema.marketplaceListings).values({
         sellerId: seller.id,
+        productId: product.id,
         title: listing.title,
         description: listing.description,
         category: listing.category,
         quantity: listing.quantity,
-        unit: listing.unit,
         price: listing.price,
         originalPrice: listing.originalPrice,
         expiryDate,

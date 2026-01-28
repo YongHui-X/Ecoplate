@@ -13,8 +13,8 @@ build/
 backend/public/assets/
 *.js.map
 
-# Database
-*.db
+# Database (allow ecoplate.db for shared dev data)
+# *.db
 *.db-journal
 *.db-wal
 *.db-shm
@@ -25,6 +25,8 @@ backend/public/assets/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.ml
+.env.mobile
 
 # IDE
 .idea/
@@ -53,4 +55,9 @@ coverage/
 # Misc
 *.pem
 .vercel
-nul
+
+# Mobile platforms
+android/
+ios/
+!android/.gitignore  # Keep the Android .gitignore
+!ios/.gitignore      # Keep the iOS .gitignore

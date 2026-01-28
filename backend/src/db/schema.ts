@@ -58,178 +58,36 @@ export const marketplaceListings = sqliteTable("marketplace_listings", {
   completedAt: integer("completed_at", { mode: "timestamp" }),
 });
 
-export const listingImages = sqliteTable("listing_images", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  listingId: integer("listing_id")
-    .notNull()
-    .references(() => marketplaceListings.id, { onDelete: "cascade" }),
-  imageUrl: text("image_url").notNull(),
-});
-
-// ==================== Communication ====================
-
-export const conversations = sqliteTable("conversations", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  listingId: integer("listing_id")
-    .notNull()
-    .references(() => marketplaceListings.id, { onDelete: "cascade" }),
-  sellerId: integer("seller_id")
-    .notNull()
-    .references(() => users.id),
-  buyerId: integer("buyer_id")
-    .notNull()
-    .references(() => users.id),
-});
-
-export const messages = sqliteTable("messages", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  conversationId: integer("conversation_id")
-    .notNull()
-    .references(() => conversations.id, { onDelete: "cascade" }),
-  userId: integer("user_id") // Sender of the message
-    .notNull()
-    .references(() => users.id),
-  messageText: text("message_text").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
-
-// ==================== ProductsSustainability ====================
-
-export const productSustainabilityMetrics = sqliteTable(
-  "product_sustainability_metrics",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    productId: integer("product_id")
-      .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
-    userId: integer("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    todayDate: integer("today_date", { mode: "timestamp" }).notNull(),
-    quantity: real("quantity").notNull(),
-    type: text("type").notNull(), // e.g., 'saved', 'wasted'
-  },
-);
-
-// ==================== Gamification ====================
-
-export const userPoints = sqliteTable("user_points", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id")
-    .notNull()
-    .unique()
-    .references(() => users.id, { onDelete: "cascade" }),
-  totalPoints: integer("total_points").default(0),
-  currentStreak: integer("current_streak").default(0),
-});
-
-// export const pointTransactions = sqliteTable("point_transactions", {
-//   id: integer("id").primaryKey({ autoIncrement: true }),
-//   userId: integer("user_id")
-//     .notNull()
-//     .references(() => users.id, { onDelete: "cascade" }),
-//   amount: integer("amount").notNull(),
-//   type: text("type").notNull(),
-//   action: text("action").notNull(),
-//   createdAt: integer("created_at", { mode: "timestamp" })
-//     .notNull()
-//     .$defaultFn(() => new Date()),
-// });
-
-export const badges = sqliteTable("badges", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  code: text("code").notNull().unique(),
-  name: text("name").notNull(),
-  description: text("description"),
-  pointsAwarded: integer("points_awarded").default(0),
-  badgeImageUrl: text("badge_image_url"),
-});
-
-export const userBadges = sqliteTable("user_badges", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  badgeId: integer("badge_id")
-    .notNull()
-    .references(() => badges.id, { onDelete: "cascade" }),
-  earnedAt: integer("earned_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
-
 // ==================== Relations ====================
 
-export const usersRelations = relations(users, ({ many, one }) => ({
+export const usersRelations = relations(users, ({ many }) => ({
   products: many(products),
-  listings: many(marketplaceListings, { relationName: "seller" }),
-  purchases: many(marketplaceListings, { relationName: "buyer" }),
-  points: one(userPoints),
-  // pointTransactions: many(pointTransactions),
-  badges: many(userBadges),
-  messages: many(messages),
+  listings: many(marketplaceListings),
+  purchases: many(marketplaceListings),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  user: one(users, {
+    fields: [products.userId],
+    references: [users.id],
+  }),
+  listings: many(marketplaceListings),
 }));
 
 export const marketplaceListingsRelations = relations(
   marketplaceListings,
-  ({ one, many }) => ({
+  ({ one }) => ({
     seller: one(users, {
       fields: [marketplaceListings.sellerId],
       references: [users.id],
-      relationName: "seller",
     }),
     buyer: one(users, {
       fields: [marketplaceListings.buyerId],
       references: [users.id],
-      relationName: "buyer",
     }),
     product: one(products, {
       fields: [marketplaceListings.productId],
       references: [products.id],
     }),
-    images: many(listingImages),
-    conversations: many(conversations),
-  }),
+  })
 );
-
-export const conversationsRelations = relations(
-  conversations,
-  ({ one, many }) => ({
-    listing: one(marketplaceListings, {
-      fields: [conversations.listingId],
-      references: [marketplaceListings.id],
-    }),
-    seller: one(users, {
-      fields: [conversations.sellerId],
-      references: [users.id],
-    }),
-    buyer: one(users, {
-      fields: [conversations.buyerId],
-      references: [users.id],
-    }),
-    messages: many(messages),
-  }),
-);
-
-export const messagesRelations = relations(messages, ({ one }) => ({
-  conversation: one(conversations, {
-    fields: [messages.conversationId],
-    references: [conversations.id],
-  }),
-  sender: one(users, {
-    fields: [messages.userId],
-    references: [users.id],
-  }),
-}));
-
-export const userBadgesRelations = relations(userBadges, ({ one }) => ({
-  user: one(users, { fields: [userBadges.userId], references: [users.id] }),
-  badge: one(badges, { fields: [userBadges.badgeId], references: [badges.id] }),
-}));
-
-export const productsRelations = relations(products, ({ one, many }) => ({
-  user: one(users, { fields: [products.userId], references: [users.id] }),
-  metrics: many(productSustainabilityMetrics),
-}));

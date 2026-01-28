@@ -7,8 +7,49 @@
 This is a monorepo with three main components:
 
 - `backend/` - Bun API server
-- `frontend/` - React application with Capacitor
+- `frontend/` - React application with Capacitor (Web + Android only)
 - `recommendation-engine/` - Python Flask API for ML recommendations
+
+## Database Schema
+
+The project uses SQLite with Drizzle ORM. Schema is defined in `backend/src/db/schema.ts`.
+
+**Core Tables (matching ERD):**
+- `users` - User accounts and profiles
+- `products` - MyFridge inventory items
+- `marketplace_listings` - Marketplace listings
+
+**CRITICAL: Database Migration Process**
+
+The SQLite database (`backend/ecoplate.db`) is **committed to git** to share data among team members.
+
+1. **Never modify the database directly** - Always modify `schema.ts`
+2. **The `.db` file IS committed** - Shared dev data via version control
+3. **When pulling changes:**
+   - If schema changed, you may need to run migrations
+   - If only data changed, git pull will update your local database
+   - **Stop the backend server before pulling** to avoid file lock conflicts
+
+4. **To reset your local database (if needed):**
+   ```bash
+   cd backend
+   # Stop the server first!
+   # Windows:
+   del ecoplate.db
+   bun run db:migrate
+   bun run db:seed
+   # Linux/macOS:
+   rm -f ecoplate.db && bun run db:migrate && bun run db:seed
+   ```
+
+5. **When modifying schema:**
+   - Edit `backend/src/db/schema.ts`
+   - Delete old migration: `rm -rf backend/src/db/migrations` (or `rmdir /s backend\src\db\migrations` on Windows)
+   - Generate new migration: `cd backend && bunx drizzle-kit generate:sqlite`
+   - Update `migrate.ts` to reference new migration file name
+   - Test locally, then commit schema.ts, migration files, AND the updated `.db` file
+
+**Note:** Avoid committing sensitive data (real user emails, passwords). The database should only contain demo/test data.
 
 ## Backend (Bun API Server)
 
@@ -91,7 +132,6 @@ frontend/
 │   ├── App.tsx             # Root component
 │   └── main.tsx            # React entry point
 ├── android/                # Capacitor Android project
-├── ios/                    # Capacitor iOS project
 ├── capacitor.config.ts     # Capacitor configuration
 ├── tailwind.config.js      # Tailwind CSS configuration
 ├── components.json         # shadcn/ui configuration
@@ -107,7 +147,6 @@ bun run dev        # Development with hot reload
 bun run build      # Production build
 bun run preview    # Preview production build
 npx cap sync       # Sync Capacitor native projects
-npx cap open ios   # Open iOS project in Xcode
 npx cap open android  # Open Android project in Android Studio
 ```
 

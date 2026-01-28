@@ -1,25 +1,26 @@
-import { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { useState, useEffect, useMemo } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 // @ts-ignore - react-leaflet-cluster doesn't have proper types
-import MarkerClusterGroup from 'react-leaflet-cluster';
-import { Icon, LatLngExpression } from 'leaflet';
-import { useGeolocation } from '../../hooks/useGeolocation';
-import { filterListingsByRadius, type Coordinates } from '../../utils/distance';
-import { ListingMapCard } from '../../components/marketplace/ListingMapCard';
-import { Button } from '../../components/ui/button';
-import { Card } from '../../components/ui/card';
-import { Label } from '../../components/ui/label';
-import { Input } from '../../components/ui/input';
-import { List, Map as MapIcon, Loader2, MapPin, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import MarkerClusterGroup from "react-leaflet-cluster";
+import { Icon, LatLngExpression } from "leaflet";
+import { useGeolocation } from "../../hooks/useGeolocation";
+import { filterListingsByRadius, type Coordinates } from "../../utils/distance";
+import { ListingMapCard } from "../../components/marketplace/ListingMapCard";
+import { Button } from "../../components/ui/button";
+import { Card } from "../../components/ui/card";
+import { Label } from "../../components/ui/label";
+import { Input } from "../../components/ui/input";
+import { List, Map as MapIcon, Loader2, MapPin, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import type { MarketplaceListingWithDistance } from "../../types/marketplace";
 
 // Fix Leaflet default marker icon issue
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
+import icon from "leaflet/dist/images/marker-icon.png";
+import iconShadow from "leaflet/dist/images/marker-shadow.png";
+import iconRetina from "leaflet/dist/images/marker-icon-2x.png";
 
 const DefaultIcon = new Icon({
   iconUrl: icon,
@@ -32,7 +33,9 @@ const DefaultIcon = new Icon({
 });
 
 const UserLocationIcon = new Icon({
-  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+  iconUrl:
+    "data:image/svg+xml;base64," +
+    btoa(`
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10" fill="#3b82f6" stroke="white" stroke-width="3"/>
       <circle cx="12" cy="12" r="3" fill="white"/>
@@ -42,31 +45,8 @@ const UserLocationIcon = new Icon({
   iconAnchor: [12, 12],
 });
 
-export interface MarketplaceListing {
-  id: number;
-  title: string;
-  description: string | null;
-  category: string | null;
-  quantity: number;
-  unit: string;
-  price: number | null;
-  originalPrice: number | null;
-  expiryDate: string | null;
-  pickupLocation: string;
-  coordinates?: Coordinates;
-  status: string;
-  sellerId: number;
-  seller?: {
-    id: number;
-    name: string;
-    avatarUrl?: string | null;
-  };
-  images?: Array<{ id: number; imageUrl: string }>;
-  distance?: number;
-}
-
 interface MarketplaceMapProps {
-  listings?: MarketplaceListing[];
+  listings?: MarketplaceListingWithDistance[];
   loading?: boolean;
   onToggleView?: () => void;
 }
@@ -113,7 +93,9 @@ export default function MarketplaceMap({
   ]);
 
   // Actual user location to use (either from GPS or default)
-  const effectiveUserLocation = useDefaultLocation ? DEFAULT_USER_LOCATION : userLocation;
+  const effectiveUserLocation = useDefaultLocation
+    ? DEFAULT_USER_LOCATION
+    : userLocation;
 
   // Filter listings by radius
   const filteredListings = useMemo(() => {
@@ -129,7 +111,10 @@ export default function MarketplaceMap({
   // Update map center when user location is available
   useEffect(() => {
     if (effectiveUserLocation) {
-      setMapCenter([effectiveUserLocation.latitude, effectiveUserLocation.longitude]);
+      setMapCenter([
+        effectiveUserLocation.latitude,
+        effectiveUserLocation.longitude,
+      ]);
     }
   }, [effectiveUserLocation]);
 
@@ -256,7 +241,8 @@ export default function MarketplaceMap({
 
         {/* Listings Count */}
         <div className="text-sm text-gray-600">
-          Showing {filteredListings.length} listing{filteredListings.length !== 1 ? 's' : ''}{' '}
+          Showing {filteredListings.length} listing
+          {filteredListings.length !== 1 ? "s" : ""}{" "}
           {effectiveUserLocation && `within ${radiusKm}km`}
         </div>
       </Card>
@@ -276,7 +262,7 @@ export default function MarketplaceMap({
             zoom={13}
             scrollWheelZoom={true}
             className="h-full w-full"
-            style={{ height: '100%', minHeight: '500px' }}
+            style={{ height: "100%", minHeight: "500px" }}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -289,16 +275,23 @@ export default function MarketplaceMap({
             {effectiveUserLocation && (
               <>
                 <Marker
-                  position={[effectiveUserLocation.latitude, effectiveUserLocation.longitude]}
+                  position={[
+                    effectiveUserLocation.latitude,
+                    effectiveUserLocation.longitude,
+                  ]}
                   icon={UserLocationIcon}
                 >
                   <Popup>
                     <div className="text-center">
                       <p className="font-semibold">
-                        {useDefaultLocation ? 'Default Location (169648)' : 'Your Location'}
+                        {useDefaultLocation
+                          ? "Default Location (169648)"
+                          : "Your Location"}
                       </p>
                       {useDefaultLocation && (
-                        <p className="text-xs text-gray-500 mt-1">Queenstown, Singapore</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Queenstown, Singapore
+                        </p>
                       )}
                     </div>
                   </Popup>
@@ -306,11 +299,14 @@ export default function MarketplaceMap({
 
                 {/* Radius Circle */}
                 <Circle
-                  center={[effectiveUserLocation.latitude, effectiveUserLocation.longitude]}
+                  center={[
+                    effectiveUserLocation.latitude,
+                    effectiveUserLocation.longitude,
+                  ]}
                   radius={radiusKm * 1000} // Convert km to meters
                   pathOptions={{
-                    color: '#3b82f6',
-                    fillColor: '#3b82f6',
+                    color: "#3b82f6",
+                    fillColor: "#3b82f6",
                     fillOpacity: 0.1,
                     weight: 2,
                   }}
@@ -331,12 +327,15 @@ export default function MarketplaceMap({
                 return (
                   <Marker
                     key={listing.id}
-                    position={[listing.coordinates.latitude, listing.coordinates.longitude]}
+                    position={[
+                      listing.coordinates.latitude,
+                      listing.coordinates.longitude,
+                    ]}
                     icon={DefaultIcon}
                   >
                     <Popup>
                       <ListingMapCard
-                        listing={listing as MarketplaceListing}
+                        listing={listing}
                         onViewDetails={() => handleViewDetails(listing.id)}
                       />
                     </Popup>
@@ -354,7 +353,9 @@ export default function MarketplaceMap({
           <Card className="p-6 text-center pointer-events-auto">
             <MapIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
             <p className="text-gray-600">No listings found in this area</p>
-            <p className="text-sm text-gray-500 mt-1">Try increasing the radius</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Try increasing the radius
+            </p>
           </Card>
         </div>
       )}
