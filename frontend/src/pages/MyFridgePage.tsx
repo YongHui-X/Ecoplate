@@ -495,9 +495,11 @@ function ScanReceiptModal({
     [addToast]
   );
 
+  const SUPPORTED_FORMATS = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
   const processFile = async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      addToast("Please upload an image file", "error");
+    if (!SUPPORTED_FORMATS.includes(file.type)) {
+      addToast("Unsupported format. Please use PNG, JPEG, GIF, or WebP.", "error");
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
@@ -750,7 +752,7 @@ function ScanReceiptModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/gif,image/webp"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) processFile(file);
