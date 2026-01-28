@@ -6,7 +6,7 @@ const dbPath = "ecoplate.db";
 const migrationFile = join(
   import.meta.dir,
   "migrations",
-  "0000_past_blackheart.sql"
+  "0000_dizzy_dust.sql"
 );
 
 console.log("Running database migration...\n");

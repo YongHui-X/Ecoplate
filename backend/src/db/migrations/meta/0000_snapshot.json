@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "sqlite",
-  "id": "a19d63ca-3882-4084-8af1-fd547fe78de9",
+  "id": "0c520b5d-149b-4684-bfdd-70a1d09d11b5",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "marketplace_listings": {
@@ -63,6 +63,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "price": {
           "name": "price",
           "type": "real",
@@ -86,6 +93,13 @@
         },
         "pickup_location": {
           "name": "pickup_location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "images": {
+          "name": "images",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -195,6 +209,13 @@
           "type": "real",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "unit_price": {

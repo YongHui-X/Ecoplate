@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
+import { uploadService } from "../services/upload";
+import { formatQuantityWithUnit } from "../constants/units";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -106,11 +108,23 @@ function ListingCard({ listing, onDelete }: ListingCardProps) {
       ? Math.round((1 - listing.price / listing.originalPrice) * 100)
       : null;
 
+  // Get first image as thumbnail
+  const imageUrls = uploadService.getListingImageUrls(listing.images);
+  const thumbnailUrl = imageUrls[0];
+
   return (
     <Card className="overflow-hidden">
-      {/* Placeholder Image */}
-      <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b">
-        <div className="text-gray-400 text-4xl">📦</div>
+      {/* Product Image */}
+      <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b overflow-hidden">
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={listing.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="text-gray-400 text-4xl">📦</div>
+        )}
         {discount && (
           <Badge className="absolute top-2 right-2 bg-red-500">
             -{discount}%
@@ -189,7 +203,7 @@ function ListingCard({ listing, onDelete }: ListingCardProps) {
             </div>
           )}
           <div className="text-sm text-gray-500 mt-1">
-            Quantity: {listing.quantity}
+            Quantity: {formatQuantityWithUnit(listing.quantity, listing.unit)}
           </div>
         </div>
 

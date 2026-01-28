@@ -8,7 +8,9 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { ArrowLeft, Plus } from "lucide-react";
 import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
+import { PRODUCT_UNITS } from "../constants/units";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
+import { ImagePicker } from "../components/common/ImagePicker";
 
 export default function CreateListingPage() {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export default function CreateListingPage() {
     description: "",
     category: "",
     quantity: "1",
+    unit: "",
     price: "",
     originalPrice: "",
     expiryDate: "",
@@ -29,6 +32,8 @@ export default function CreateListingPage() {
   const [coordinates, setCoordinates] = useState<
     { latitude: number; longitude: number } | undefined
   >();
+
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -63,13 +68,15 @@ export default function CreateListingPage() {
         description: formData.description.trim() || undefined,
         category: formData.category || undefined,
         quantity: parseFloat(formData.quantity),
-        price: formData.price ? parseFloat(formData.price) : null,
-        originalPrice: formData.originalPrice
+        unit: formData.unit || undefined,
+        price: formData.price && formData.price.trim() !== "" ? parseFloat(formData.price) : null,
+        originalPrice: formData.originalPrice && formData.originalPrice.trim() !== ""
           ? parseFloat(formData.originalPrice)
           : undefined,
-        expiryDate: formData.expiryDate || undefined,
+        expiryDate: formData.expiryDate && formData.expiryDate.trim() !== "" ? formData.expiryDate : undefined,
         pickupLocation: formData.pickupLocation.trim() || undefined,
         coordinates: coordinates,
+        images: imageUrls.length > 0 ? imageUrls : undefined,
       };
 
       const listing = await marketplaceService.createListing(data);
@@ -161,26 +168,46 @@ export default function CreateListingPage() {
               </div>
             </div>
 
-            {/* Quantity */}
-            <div className="space-y-2">
-              <Label htmlFor="quantity">
-                Quantity <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="quantity"
-                name="quantity"
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={formData.quantity}
-                onChange={handleChange}
-                placeholder="e.g., 2.5"
-                required
-              />
-              <p className="text-sm text-gray-500">
-                Enter quantity (e.g., 2 for 2kg, 3 for 3 items)
-              </p>
+            {/* Quantity and Unit */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">
+                  Quantity <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="quantity"
+                  name="quantity"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  placeholder="e.g., 2.5"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unit">Unit</Label>
+                <select
+                  id="unit"
+                  name="unit"
+                  value={formData.unit}
+                  onChange={handleChange}
+                  className="w-full h-10 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Select unit (optional)</option>
+                  {PRODUCT_UNITS.map((unit) => (
+                    <option key={unit.value} value={unit.value}>
+                      {unit.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+            <p className="text-sm text-gray-500 -mt-3">
+              Specify the unit of measurement (e.g., kg, bottles, pcs)
+            </p>
 
             {/* Prices */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -235,6 +262,19 @@ export default function CreateListingPage() {
                 Please select a location from the dropdown to enable map display
               </p>
             ) : null}
+
+            {/* Product Images */}
+            <div className="space-y-2">
+              <Label>Product Images</Label>
+              <ImagePicker
+                maxImages={5}
+                onImagesChange={setImageUrls}
+                initialImages={[]}
+              />
+              <p className="text-sm text-gray-500">
+                Add up to 5 images. You can take photos or choose from your gallery.
+              </p>
+            </div>
 
             {/* Submit Buttons */}
             <div className="flex gap-4 pt-4">

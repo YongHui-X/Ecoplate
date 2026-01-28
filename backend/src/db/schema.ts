@@ -28,6 +28,7 @@ export const products = sqliteTable("products", {
   productName: text("product_name").notNull(),
   category: text("category"),
   quantity: real("quantity").notNull(),
+  unit: text("unit"), // e.g., "kg", "L", "pcs", "bottles"
   unitPrice: real("unit_price"),
   purchaseDate: integer("purchase_date", { mode: "timestamp" }),
   description: text("description"),
@@ -47,10 +48,12 @@ export const marketplaceListings = sqliteTable("marketplace_listings", {
   description: text("description"),
   category: text("category"),
   quantity: real("quantity").notNull(),
+  unit: text("unit"), // e.g., "kg", "L", "pcs", "bottles"
   price: real("price"),
   originalPrice: real("original_price"),
   expiryDate: integer("expiry_date", { mode: "timestamp" }),
   pickupLocation: text("pickup_location"),
+  images: text("images"), // JSON array of image URLs: ["uploads/marketplace/abc.jpg", ...]
   status: text("status").notNull().default("active"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()

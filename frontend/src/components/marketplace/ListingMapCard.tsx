@@ -1,4 +1,6 @@
 import { formatDistance } from "../../utils/distance";
+import { uploadService } from "../../services/upload";
+import { formatQuantityWithUnit } from "../../constants/units";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Calendar, MapPin, DollarSign, Package } from "lucide-react";
@@ -54,11 +56,23 @@ export function ListingMapCard({
 
   const urgency = getExpiryUrgency(listing.expiryDate);
 
+  // Get first image as thumbnail
+  const imageUrls = uploadService.getListingImageUrls(listing.images);
+  const thumbnailUrl = imageUrls[0];
+
   return (
     <div className="w-64 p-0 space-y-3">
-      {/* Placeholder Image */}
-      <div className="w-full h-32 bg-gray-100 flex items-center justify-center rounded-t border-b">
-        <Package className="h-12 w-12 text-gray-400" />
+      {/* Product Image */}
+      <div className="w-full h-32 bg-gray-100 flex items-center justify-center rounded-t border-b overflow-hidden">
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={listing.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Package className="h-12 w-12 text-gray-400" />
+        )}
       </div>
 
       <div className="px-3 pb-3 space-y-2">
@@ -120,7 +134,9 @@ export function ListingMapCard({
         )}
 
         {/* Quantity */}
-        <div className="text-xs text-gray-600">Quantity: {listing.quantity}</div>
+        <div className="text-xs text-gray-600">
+          Quantity: {formatQuantityWithUnit(listing.quantity, listing.unit)}
+        </div>
 
         {/* Action Button */}
         <Button onClick={onViewDetails} size="sm" className="w-full">

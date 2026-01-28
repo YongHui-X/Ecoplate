@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
+import { uploadService } from "../services/upload";
+import { formatQuantityWithUnit } from "../constants/units";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { ArrowLeft, MapPin, Clock, Edit, Trash2, CheckCircle } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Edit, Trash2, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatDate, getDaysUntilExpiry } from "../lib/utils";
 import type { MarketplaceListing } from "../types/marketplace";
 
@@ -15,6 +17,7 @@ export default function ListingDetailPage() {
   const [listing, setListing] = useState<MarketplaceListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { user } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -92,6 +95,18 @@ export default function ListingDetailPage() {
       ? Math.round((1 - listing.price / listing.originalPrice) * 100)
       : null;
 
+  // Get listing images
+  const imageUrls = uploadService.getListingImageUrls(listing.images);
+  const hasImages = imageUrls.length > 0;
+
+  const handlePrevImage = () => {
+    setCurrentImageIndex((prev) => (prev === 0 ? imageUrls.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = () => {
+    setCurrentImageIndex((prev) => (prev === imageUrls.length - 1 ? 0 : prev + 1));
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Button variant="ghost" onClick={() => navigate("/marketplace")}>
@@ -100,12 +115,73 @@ export default function ListingDetailPage() {
       </Button>
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Placeholder Image */}
-        <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center border">
-          <div className="text-center text-gray-400">
-            <p className="text-4xl mb-2">📦</p>
-            <p className="text-sm">No image</p>
+        {/* Image Gallery */}
+        <div className="space-y-4">
+          {/* Main Image */}
+          <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden border">
+            {hasImages ? (
+              <>
+                <img
+                  src={imageUrls[currentImageIndex]}
+                  alt={`${listing.title} - Image ${currentImageIndex + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                {imageUrls.length > 1 && (
+                  <>
+                    {/* Navigation Arrows */}
+                    <button
+                      onClick={handlePrevImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition"
+                      aria-label="Previous image"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={handleNextImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition"
+                      aria-label="Next image"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                    {/* Image Counter */}
+                    <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
+                      {currentImageIndex + 1} / {imageUrls.length}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center text-gray-400">
+                  <p className="text-4xl mb-2">📦</p>
+                  <p className="text-sm">No image</p>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Thumbnail Gallery */}
+          {imageUrls.length > 1 && (
+            <div className="grid grid-cols-5 gap-2">
+              {imageUrls.map((url, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`aspect-square rounded-md overflow-hidden border-2 transition ${
+                    index === currentImageIndex
+                      ? "border-primary ring-2 ring-primary/20"
+                      : "border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  <img
+                    src={url}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Details */}
@@ -185,7 +261,7 @@ export default function ListingDetailPage() {
             )}
 
             <div>
-              <strong>Quantity:</strong> {listing.quantity}
+              <strong>Quantity:</strong> {formatQuantityWithUnit(listing.quantity, listing.unit)}
             </div>
 
             <div className="text-sm text-gray-500">

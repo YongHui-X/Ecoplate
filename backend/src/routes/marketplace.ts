@@ -12,6 +12,7 @@ const listingSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional(),
   quantity: z.number().positive().default(1),
+  unit: z.string().optional(), // e.g., "kg", "L", "pcs"
   price: z.number().min(0).nullable().optional(),
   originalPrice: z.number().positive().optional(),
   expiryDate: z.string().optional(),
@@ -20,6 +21,7 @@ const listingSchema = z.object({
     latitude: z.number(),
     longitude: z.number(),
   }).optional(),
+  images: z.array(z.string()).max(5).optional(), // Array of image URLs, max 5
 });
 
 export function registerMarketplaceRoutes(router: Router) {
@@ -156,7 +158,15 @@ export function registerMarketplaceRoutes(router: Router) {
       const body = await parseBody(req);
       console.log("Create listing - Body:", JSON.stringify(body, null, 2));
 
-      const data = listingSchema.parse(body);
+      // Validate with Zod
+      const result = listingSchema.safeParse(body);
+      if (!result.success) {
+        console.error("Validation failed:", result.error.format());
+        const firstError = result.error.errors[0];
+        return error(`${firstError.path.join('.')}: ${firstError.message}`, 400);
+      }
+
+      const data = result.data;
       console.log("Create listing - Validated data:", JSON.stringify(data, null, 2));
 
       let pickupLocationValue = data.pickupLocation;
@@ -173,10 +183,12 @@ export function registerMarketplaceRoutes(router: Router) {
           description: data.description,
           category: data.category,
           quantity: data.quantity,
+          unit: data.unit,
           price: data.price,
           originalPrice: data.originalPrice,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
           pickupLocation: pickupLocationValue,
+          images: data.images ? JSON.stringify(data.images) : null,
         })
         .returning();
 
@@ -199,7 +211,18 @@ export function registerMarketplaceRoutes(router: Router) {
       const user = getUser(req);
       const listingId = parseInt(params.id, 10);
       const body = await parseBody(req);
-      const data = listingSchema.partial().parse(body);
+      console.log("Update listing - Body:", JSON.stringify(body, null, 2));
+
+      // Validate with Zod
+      const result = listingSchema.partial().safeParse(body);
+      if (!result.success) {
+        console.error("Validation failed:", result.error.format());
+        const firstError = result.error.errors[0];
+        return error(`${firstError.path.join('.')}: ${firstError.message}`, 400);
+      }
+
+      const data = result.data;
+      console.log("Update listing - Validated data:", JSON.stringify(data, null, 2));
 
       const existing = await db.query.marketplaceListings.findFirst({
         where: and(
@@ -212,34 +235,50 @@ export function registerMarketplaceRoutes(router: Router) {
         return error("Listing not found", 404);
       }
 
-      let pickupLocationValue = data.pickupLocation;
-      if (data.coordinates && data.pickupLocation) {
-        pickupLocationValue = `${data.pickupLocation}|${data.coordinates.latitude},${data.coordinates.longitude}`;
+      // Build update object only with provided fields
+      const updateData: any = {};
+
+      if (data.productId !== undefined) updateData.productId = data.productId;
+      if (data.title !== undefined) updateData.title = data.title;
+      if (data.description !== undefined) updateData.description = data.description;
+      if (data.category !== undefined) updateData.category = data.category;
+      if (data.quantity !== undefined) updateData.quantity = data.quantity;
+      if (data.unit !== undefined) updateData.unit = data.unit;
+      if (data.price !== undefined) updateData.price = data.price;
+      if (data.originalPrice !== undefined) updateData.originalPrice = data.originalPrice;
+      if (data.expiryDate !== undefined) updateData.expiryDate = new Date(data.expiryDate);
+
+      // Handle pickup location with coordinates
+      if (data.pickupLocation !== undefined) {
+        if (data.coordinates) {
+          updateData.pickupLocation = `${data.pickupLocation}|${data.coordinates.latitude},${data.coordinates.longitude}`;
+        } else {
+          updateData.pickupLocation = data.pickupLocation;
+        }
+      }
+
+      // Handle images
+      if (data.images !== undefined) {
+        updateData.images = data.images.length > 0 ? JSON.stringify(data.images) : null;
       }
 
       const [updated] = await db
         .update(marketplaceListings)
-        .set({
-          productId: data.productId,
-          title: data.title,
-          description: data.description,
-          category: data.category,
-          quantity: data.quantity,
-          price: data.price,
-          originalPrice: data.originalPrice,
-          expiryDate: data.expiryDate ? new Date(data.expiryDate) : existing.expiryDate,
-          pickupLocation: pickupLocationValue ?? existing.pickupLocation,
-        })
+        .set(updateData)
         .where(eq(marketplaceListings.id, listingId))
         .returning();
 
+      console.log("Update listing - Success:", updated);
       return json(updated);
-    } catch (e) {
+    } catch (e: any) {
       if (e instanceof z.ZodError) {
+        console.error("Update listing validation error:", e.errors);
         return error(e.errors[0].message, 400);
       }
       console.error("Update listing error:", e);
-      return error("Failed to update listing", 500);
+      console.error("Error message:", e?.message);
+      console.error("Error stack:", e?.stack);
+      return error(e?.message || "Failed to update listing", 500);
     }
   });
 

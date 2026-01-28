@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
+import { uploadService } from "../services/upload";
+import { formatQuantityWithUnit } from "../constants/units";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
@@ -188,11 +190,23 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
       ? Math.round((1 - listing.price / listing.originalPrice) * 100)
       : null;
 
+  // Get first image as thumbnail
+  const imageUrls = uploadService.getListingImageUrls(listing.images);
+  const thumbnailUrl = imageUrls[0];
+
   return (
     <Link to={`/marketplace/${listing.id}`}>
       <Card className="hover:shadow-md transition-shadow overflow-hidden">
-        <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b">
-          <div className="text-gray-400 text-4xl">📦</div>
+        <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b overflow-hidden">
+          {thumbnailUrl ? (
+            <img
+              src={thumbnailUrl}
+              alt={listing.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="text-gray-400 text-4xl">📦</div>
+          )}
           {discount && (
             <Badge className="absolute top-2 right-2 bg-red-500">
               -{discount}%
@@ -250,7 +264,7 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
               )}
             </div>
             <div className="text-sm text-gray-500">
-              Qty: {listing.quantity}
+              Qty: {formatQuantityWithUnit(listing.quantity, listing.unit)}
             </div>
           </div>
 
