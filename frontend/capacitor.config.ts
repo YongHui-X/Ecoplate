@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: {
     // For development, connect to local backend
     // Comment out for production builds
-    url: 'http://localhost:5173',
+    url: 'http://10.0.2.2:5173',
     cleartext: true,
   },
   plugins: {

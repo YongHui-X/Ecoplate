@@ -19,7 +19,7 @@
     "db:seed": "cd backend && bun run src/db/seed.ts"
   },
   "dependencies": {
-    "@capacitor/android": "^8.0.1",
+    "@capacitor/android": "^8.0.2",
     "@capacitor/geolocation": "^8.0.0",
     "debug": "^4.4.3",
     "drizzle-kit": "^0.31.8",
