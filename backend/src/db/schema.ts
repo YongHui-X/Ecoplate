@@ -35,6 +35,39 @@ export const products = sqliteTable("products", {
   co2Emission: real("co2_emission"),
 });
 
+// ==================== Product Sustainability Metrics ====================
+
+export const productSustainabilityMetrics = sqliteTable("product_sustainability_metrics", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  productId: integer("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  todayDate: text("today_date"), // YYYY-MM-DD format
+  quantity: real("quantity"),
+  type: text("type"), // e.g., "Add", "Consume", "Waste"
+});
+
+// ==================== Pending Consumption Records ====================
+
+export const pendingConsumptionRecords = sqliteTable("pending_consumption_records", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  rawPhoto: text("raw_photo").notNull(), // Base64 encoded image
+  ingredients: text("ingredients").notNull(), // JSON array of ingredients
+  status: text("status").notNull().default("PENDING_WASTE_PHOTO"), // PENDING_WASTE_PHOTO | COMPLETED
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 // ==================== Marketplace Listings ====================
 
 export const marketplaceListings = sqliteTable("marketplace_listings", {
@@ -103,6 +136,8 @@ export const messages = sqliteTable("messages", {
 
 export const usersRelations = relations(users, ({ many }) => ({
   products: many(products),
+  productSustainabilityMetrics: many(productSustainabilityMetrics),
+  pendingConsumptionRecords: many(pendingConsumptionRecords),
   listings: many(marketplaceListings, { relationName: "seller" }),
   purchases: many(marketplaceListings, { relationName: "buyer" }),
   conversationsAsSeller: many(conversations, { relationName: "seller" }),
@@ -115,6 +150,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     fields: [products.userId],
     references: [users.id],
   }),
+  sustainabilityMetrics: many(productSustainabilityMetrics),
   listings: many(marketplaceListings),
 }));
 
@@ -170,3 +206,27 @@ export const messagesRelations = relations(messages, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const productSustainabilityMetricsRelations = relations(
+  productSustainabilityMetrics,
+  ({ one }) => ({
+    product: one(products, {
+      fields: [productSustainabilityMetrics.productId],
+      references: [products.id],
+    }),
+    user: one(users, {
+      fields: [productSustainabilityMetrics.userId],
+      references: [users.id],
+    }),
+  })
+);
+
+export const pendingConsumptionRecordsRelations = relations(
+  pendingConsumptionRecords,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [pendingConsumptionRecords.userId],
+      references: [users.id],
+    }),
+  })
+);

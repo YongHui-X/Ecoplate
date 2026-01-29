@@ -141,7 +141,6 @@ beforeAll(async () => {
       quantity: 2,
       unitPrice: 8.0,
       co2Emission: 9.0,
-      isConsumed: false,
     })
     .returning();
   testProductId = product.id;
@@ -277,7 +276,6 @@ describe("POST /api/v1/consumption/analyze-waste", () => {
             co2Emission: 9.0,
           },
         ],
-        disposalMethod: "landfill",
       }
     );
 
@@ -288,7 +286,6 @@ describe("POST /api/v1/consumption/analyze-waste", () => {
     const m = res.data.metrics;
     expect(typeof m.totalCO2Wasted).toBe("number");
     expect(typeof m.totalCO2Saved).toBe("number");
-    expect(typeof m.disposalCO2).toBe("number");
     expect(typeof m.totalEconomicWaste).toBe("number");
     expect(typeof m.totalEconomicConsumed).toBe("number");
     expect(typeof m.wastePercentage).toBe("number");
@@ -309,8 +306,8 @@ describe("POST /api/v1/consumption/analyze-waste", () => {
   test("records product interactions in database", async () => {
     // Clear any existing interactions first
     await testDb
-      .delete(schema.productInteraction)
-      .where(eq(schema.productInteraction.userId, testUserId));
+      .delete(schema.productSustainabilityMetrics)
+      .where(eq(schema.productSustainabilityMetrics.userId, testUserId));
 
     const router = createRouter();
     await makeRequest(router, "POST", "/api/v1/consumption/analyze-waste", {
@@ -325,43 +322,18 @@ describe("POST /api/v1/consumption/analyze-waste", () => {
           co2Emission: 9.0,
         },
       ],
-      disposalMethod: "landfill",
     });
 
     // Verify interactions in database
-    const interactions = await testDb.query.productInteraction.findMany({
-      where: eq(schema.productInteraction.userId, testUserId),
+    const interactions = await testDb.query.productSustainabilityMetrics.findMany({
+      where: eq(schema.productSustainabilityMetrics.userId, testUserId),
     });
 
     expect(interactions.length).toBeGreaterThan(0);
-    // Should have both consumed and wasted interactions (since mock returns waste)
+    // Should have both Consume and Waste interactions (since mock returns waste)
     const types = interactions.map((i) => i.type);
-    expect(types).toContain("consumed");
-    expect(types).toContain("wasted");
+    expect(types).toContain("Consume");
+    expect(types).toContain("Waste");
   });
 
-  test("defaults to landfill when disposalMethod is not provided", async () => {
-    const router = createRouter();
-    const res = await makeRequest(
-      router,
-      "POST",
-      "/api/v1/consumption/analyze-waste",
-      {
-        imageBase64: "data:image/jpeg;base64,/9j/fakeimage",
-        ingredients: [
-          {
-            productId: testProductId,
-            productName: "Chicken Breast",
-            quantityUsed: 0.5,
-            category: "meat",
-            unitPrice: 8.0,
-            co2Emission: 9.0,
-          },
-        ],
-      }
-    );
-
-    expect(res.status).toBe(200);
-    expect(res.data.metrics).toBeDefined();
-  });
 });

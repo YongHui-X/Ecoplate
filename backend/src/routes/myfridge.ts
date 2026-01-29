@@ -1,6 +1,6 @@
 import { Router, json, error, parseBody } from "../utils/router";
 import { db } from "../index";
-import { products, productInteraction } from "../db/schema";
+import { products, productSustainabilityMetrics, pendingConsumptionRecords } from "../db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
@@ -17,18 +17,32 @@ const productSchema = z.object({
 });
 
 const interactionSchema = z.object({
-  type: z.enum(["consumed", "wasted", "shared", "sold"]),
+  type: z.enum(["Add", "Consume", "Waste"]),
   quantity: z.number().positive(),
   todayDate: z.string().optional(),
 });
 
+const pendingConsumptionSchema = z.object({
+  rawPhoto: z.string().min(1, "Raw photo is required"),
+  ingredients: z.array(z.object({
+    id: z.string().optional(),
+    productId: z.number(),
+    name: z.string(),
+    matchedProductName: z.string().optional().default(""),
+    estimatedQuantity: z.number(),
+    category: z.string(),
+    unitPrice: z.number(),
+    co2Emission: z.number(),
+    confidence: z.enum(["high", "medium", "low"]).optional().default("low"),
+  })).default([]),
+  status: z.enum(["PENDING_WASTE_PHOTO", "COMPLETED"]).default("PENDING_WASTE_PHOTO"),
+});
+
 // Points awarded for different actions
-const POINTS = {
-  consumed: 5,
-  shared: 10,
-  sold: 8,
-  wasted: -2,
-  addProduct: 2,
+const POINTS: Record<string, number> = {
+  Add: 2,
+  Consume: 5,
+  Waste: -2,
 };
 
 export function registerMyFridgeRoutes(router: Router) {
@@ -164,7 +178,7 @@ export function registerMyFridgeRoutes(router: Router) {
       }
 
       // Log the interaction
-      await db.insert(productInteraction).values({
+      await db.insert(productSustainabilityMetrics).values({
         productId,
         userId: user.id,
         todayDate: data.todayDate || new Date().toISOString().split("T")[0],
@@ -172,11 +186,22 @@ export function registerMyFridgeRoutes(router: Router) {
         type: data.type,
       });
 
+      // Deduct quantity from product
+      const newQuantity = Math.max(0, (product.quantity || 0) - data.quantity);
+      await db
+        .update(products)
+        .set({ quantity: newQuantity })
+        .where(eq(products.id, productId));
+
       // Award/deduct points based on action
       const pointsChange = POINTS[data.type];
       await awardPoints(user.id, pointsChange);
 
-      return json({ message: "Product interaction logged", pointsChange });
+      return json({
+        message: "Product interaction logged",
+        pointsChange,
+        newQuantity,
+      });
     } catch (e) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);
@@ -292,6 +317,180 @@ For each item, determine its eco-focused sub-category (Ruminant meat, Non-rumina
     } catch (e) {
       console.error("Receipt scan error:", e);
       return error("Failed to scan receipt", 500);
+    }
+  });
+
+  // ==================== Pending Consumption Records ====================
+
+  // Get all pending consumption records for the authenticated user
+  router.get("/api/v1/myfridge/consumption/pending", async (req) => {
+    try {
+      const user = getUser(req);
+
+      const records = await db.query.pendingConsumptionRecords.findMany({
+        where: and(
+          eq(pendingConsumptionRecords.userId, user.id),
+          eq(pendingConsumptionRecords.status, "PENDING_WASTE_PHOTO")
+        ),
+        orderBy: [desc(pendingConsumptionRecords.createdAt)],
+      });
+
+      // Parse ingredients JSON for each record
+      const formattedRecords = records.map((record) => ({
+        id: record.id,
+        rawPhoto: record.rawPhoto,
+        ingredients: JSON.parse(record.ingredients),
+        status: record.status,
+        createdAt: record.createdAt?.toISOString() || new Date().toISOString(),
+      }));
+
+      return json(formattedRecords);
+    } catch (e) {
+      console.error("Get pending consumptions error:", e);
+      return error("Failed to get pending consumptions", 500);
+    }
+  });
+
+  // Create a new pending consumption record
+  router.post("/api/v1/myfridge/consumption/pending", async (req) => {
+    console.log("[pending/create] Endpoint called");
+    try {
+      const user = getUser(req);
+      console.log("[pending/create] User:", user.id);
+
+      const body = await parseBody<{
+        rawPhoto?: string;
+        ingredients?: unknown[];
+        status?: string;
+      }>(req);
+      console.log("[pending/create] Body received:", {
+        hasRawPhoto: !!body?.rawPhoto,
+        rawPhotoLength: body?.rawPhoto?.length || 0,
+        ingredientsCount: Array.isArray(body?.ingredients) ? body.ingredients.length : 'not array',
+        status: body?.status,
+      });
+
+      const parsed = pendingConsumptionSchema.safeParse(body);
+      if (!parsed.success) {
+        console.log("[pending/create] Validation failed:", parsed.error.errors);
+        return error(parsed.error.errors[0].message, 400);
+      }
+      console.log("[pending/create] Validation passed");
+
+      const { rawPhoto, ingredients, status } = parsed.data;
+
+      const [record] = await db
+        .insert(pendingConsumptionRecords)
+        .values({
+          userId: user.id,
+          rawPhoto,
+          ingredients: JSON.stringify(ingredients),
+          status,
+        })
+        .returning();
+
+      return json({
+        id: record.id,
+        rawPhoto: record.rawPhoto,
+        ingredients: JSON.parse(record.ingredients),
+        status: record.status,
+        createdAt: record.createdAt?.toISOString() || new Date().toISOString(),
+      });
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        return error(e.errors[0].message, 400);
+      }
+      console.error("Create pending consumption error:", e);
+      return error("Failed to create pending consumption", 500);
+    }
+  });
+
+  // Update a pending consumption record
+  router.put("/api/v1/myfridge/consumption/pending/:id", async (req, params) => {
+    try {
+      const user = getUser(req);
+      const recordId = parseInt(params.id, 10);
+      const body = await parseBody(req);
+
+      const parsed = pendingConsumptionSchema.partial().safeParse(body);
+      if (!parsed.success) {
+        return error(parsed.error.errors[0].message, 400);
+      }
+
+      // Check if record exists and belongs to user
+      const existing = await db.query.pendingConsumptionRecords.findFirst({
+        where: and(
+          eq(pendingConsumptionRecords.id, recordId),
+          eq(pendingConsumptionRecords.userId, user.id)
+        ),
+      });
+
+      if (!existing) {
+        return error("Pending consumption record not found", 404);
+      }
+
+      const updateData: Record<string, unknown> = {
+        updatedAt: new Date(),
+      };
+
+      if (parsed.data.rawPhoto !== undefined) {
+        updateData.rawPhoto = parsed.data.rawPhoto;
+      }
+      if (parsed.data.ingredients !== undefined) {
+        updateData.ingredients = JSON.stringify(parsed.data.ingredients);
+      }
+      if (parsed.data.status !== undefined) {
+        updateData.status = parsed.data.status;
+      }
+
+      const [updated] = await db
+        .update(pendingConsumptionRecords)
+        .set(updateData)
+        .where(eq(pendingConsumptionRecords.id, recordId))
+        .returning();
+
+      return json({
+        id: updated.id,
+        rawPhoto: updated.rawPhoto,
+        ingredients: JSON.parse(updated.ingredients),
+        status: updated.status,
+        createdAt: updated.createdAt?.toISOString() || new Date().toISOString(),
+      });
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        return error(e.errors[0].message, 400);
+      }
+      console.error("Update pending consumption error:", e);
+      return error("Failed to update pending consumption", 500);
+    }
+  });
+
+  // Delete a pending consumption record
+  router.delete("/api/v1/myfridge/consumption/pending/:id", async (req, params) => {
+    try {
+      const user = getUser(req);
+      const recordId = parseInt(params.id, 10);
+
+      // Check if record exists and belongs to user
+      const existing = await db.query.pendingConsumptionRecords.findFirst({
+        where: and(
+          eq(pendingConsumptionRecords.id, recordId),
+          eq(pendingConsumptionRecords.userId, user.id)
+        ),
+      });
+
+      if (!existing) {
+        return error("Pending consumption record not found", 404);
+      }
+
+      await db
+        .delete(pendingConsumptionRecords)
+        .where(eq(pendingConsumptionRecords.id, recordId));
+
+      return json({ message: "Pending consumption record deleted" });
+    } catch (e) {
+      console.error("Delete pending consumption error:", e);
+      return error("Failed to delete pending consumption", 500);
     }
   });
 }

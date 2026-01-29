@@ -1,6 +1,6 @@
 import { Router, json, error, parseBody } from "../utils/router";
 import { db } from "../index";
-import { marketplaceListings, listingImages } from "../db/schema";
+import { marketplaceListings } from "../db/schema";
 import { eq, and, desc, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
@@ -238,29 +238,11 @@ export function registerMarketplaceRoutes(router: Router) {
           originalPrice: data.originalPrice,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
           pickupLocation: pickupLocationValue,
-          pickupInstructions: data.pickupInstructions,
+          images: data.imageUrls ? JSON.stringify(data.imageUrls) : null,
         })
         .returning();
 
-      // Save images if provided
-      if (data.imageUrls && data.imageUrls.length > 0) {
-        for (let i = 0; i < data.imageUrls.length; i++) {
-          await db.insert(listingImages).values({
-            listingId: listing.id,
-            imageUrl: data.imageUrls[i],
-            sortOrder: i,
-          });
-        }
-      }
-
-      const listingWithImages = await db.query.marketplaceListings.findFirst({
-        where: eq(marketplaceListings.id, listing.id),
-        with: {
-          images: true,
-        },
-      });
-
-      return json(listingWithImages);
+      return json(listing);
     } catch (e) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);

@@ -7,8 +7,8 @@ User wants to upload a picture of raw ingredients before cooking. And then the u
 
 Code Requirement:
 1. Retrieve current products user has in the fridge
-2. Process image of raw food to identify which ingredients from the fridge the user has taken out and is planning to cook with
-3. Process the image of waste food to identify  the ingredients that was taken out and cooked with, which of those are now being thrown away.
+2. Process image of raw food to identify which ingredients from the fridge the user has taken out and is planning to cook with. Using chatgpt vision.
+3. Process the image of waste food to identify  the ingredients that was taken out and cooked with, which of those are now being thrown away. Using chatgpt vision.
 
 Requirements from front end: 
 API 1: Take in an image, return a list of ingredients

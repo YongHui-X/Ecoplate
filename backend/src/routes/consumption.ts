@@ -1,6 +1,6 @@
 import { Router, json, error, parseBody } from "../utils/router";
 import { products } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
 import OpenAI from "openai";
@@ -30,7 +30,6 @@ const ingredientSchema = z.object({
 const analyzeWasteSchema = z.object({
   imageBase64: z.string().min(1, "Image is required"),
   ingredients: z.array(ingredientSchema).min(1, "Ingredients are required"),
-  disposalMethod: z.string().default("landfill"),
 });
 
 // ==================== Route Registration ====================
@@ -42,29 +41,38 @@ export function registerConsumptionRoutes(
 
   // API 1: Identify ingredients from a photo of raw food
   router.post("/api/v1/consumption/identify", async (req) => {
+    console.log("[consumption/identify] Endpoint called");
     try {
       const user = getUser(req);
-      const body = await parseBody(req);
+      console.log("[consumption/identify] User:", user.id);
+
+      const body = await parseBody<{ imageBase64?: string }>(req);
+      console.log("[consumption/identify] Body received, imageBase64 length:", body?.imageBase64?.length || 0);
 
       const parsed = identifySchema.safeParse(body);
       if (!parsed.success) {
+        console.log("[consumption/identify] Validation failed:", parsed.error.errors[0].message);
         return error(parsed.error.errors[0].message, 400);
       }
 
       const { imageBase64 } = parsed.data;
+      console.log("[consumption/identify] Image validated, starts with 'data:':", imageBase64.startsWith("data:"));
 
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
+        console.log("[consumption/identify] ERROR: OpenAI API key not configured");
         return error("OpenAI API key not configured", 500);
       }
+      console.log("[consumption/identify] OpenAI API key present");
 
-      // Get user's unconsumed fridge products
+      // Get user's fridge products with quantity > 0
       const fridgeProducts = await db.query.products.findMany({
         where: and(
           eq(products.userId, user.id),
-          eq(products.isConsumed, false)
+          gt(products.quantity, 0)
         ),
       });
+      console.log("[consumption/identify] Fridge products found:", fridgeProducts.length);
 
       const fridgeList = fridgeProducts.map((p) => ({
         id: p.id,
@@ -74,9 +82,11 @@ export function registerConsumptionRoutes(
         unitPrice: p.unitPrice,
         co2Emission: p.co2Emission,
       }));
+      console.log("[consumption/identify] Fridge list:", JSON.stringify(fridgeList));
 
       const openai = new OpenAI({ apiKey });
 
+      console.log("[consumption/identify] Calling OpenAI API...");
       const response = await openai.chat.completions.create({
         model: "gpt-4.1-nano",
         messages: [
@@ -167,16 +177,31 @@ If an ingredient is not in the fridge, omit the productId and provide your best 
         },
       });
 
+      console.log("[consumption/identify] OpenAI API call completed");
       const content =
         response.choices[0]?.message?.content || '{"ingredients":[]}';
+      console.log("[consumption/identify] OpenAI raw response:", content);
+      console.log("[consumption/identify] Finish reason:", response.choices[0]?.finish_reason);
+      console.log("[consumption/identify] Refusal:", response.choices[0]?.message?.refusal);
+
       const parsed_response = JSON.parse(content);
+      console.log("[consumption/identify] Parsed ingredients count:", parsed_response.ingredients?.length || 0);
 
       return json({ ingredients: parsed_response.ingredients });
-    } catch (e) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError) {
+        console.log("[consumption/identify] Zod validation error:", e.errors[0].message);
         return error(e.errors[0].message, 400);
       }
-      console.error("Consumption identify error:", e);
+      // Log detailed OpenAI error information
+      const err = e as { status?: number; message?: string; code?: string; type?: string };
+      console.error("[consumption/identify] ERROR:", {
+        message: err.message,
+        status: err.status,
+        code: err.code,
+        type: err.type,
+        fullError: e,
+      });
       return error("Failed to identify ingredients", 500);
     }
   });
@@ -192,7 +217,7 @@ If an ingredient is not in the fridge, omit the productId and provide your best 
         return error(parsed.error.errors[0].message, 400);
       }
 
-      const { imageBase64, ingredients, disposalMethod } = parsed.data;
+      const { imageBase64, ingredients } = parsed.data;
 
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
@@ -283,6 +308,9 @@ Return JSON:
       const content =
         response.choices[0]?.message?.content ||
         '{"wasteItems":[],"overallObservation":"Unable to analyze"}';
+      console.log("OpenAI analyze-waste raw response:", content);
+      console.log("Finish reason:", response.choices[0]?.finish_reason);
+      console.log("Refusal:", response.choices[0]?.message?.refusal);
       const wasteAnalysis = JSON.parse(content);
 
       // Calculate metrics
@@ -297,8 +325,7 @@ Return JSON:
 
       const metrics = calculateWasteMetrics(
         ingredientInputs,
-        wasteAnalysis.wasteItems,
-        disposalMethod
+        wasteAnalysis.wasteItems
       );
 
       // Record interactions in the database

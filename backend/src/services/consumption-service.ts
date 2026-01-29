@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm";
-import { products, productInteraction } from "../db/schema";
+import { products, productSustainabilityMetrics } from "../db/schema";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import type * as schema from "../db/schema";
 
@@ -59,14 +59,6 @@ export const EMISSION_FACTORS: Record<string, number> = {
   snacks: 5.0,
 };
 
-export const DISPOSAL_EMISSION_FACTORS: Record<string, number> = {
-  landfill: 0.5,
-  incineration: 0.9,
-  composting: 0.1,
-  anaerobic_digestion: -0.2,
-  sewer: 0.3,
-};
-
 export const CATEGORY_FALLBACKS: Record<string, number> = {
   meat: 15.0,
   dairy: 9.0,
@@ -100,7 +92,6 @@ export interface WasteItem {
 export interface WasteMetrics {
   totalCO2Wasted: number;
   totalCO2Saved: number;
-  disposalCO2: number;
   totalEconomicWaste: number;
   totalEconomicConsumed: number;
   wastePercentage: number;
@@ -167,8 +158,7 @@ export function getSustainabilityRating(score: number): string {
  */
 export function calculateWasteMetrics(
   ingredients: IngredientInput[],
-  wasteItems: WasteItem[],
-  disposalMethod: string
+  wasteItems: WasteItem[]
 ): WasteMetrics {
   // Build waste lookup by productId or productName
   const wasteMap = new Map<string, number>();
@@ -230,9 +220,6 @@ export function calculateWasteMetrics(
     });
   }
 
-  const disposalFactor = DISPOSAL_EMISSION_FACTORS[disposalMethod] ?? 0.5;
-  const disposalCO2 = totalWasteWeight * disposalFactor;
-
   const wastePercentage =
     totalUsedWeight > 0 ? (totalWasteWeight / totalUsedWeight) * 100 : 0;
 
@@ -259,7 +246,6 @@ export function calculateWasteMetrics(
   return {
     totalCO2Wasted: round2(totalCO2Wasted),
     totalCO2Saved: round2(totalCO2Saved),
-    disposalCO2: round2(disposalCO2),
     totalEconomicWaste: round2(totalEconomicWaste),
     totalEconomicConsumed: round2(totalEconomicConsumed),
     wastePercentage: round2(wastePercentage),
@@ -297,23 +283,23 @@ export async function recordConsumptionInteractions(
     const consumedQty = ingredient.quantityUsed - wastedQty;
 
     if (consumedQty > 0) {
-      await db.insert(productInteraction).values({
+      await db.insert(productSustainabilityMetrics).values({
         productId: ingredient.productId,
         userId,
         todayDate,
         quantity: consumedQty,
-        type: "consumed",
+        type: "Consume",
       });
       count++;
     }
 
     if (wastedQty > 0) {
-      await db.insert(productInteraction).values({
+      await db.insert(productSustainabilityMetrics).values({
         productId: ingredient.productId,
         userId,
         todayDate,
         quantity: wastedQty,
-        type: "wasted",
+        type: "Waste",
       });
       count++;
     }

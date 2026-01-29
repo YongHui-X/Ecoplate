@@ -55,7 +55,6 @@ interface PendingConsumptionRecord {
   id: number;
   rawPhoto: string;
   ingredients: IdentifiedIngredient[];
-  disposalMethod: string;
   status: "PENDING_WASTE_PHOTO" | "COMPLETED";
   createdAt: string;
 }
@@ -1030,10 +1029,10 @@ function TrackConsumptionModal({
   const [ingredients, setIngredients] = useState<IdentifiedIngredient[]>(
     pendingRecord?.ingredients || []
   );
-  const [disposalMethod, setDisposalMethod] = useState(pendingRecord?.disposalMethod || "landfill");
   const [showCamera, setShowCamera] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [identifyingIngredients, setIdentifyingIngredients] = useState(false);
   const [pendingRecordId, setPendingRecordId] = useState<number | undefined>(pendingRecord?.id);
   const [editableWasteItems, setEditableWasteItems] = useState<Array<{
     id: string;
@@ -1080,24 +1079,128 @@ function TrackConsumptionModal({
     handler(base64);
   };
 
-  // --- Raw Photo Processing (frontend-only, no backend call) ---
+  // --- Raw Photo Processing - calls backend API to identify ingredients ---
   const processRawPhoto = useCallback(
-    (base64: string) => {
+    async (base64: string) => {
       setRawPhoto(base64);
       setShowCamera(false);
-      setStep("raw-review");
+      setIdentifyingIngredients(true);
+
+      try {
+        console.log("[TrackConsumption] Calling /consumption/identify...");
+        const response = await api.post<{
+          ingredients: Array<{
+            productId: number;
+            name: string;
+            matchedProductName: string;
+            estimatedQuantity: number;
+            category: string;
+            unitPrice: number;
+            co2Emission: number;
+            confidence: "high" | "medium" | "low";
+          }>;
+        }>("/consumption/identify", { imageBase64: base64 });
+
+        console.log("[TrackConsumption] Response received:", response);
+
+        // Add unique IDs to each ingredient for React keys
+        const ingredientsWithIds = response.ingredients.map((ing) => ({
+          ...ing,
+          id: Math.random().toString(36).slice(2),
+        }));
+
+        setIngredients(ingredientsWithIds);
+        console.log("[TrackConsumption] Ingredients set:", ingredientsWithIds.length);
+
+        if (response.ingredients.length === 0) {
+          addToast("No ingredients identified in the image. You can add them manually.", "info");
+        }
+      } catch (err) {
+        console.error("[TrackConsumption] Error identifying ingredients:", err);
+        addToast("Failed to identify ingredients. You can add them manually.", "error");
+      } finally {
+        setIdentifyingIngredients(false);
+        setStep("raw-review");
+      }
     },
-    []
+    [addToast]
   );
 
-  // --- Waste Photo Processing (frontend-only, no backend call) ---
+  // --- Waste Photo Processing - calls backend API to analyze waste ---
+  const [_analyzingWaste, setAnalyzingWaste] = useState(false);
+  const [_wasteMetrics, setWasteMetrics] = useState<{
+    totalCO2Wasted: number;
+    totalCO2Saved: number;
+    totalEconomicWaste: number;
+    wastePercentage: number;
+    sustainabilityScore: number;
+    sustainabilityRating: string;
+  } | null>(null);
+
   const processWastePhoto = useCallback(
-    (base64: string) => {
+    async (base64: string) => {
       setWastePhoto(base64);
       setShowCamera(false);
-      setStep("waste-review");
+      setAnalyzingWaste(true);
+
+      try {
+        console.log("[TrackConsumption] Calling /consumption/analyze-waste...");
+        const response = await api.post<{
+          metrics: {
+            totalCO2Wasted: number;
+            totalCO2Saved: number;
+            totalEconomicWaste: number;
+            wastePercentage: number;
+            sustainabilityScore: number;
+            sustainabilityRating: string;
+          };
+          wasteAnalysis: {
+            wasteItems: Array<{
+              productName: string;
+              quantityWasted: number;
+              productId: number;
+            }>;
+            overallObservation: string;
+          };
+        }>("/consumption/analyze-waste", {
+          imageBase64: base64,
+          ingredients: ingredients.map((ing) => ({
+            productId: ing.productId,
+            productName: ing.name,
+            quantityUsed: ing.estimatedQuantity,
+            category: ing.category,
+            unitPrice: ing.unitPrice,
+            co2Emission: ing.co2Emission,
+          })),
+        });
+
+        console.log("[TrackConsumption] Waste analysis response:", response);
+
+        setWasteMetrics(response.metrics);
+
+        // Convert waste items to editable format
+        const wasteItemsWithIds = response.wasteAnalysis.wasteItems.map((item) => ({
+          id: Math.random().toString(36).slice(2),
+          productName: item.productName,
+          quantity: item.quantityWasted,
+          category: ingredients.find((i) => i.productId === item.productId)?.category || "other",
+          co2Emission: ingredients.find((i) => i.productId === item.productId)?.co2Emission || 0,
+        }));
+
+        setEditableWasteItems(wasteItemsWithIds);
+
+        if (response.wasteAnalysis.wasteItems.length === 0) {
+          addToast("No waste detected - great job!", "success");
+        }
+      } catch (err) {
+        console.error("[TrackConsumption] Error analyzing waste:", err);
+        addToast("Failed to analyze waste. You can add items manually.", "error");
+      } finally {
+        setAnalyzingWaste(false);
+        setStep("waste-review");
+      }
     },
-    []
+    [ingredients, addToast]
   );
 
   const handleConfirmPhoto = () => {
@@ -1179,7 +1282,6 @@ function TrackConsumptionModal({
       const draftData = {
         rawPhoto,
         ingredients,
-        disposalMethod,
         status: "PENDING_WASTE_PHOTO",
       };
 
@@ -1412,23 +1514,6 @@ function TrackConsumptionModal({
               className="hidden"
             />
 
-            {step === "waste-input" && (
-              <div className="pt-2">
-                <label className="text-xs text-gray-500">Disposal method</label>
-                <select
-                  value={disposalMethod}
-                  onChange={(e) => setDisposalMethod(e.target.value)}
-                  className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
-                >
-                  <option value="landfill">Landfill</option>
-                  <option value="composting">Composting</option>
-                  <option value="incineration">Incineration</option>
-                  <option value="anaerobic_digestion">Anaerobic Digestion</option>
-                  <option value="sewer">Sewer</option>
-                </select>
-              </div>
-            )}
-
             {backButton}
           </div>
         </CardContent>
@@ -1438,6 +1523,21 @@ function TrackConsumptionModal({
 
   // --- PAGE 1: Raw Photo Input ---
   if (step === "raw-input") {
+    // Show loading while identifying ingredients
+    if (identifyingIngredients) {
+      return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-12 text-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
+              <p className="text-gray-600 font-medium">Identifying ingredients...</p>
+              <p className="text-sm text-gray-400 mt-1">Using AI to analyze your photo</p>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <PhotoInputView
         title="Track Consumption"
@@ -1675,21 +1775,6 @@ function TrackConsumptionModal({
                 }}
                 className="hidden"
               />
-
-              <div className="pt-2">
-                <label className="text-xs text-gray-500">Disposal method</label>
-                <select
-                  value={disposalMethod}
-                  onChange={(e) => setDisposalMethod(e.target.value)}
-                  className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
-                >
-                  <option value="landfill">Landfill</option>
-                  <option value="composting">Composting</option>
-                  <option value="incineration">Incineration</option>
-                  <option value="anaerobic_digestion">Anaerobic Digestion</option>
-                  <option value="sewer">Sewer</option>
-                </select>
-              </div>
 
               {/* Do Later button */}
               <Button
