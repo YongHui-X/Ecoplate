@@ -13,6 +13,7 @@ describe('ListingMapCard', () => {
     description: 'Organic apples from local farm',
     category: 'produce',
     quantity: 5,
+    unit: 'pieces',
     price: 10,
     originalPrice: 15,
     expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
@@ -21,6 +22,7 @@ describe('ListingMapCard', () => {
     status: 'active',
     createdAt: new Date().toISOString(),
     completedAt: null,
+    images: null,
     distance: 2.5,
   };
 

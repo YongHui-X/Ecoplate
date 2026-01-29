@@ -6,7 +6,9 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     // For development, connect to local backend
-    // Comment out for production builds
+    // For Android Emulator: use 10.0.2.2 (special IP for host machine)
+    // For Physical Device: use your computer's IP (run: ipconfig getifaddr en0)
+    // Comment out 'url' for production builds
     url: 'http://10.0.2.2:5173',
     cleartext: true,
   },

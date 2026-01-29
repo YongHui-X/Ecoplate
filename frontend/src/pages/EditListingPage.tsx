@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
+import { uploadService } from "../services/upload";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -8,7 +9,9 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { ArrowLeft, Save } from "lucide-react";
 import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
+import { PRODUCT_UNITS } from "../constants/units";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
+import { ImagePicker } from "../components/common/ImagePicker";
 
 export default function EditListingPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +25,7 @@ export default function EditListingPage() {
     description: "",
     category: "",
     quantity: "1",
+    unit: "",
     price: "",
     originalPrice: "",
     expiryDate: "",
@@ -31,6 +35,8 @@ export default function EditListingPage() {
   const [coordinates, setCoordinates] = useState<
     { latitude: number; longitude: number } | undefined
   >();
+
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   useEffect(() => {
     loadListing();
@@ -47,18 +53,34 @@ export default function EditListingPage() {
         expiryDateStr = date.toISOString().split("T")[0];
       }
 
+      // Parse coordinates from pickupLocation if exists (format: "address|lat,lng")
+      let pickupLocationValue = listing.pickupLocation || "";
+      if (listing.pickupLocation && listing.pickupLocation.includes("|")) {
+        const [address, coords] = listing.pickupLocation.split("|");
+        pickupLocationValue = address;
+        const [lat, lng] = coords.split(",").map(parseFloat);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          setCoordinates({ latitude: lat, longitude: lng });
+        }
+      }
+
       setFormData({
         title: listing.title,
         description: listing.description || "",
         category: listing.category || "",
         quantity: String(listing.quantity),
+        unit: listing.unit || "",
         price: listing.price !== null ? String(listing.price) : "",
         originalPrice: listing.originalPrice
           ? String(listing.originalPrice)
           : "",
         expiryDate: expiryDateStr,
-        pickupLocation: listing.pickupLocation || "",
+        pickupLocation: pickupLocationValue,
       });
+
+      // Load existing images
+      const existingImages = uploadService.parseImages(listing.images);
+      setImageUrls(existingImages);
     } catch (error: any) {
       addToast(error.message || "Failed to load listing", "error");
       navigate("/marketplace");
@@ -100,13 +122,15 @@ export default function EditListingPage() {
         description: formData.description.trim() || undefined,
         category: formData.category || undefined,
         quantity: parseFloat(formData.quantity),
-        price: formData.price ? parseFloat(formData.price) : null,
-        originalPrice: formData.originalPrice
+        unit: formData.unit || undefined,
+        price: formData.price && formData.price.trim() !== "" ? parseFloat(formData.price) : null,
+        originalPrice: formData.originalPrice && formData.originalPrice.trim() !== ""
           ? parseFloat(formData.originalPrice)
           : undefined,
-        expiryDate: formData.expiryDate || undefined,
+        expiryDate: formData.expiryDate && formData.expiryDate.trim() !== "" ? formData.expiryDate : undefined,
         pickupLocation: formData.pickupLocation.trim() || undefined,
         coordinates: coordinates,
+        images: imageUrls.length > 0 ? imageUrls : undefined,
       };
 
       await marketplaceService.updateListing(Number(id), data);
@@ -206,26 +230,46 @@ export default function EditListingPage() {
               </div>
             </div>
 
-            {/* Quantity */}
-            <div className="space-y-2">
-              <Label htmlFor="quantity">
-                Quantity <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="quantity"
-                name="quantity"
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={formData.quantity}
-                onChange={handleChange}
-                placeholder="e.g., 2.5"
-                required
-              />
-              <p className="text-sm text-gray-500">
-                Enter quantity (e.g., 2 for 2kg, 3 for 3 items)
-              </p>
+            {/* Quantity and Unit */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">
+                  Quantity <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="quantity"
+                  name="quantity"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  placeholder="e.g., 2.5"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unit">Unit</Label>
+                <select
+                  id="unit"
+                  name="unit"
+                  value={formData.unit}
+                  onChange={handleChange}
+                  className="w-full h-10 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">Select unit (optional)</option>
+                  {PRODUCT_UNITS.map((unit) => (
+                    <option key={unit.value} value={unit.value}>
+                      {unit.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+            <p className="text-sm text-gray-500 -mt-3">
+              Specify the unit of measurement (e.g., kg, bottles, pcs)
+            </p>
 
             {/* Prices */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -269,6 +313,19 @@ export default function EditListingPage() {
               label="Pickup Location"
               placeholder="Search for address, postal code, or landmark in Singapore"
             />
+
+            {/* Product Images */}
+            <div className="space-y-2">
+              <Label>Product Images</Label>
+              <ImagePicker
+                maxImages={5}
+                onImagesChange={setImageUrls}
+                initialImages={imageUrls}
+              />
+              <p className="text-sm text-gray-500">
+                Add up to 5 images. You can take photos or choose from your gallery.
+              </p>
+            </div>
 
             {/* Submit Buttons */}
             <div className="flex gap-4 pt-4">

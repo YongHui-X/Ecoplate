@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
+import { messageService } from "../services/messages";
+import { uploadService } from "../services/upload";
+import { formatQuantityWithUnit } from "../constants/units";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { ArrowLeft, MapPin, Clock, Edit, Trash2, CheckCircle } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Edit, Trash2, CheckCircle, ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
 import { formatDate, getDaysUntilExpiry } from "../lib/utils";
+import { SimilarProducts } from "../components/marketplace/SimilarProducts";
 import type { MarketplaceListing } from "../types/marketplace";
 
 export default function ListingDetailPage() {
@@ -15,6 +19,7 @@ export default function ListingDetailPage() {
   const [listing, setListing] = useState<MarketplaceListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { user } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -92,6 +97,32 @@ export default function ListingDetailPage() {
       ? Math.round((1 - listing.price / listing.originalPrice) * 100)
       : null;
 
+  // Get listing images
+  const imageUrls = uploadService.getListingImageUrls(listing.images);
+  const hasImages = imageUrls.length > 0;
+
+  const handlePrevImage = () => {
+    setCurrentImageIndex((prev) => (prev === 0 ? imageUrls.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = () => {
+    setCurrentImageIndex((prev) => (prev === imageUrls.length - 1 ? 0 : prev + 1));
+  };
+
+  const handleMessageSeller = async () => {
+    if (!listing) return;
+    setActionLoading(true);
+    try {
+      const conversation = await messageService.getOrCreateConversationForListing(listing.id);
+      navigate(`/messages/${conversation.id}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to start conversation";
+      addToast(message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Button variant="ghost" onClick={() => navigate("/marketplace")}>
@@ -100,12 +131,73 @@ export default function ListingDetailPage() {
       </Button>
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Placeholder Image */}
-        <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center border">
-          <div className="text-center text-gray-400">
-            <p className="text-4xl mb-2">📦</p>
-            <p className="text-sm">No image</p>
+        {/* Image Gallery */}
+        <div className="space-y-4">
+          {/* Main Image */}
+          <div className="relative aspect-square bg-muted rounded-xl overflow-hidden border">
+            {hasImages ? (
+              <>
+                <img
+                  src={imageUrls[currentImageIndex]}
+                  alt={`${listing.title} - Image ${currentImageIndex + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                {imageUrls.length > 1 && (
+                  <>
+                    {/* Navigation Arrows */}
+                    <button
+                      onClick={handlePrevImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition"
+                      aria-label="Previous image"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={handleNextImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition"
+                      aria-label="Next image"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                    {/* Image Counter */}
+                    <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
+                      {currentImageIndex + 1} / {imageUrls.length}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center text-muted-foreground">
+                  <p className="text-4xl mb-2">📦</p>
+                  <p className="text-sm">No image</p>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Thumbnail Gallery */}
+          {imageUrls.length > 1 && (
+            <div className="grid grid-cols-5 gap-2">
+              {imageUrls.map((url, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`aspect-square rounded-xl overflow-hidden border-2 transition ${
+                    index === currentImageIndex
+                      ? "border-primary ring-2 ring-primary/20"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                >
+                  <img
+                    src={url}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Details */}
@@ -138,17 +230,17 @@ export default function ListingDetailPage() {
           {/* Price */}
           <div className="flex items-baseline gap-3">
             {listing.price === null || listing.price === 0 ? (
-              <span className="text-3xl font-bold text-green-600">Free</span>
+              <span className="text-3xl font-bold text-success">Free</span>
             ) : (
               <>
                 <span className="text-3xl font-bold">${listing.price.toFixed(2)}</span>
                 {listing.originalPrice && (
                   <>
-                    <span className="text-lg text-gray-400 line-through">
+                    <span className="text-lg text-muted-foreground line-through">
                       ${listing.originalPrice.toFixed(2)}
                     </span>
                     {discount && (
-                      <Badge className="bg-red-500">-{discount}%</Badge>
+                      <Badge variant="destructive">-{discount}%</Badge>
                     )}
                   </>
                 )}
@@ -157,17 +249,17 @@ export default function ListingDetailPage() {
           </div>
 
           {/* Info */}
-          <div className="space-y-3 text-gray-600">
+          <div className="space-y-3 text-muted-foreground">
             {listing.expiryDate && (
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
                 {daysUntil !== null ? (
                   daysUntil < 0 ? (
-                    <span className="text-red-600">
+                    <span className="text-destructive">
                       Expired {Math.abs(daysUntil)} days ago
                     </span>
                   ) : daysUntil === 0 ? (
-                    <span className="text-yellow-600">Expires today</span>
+                    <span className="text-warning">Expires today</span>
                   ) : (
                     <span>Expires in {daysUntil} days</span>
                   )
@@ -185,10 +277,10 @@ export default function ListingDetailPage() {
             )}
 
             <div>
-              <strong>Quantity:</strong> {listing.quantity}
+              <strong>Quantity:</strong> {formatQuantityWithUnit(listing.quantity, listing.unit)}
             </div>
 
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               Posted {formatDate(listing.createdAt)}
             </div>
           </div>
@@ -197,7 +289,7 @@ export default function ListingDetailPage() {
           {listing.description && (
             <div>
               <h3 className="font-semibold mb-2">Description</h3>
-              <p className="text-gray-600 whitespace-pre-wrap">
+              <p className="text-muted-foreground whitespace-pre-wrap">
                 {listing.description}
               </p>
             </div>
@@ -205,13 +297,13 @@ export default function ListingDetailPage() {
 
           {/* Seller */}
           {listing.seller && (
-            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-3 p-4 bg-muted rounded-xl">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
                 {listing.seller.name.charAt(0).toUpperCase()}
               </div>
               <div>
                 <p className="font-medium">{listing.seller.name}</p>
-                <p className="text-sm text-gray-500">Seller</p>
+                <p className="text-sm text-muted-foreground">Seller</p>
               </div>
             </div>
           )}
@@ -245,7 +337,7 @@ export default function ListingDetailPage() {
                       variant="outline"
                       onClick={handleDelete}
                       disabled={actionLoading}
-                      className="flex-1 text-red-600 hover:text-red-700"
+                      className="flex-1 text-destructive hover:text-destructive/80"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
@@ -254,9 +346,9 @@ export default function ListingDetailPage() {
                 </>
               )}
               {listing.status === "completed" && listing.completedAt && (
-                <Card className="bg-green-50 border-green-200">
+                <Card className="bg-success/10 border-success/20">
                   <CardContent className="p-4">
-                    <p className="text-sm text-green-800">
+                    <p className="text-sm text-success">
                       Completed on {formatDate(listing.completedAt)}
                     </p>
                   </CardContent>
@@ -264,19 +356,20 @@ export default function ListingDetailPage() {
               )}
             </div>
           ) : (
-            <div>
+            <div className="space-y-3">
               {listing.status === "active" ? (
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
-                    <p className="text-sm text-blue-800">
-                      Contact the seller at their pickup location to arrange collection.
-                    </p>
-                  </CardContent>
-                </Card>
+                <Button
+                  onClick={handleMessageSeller}
+                  disabled={actionLoading}
+                  className="w-full"
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Message Seller
+                </Button>
               ) : (
-                <Card className="bg-gray-50">
+                <Card className="bg-muted">
                   <CardContent className="p-4">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       This listing is no longer available.
                     </p>
                   </CardContent>
@@ -286,6 +379,11 @@ export default function ListingDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Similar Products Section */}
+      {listing && listing.status === "active" && !isOwner && (
+        <SimilarProducts listingId={listing.id} />
+      )}
     </div>
   );
 }

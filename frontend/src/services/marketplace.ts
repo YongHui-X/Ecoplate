@@ -52,6 +52,20 @@ export const marketplaceService = {
   },
 
   /**
+   * Get similar listings for a given listing ID
+   */
+  async getSimilarListings(
+    listingId: number,
+    limit: number = 6
+  ): Promise<{
+    listings: MarketplaceListing[];
+    targetListing: { id: number; title: string };
+    fallback: boolean;
+  }> {
+    return api.get(`/marketplace/listings/${listingId}/similar?limit=${limit}`);
+  },
+
+  /**
    * Create a new marketplace listing
    */
   async createListing(

@@ -46,6 +46,7 @@ describe('MarketplaceMap', () => {
       description: 'Organic apples',
       category: 'produce',
       quantity: 5,
+      unit: 'pieces',
       price: 10,
       originalPrice: 15,
       expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
@@ -54,6 +55,7 @@ describe('MarketplaceMap', () => {
       status: 'active',
       createdAt: new Date().toISOString(),
       completedAt: null,
+      images: null,
     },
     {
       id: 2,
@@ -64,6 +66,7 @@ describe('MarketplaceMap', () => {
       description: 'Fresh bread',
       category: 'bakery',
       quantity: 2,
+      unit: 'pieces',
       price: null,
       originalPrice: null,
       expiryDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
@@ -72,6 +75,7 @@ describe('MarketplaceMap', () => {
       status: 'active',
       createdAt: new Date().toISOString(),
       completedAt: null,
+      images: null,
     },
   ];
 

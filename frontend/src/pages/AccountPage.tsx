@@ -6,7 +6,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { cn } from "../lib/utils";
-import { User, MapPin, Mail, Calendar } from "lucide-react";
+import { User, MapPin, Mail } from "lucide-react";
 
 // Predefined avatar options (same as RegisterPage)
 const AVATAR_OPTIONS = [
@@ -61,16 +61,6 @@ export default function AccountPage() {
   const getAvatarEmoji = (avatarId: string) => {
     const avatar = AVATAR_OPTIONS.find(a => a.id === avatarId);
     return avatar?.emoji || AVATAR_OPTIONS[0].emoji;
-  };
-
-  const formatDate = (dateString?: string | Date) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    });
   };
 
   if (!user) {
@@ -188,31 +178,6 @@ export default function AccountPage() {
         </Card>
       </div>
 
-      {/* Account Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Account Information</CardTitle>
-          <CardDescription>Additional account details</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-500">Account Created</p>
-                <p className="font-medium">{formatDate((user as any).createdAt)}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-500">Last Updated</p>
-                <p className="font-medium">{formatDate((user as any).updatedAt)}</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

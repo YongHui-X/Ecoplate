@@ -54,6 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("token", response.token);
     localStorage.setItem("user", JSON.stringify(response.user));
     setUser(response.user);
+
+    // Dispatch event to notify other contexts (like UnreadCount) that user logged in
+    window.dispatchEvent(new CustomEvent("auth:login"));
   };
 
   const register = async (email: string, password: string, name: string, userLocation?: string, avatarUrl?: string) => {
@@ -76,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("ecoplate_unread_count");
     setUser(null);
   };
 

@@ -7,6 +7,8 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 import os
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 app = Flask(__name__)
 CORS(app)
@@ -159,6 +161,173 @@ class BuyerMatcher:
                 score += weights['freshness'] * freshness_score
         
         return min(score, 1.0)
+
+
+class SimilarProductsMatcher:
+    """Find similar products using TF-IDF text similarity and multi-factor scoring"""
+
+    RELATED_CATEGORIES = {
+        "produce": ["frozen"],
+        "dairy": ["beverages"],
+        "meat": ["frozen"],
+        "bakery": ["pantry"],
+        "frozen": ["meat", "dairy"],
+        "beverages": ["dairy"],
+        "pantry": ["bakery"]
+    }
+
+    WEIGHTS = {
+        'category': 0.35,
+        'text': 0.25,
+        'price': 0.15,
+        'distance': 0.15,
+        'freshness': 0.10
+    }
+
+    @staticmethod
+    def calculate_category_score(target_cat: str, candidate_cat: str) -> float:
+        """Score based on category match: exact=1.0, related=0.5, different=0.0"""
+        if not target_cat or not candidate_cat:
+            return 0.5
+        target_cat = target_cat.lower()
+        candidate_cat = candidate_cat.lower()
+        if target_cat == candidate_cat:
+            return 1.0
+        related = SimilarProductsMatcher.RELATED_CATEGORIES.get(target_cat, [])
+        return 0.5 if candidate_cat in related else 0.0
+
+    @staticmethod
+    def calculate_text_similarity(texts: List[str]) -> np.ndarray:
+        """Calculate TF-IDF cosine similarity matrix for texts"""
+        if len(texts) < 2:
+            return np.array([[1.0]])
+        # Handle empty strings by adding placeholder
+        processed_texts = [t if t.strip() else "unknown" for t in texts]
+        try:
+            vectorizer = TfidfVectorizer(stop_words='english')
+            tfidf_matrix = vectorizer.fit_transform(processed_texts)
+            return cosine_similarity(tfidf_matrix)
+        except Exception:
+            # Fallback if vectorization fails
+            return np.ones((len(texts), len(texts))) * 0.5
+
+    @staticmethod
+    def calculate_price_score(target_price: float, candidate_price: float) -> float:
+        """Score based on price similarity (50% tolerance)"""
+        if not target_price or not candidate_price:
+            return 0.5
+        diff_ratio = abs(target_price - candidate_price) / max(target_price, 0.01)
+        return max(0, 1 - (diff_ratio / 0.5))
+
+    @staticmethod
+    def calculate_distance_score(distance_km: float, max_distance: float = 10) -> float:
+        """Score based on distance (closer = higher score)"""
+        if distance_km is None:
+            return 0.5
+        return max(0, 1 - (distance_km / max_distance))
+
+    @staticmethod
+    def calculate_freshness_score(target_days: int, candidate_days: int) -> float:
+        """Score based on similarity in days until expiry (7-day tolerance)"""
+        if target_days is None or candidate_days is None:
+            return 0.5
+        diff = abs(target_days - candidate_days)
+        return max(0, 1 - (diff / 7))
+
+    @classmethod
+    def find_similar(cls, target: Dict, candidates: List[Dict], limit: int = 6) -> List[Dict]:
+        """
+        Find similar products using multi-factor weighted scoring.
+
+        Args:
+            target: Target listing dict with id, title, description, category, price, etc.
+            candidates: List of candidate listings
+            limit: Maximum number of results to return
+
+        Returns:
+            List of similar products with similarity_score and match_factors
+        """
+        if not candidates:
+            return []
+
+        results = []
+
+        # Prepare texts for TF-IDF
+        target_text = f"{target.get('title', '')} {target.get('description', '')}"
+        all_texts = [target_text] + [
+            f"{c.get('title', '')} {c.get('description', '')}" for c in candidates
+        ]
+
+        # Calculate text similarities
+        similarity_matrix = cls.calculate_text_similarity(all_texts)
+
+        for i, candidate in enumerate(candidates):
+            # Skip same listing
+            if candidate.get('id') == target.get('id'):
+                continue
+            # Skip same seller
+            if candidate.get('sellerId') == target.get('sellerId'):
+                continue
+
+            # Calculate individual scores
+            category_score = cls.calculate_category_score(
+                target.get('category', ''),
+                candidate.get('category', '')
+            )
+            text_score = float(similarity_matrix[0, i + 1])
+            price_score = cls.calculate_price_score(
+                target.get('price'),
+                candidate.get('price')
+            )
+            distance_score = cls.calculate_distance_score(
+                candidate.get('distance_km')
+            )
+            freshness_score = cls.calculate_freshness_score(
+                target.get('days_until_expiry'),
+                candidate.get('days_until_expiry')
+            )
+
+            # Weighted total
+            total_score = (
+                cls.WEIGHTS['category'] * category_score +
+                cls.WEIGHTS['text'] * text_score +
+                cls.WEIGHTS['price'] * price_score +
+                cls.WEIGHTS['distance'] * distance_score +
+                cls.WEIGHTS['freshness'] * freshness_score
+            )
+
+            if total_score >= 0.5:  # Threshold
+                # Create result without internal fields
+                result = {
+                    'id': candidate.get('id'),
+                    'sellerId': candidate.get('sellerId'),
+                    'title': candidate.get('title'),
+                    'description': candidate.get('description'),
+                    'category': candidate.get('category'),
+                    'price': candidate.get('price'),
+                    'originalPrice': candidate.get('originalPrice'),
+                    'quantity': candidate.get('quantity'),
+                    'unit': candidate.get('unit'),
+                    'expiryDate': candidate.get('expiryDate'),
+                    'pickupLocation': candidate.get('pickupLocation'),
+                    'images': candidate.get('images'),
+                    'status': candidate.get('status'),
+                    'createdAt': candidate.get('createdAt'),
+                    'seller': candidate.get('seller'),
+                    'similarity_score': round(total_score, 3),
+                    'match_factors': {
+                        'category': round(category_score, 2),
+                        'text': round(text_score, 2),
+                        'price': round(price_score, 2),
+                        'distance': round(distance_score, 2),
+                        'freshness': round(freshness_score, 2)
+                    }
+                }
+                results.append(result)
+
+        # Sort by score descending, return top N
+        results.sort(key=lambda x: x['similarity_score'], reverse=True)
+        return results[:limit]
 
 
 class SellerNotificationEngine:
@@ -399,6 +568,57 @@ def calculate_urgency():
         })
     
     return jsonify({'results': results})
+
+
+@app.route('/api/v1/recommendations/similar', methods=['POST'])
+def get_similar_products():
+    """
+    Find similar products based on multi-factor scoring.
+
+    Request body:
+    {
+        "target": {
+            "id": 1,
+            "title": "Fresh Apples",
+            "description": "Organic green apples",
+            "category": "produce",
+            "price": 5.00,
+            "days_until_expiry": 5,
+            "sellerId": 1
+        },
+        "candidates": [
+            {
+                "id": 2,
+                "title": "Red Apples",
+                "description": "Sweet red apples",
+                "category": "produce",
+                "price": 4.50,
+                "distance_km": 2.5,
+                "days_until_expiry": 4,
+                "sellerId": 2,
+                ... (full listing fields)
+            }
+        ],
+        "limit": 6
+    }
+    """
+    data = request.get_json()
+
+    if not data.get('target') or not data.get('candidates'):
+        return jsonify({'error': 'target and candidates are required'}), 400
+
+    similar = SimilarProductsMatcher.find_similar(
+        target=data['target'],
+        candidates=data['candidates'],
+        limit=data.get('limit', 6)
+    )
+
+    return jsonify({
+        'similar_products': similar,
+        'count': len(similar),
+        'threshold': 0.5,
+        'generated_at': datetime.utcnow().isoformat()
+    })
 
 
 def _get_urgency_level(score: float) -> str:

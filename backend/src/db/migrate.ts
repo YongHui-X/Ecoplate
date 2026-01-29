@@ -4,6 +4,11 @@ import { join } from "path";
 
 const dbPath = "ecoplate.db";
 const migrationsDir = join(import.meta.dir, "migrations");
+const migrationFile = join(
+  import.meta.dir,
+  "migrations",
+  "0000_yummy_frank_castle.sql"
+);
 
 // List of migrations in order
 const migrationFiles = [

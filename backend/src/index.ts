@@ -4,8 +4,9 @@ import { Router, json, error } from "./utils/router";
 import { authMiddleware } from "./middleware/auth";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerMarketplaceRoutes } from "./routes/marketplace";
-import { registerGamificationRoutes } from "./routes/gamification";
-// import { registerMyFridgeRoutes } from "./routes/myfridge";
+import { registerMessageRoutes } from "./routes/messages";
+import { registerUploadRoutes } from "./routes/upload";
+import { initializeUploadDir } from "./services/image-upload";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -13,6 +14,9 @@ import { join } from "path";
 // Initialize database
 const sqlite = new Database("ecoplate.db");
 export const db = drizzle(sqlite, { schema });
+
+// Initialize upload directory
+await initializeUploadDir();
 
 
 
@@ -26,8 +30,6 @@ protectedRouter.use(authMiddleware);
 // Register routes
 registerAuthRoutes(publicRouter);
 registerMarketplaceRoutes(protectedRouter);
-registerGamificationRoutes(protectedRouter);
-// registerMyFridgeRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));
@@ -55,11 +57,10 @@ function getMimeType(path: string): string {
 
 async function serveStatic(path: string): Promise<Response | null> {
   const publicDir = join(import.meta.dir, "../public");
-  const uploadsDir = join(import.meta.dir, "../uploads");
 
-  // Handle uploads directory
+  // Handle uploads directory (now inside public/)
   if (path.startsWith("/uploads/")) {
-    const uploadPath = join(uploadsDir, path.replace("/uploads/", ""));
+    const uploadPath = join(publicDir, path);
     if (existsSync(uploadPath)) {
       const file = Bun.file(uploadPath);
       return new Response(file, {

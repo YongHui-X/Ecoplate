@@ -13,8 +13,11 @@ build/
 backend/public/assets/
 *.js.map
 
-# Database (allow ecoplate.db for shared dev data)
-# *.db
+# Uploaded files (local development)
+backend/public/uploads/
+
+# Database (each developer maintains their own local database)
+*.db
 *.db-journal
 *.db-wal
 *.db-shm
@@ -38,6 +41,7 @@ backend/public/assets/
 # OS
 .DS_Store
 Thumbs.db
+nul
 
 # Logs
 logs/

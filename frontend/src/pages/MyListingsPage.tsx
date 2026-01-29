@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
+import { uploadService } from "../services/upload";
+import { formatQuantityWithUnit } from "../constants/units";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -106,44 +108,58 @@ function ListingCard({ listing, onDelete }: ListingCardProps) {
       ? Math.round((1 - listing.price / listing.originalPrice) * 100)
       : null;
 
-  return (
-    <Card className="overflow-hidden">
-      {/* Placeholder Image */}
-      <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b">
-        <div className="text-gray-400 text-4xl">📦</div>
-        {discount && (
-          <Badge className="absolute top-2 right-2 bg-red-500">
-            -{discount}%
-          </Badge>
-        )}
-        <Badge
-          className="absolute top-2 left-2"
-          variant={
-            listing.status === "active"
-              ? "default"
-              : listing.status === "completed"
-              ? "secondary"
-              : "outline"
-          }
-        >
-          {listing.status}
-        </Badge>
-      </div>
+  // Get first image as thumbnail
+  const imageUrls = uploadService.getListingImageUrls(listing.images);
+  const thumbnailUrl = imageUrls[0];
 
-      <CardContent className="p-4">
-        {/* Title and Category */}
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <Link to={`/marketplace/${listing.id}`}>
-            <h3 className="font-semibold line-clamp-1 hover:text-primary">
-              {listing.title}
-            </h3>
-          </Link>
-          {listing.category && (
-            <Badge variant="secondary" className="shrink-0 text-xs">
-              {listing.category}
+  const handleActionClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  return (
+    <Link to={`/marketplace/${listing.id}`}>
+      <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+        {/* Product Image */}
+        <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b overflow-hidden">
+          {thumbnailUrl ? (
+            <img
+              src={thumbnailUrl}
+              alt={listing.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="text-gray-400 text-4xl">📦</div>
+          )}
+          {discount && (
+            <Badge className="absolute top-2 right-2 bg-red-500">
+              -{discount}%
             </Badge>
           )}
+          <Badge
+            className="absolute top-2 left-2"
+            variant={
+              listing.status === "active"
+                ? "default"
+                : listing.status === "completed"
+                ? "secondary"
+                : "outline"
+            }
+          >
+            {listing.status}
+          </Badge>
         </div>
+
+        <CardContent className="p-4">
+          {/* Title and Category */}
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <h3 className="font-semibold line-clamp-1">{listing.title}</h3>
+            {listing.category && (
+              <Badge variant="secondary" className="shrink-0 text-xs">
+                {listing.category}
+              </Badge>
+            )}
+          </div>
 
         {/* Info */}
         <div className="space-y-1 text-sm text-gray-600 mb-3">
@@ -189,13 +205,13 @@ function ListingCard({ listing, onDelete }: ListingCardProps) {
             </div>
           )}
           <div className="text-sm text-gray-500 mt-1">
-            Quantity: {listing.quantity}
+            Quantity: {formatQuantityWithUnit(listing.quantity, listing.unit)}
           </div>
         </div>
 
         {/* Actions */}
         {listing.status === "active" && (
-          <div className="flex gap-2">
+          <div className="flex gap-2" onClick={handleActionClick}>
             <Button variant="outline" size="sm" asChild className="flex-1">
               <Link to={`/marketplace/${listing.id}/edit`}>
                 <Edit className="h-3 w-3 mr-1" />
@@ -221,5 +237,6 @@ function ListingCard({ listing, onDelete }: ListingCardProps) {
         )}
       </CardContent>
     </Card>
+    </Link>
   );
 }
