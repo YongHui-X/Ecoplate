@@ -60,6 +60,7 @@ flowchart TB
 ### Marketplace
 - List near-expiry food items for sale or free
 - Browse and reserve listings from others
+- Complete actions to earn sustainability points
 - AI-powered product recommendations
 - In-app messaging between buyers and sellers
 
@@ -83,17 +84,20 @@ flowchart TD
     DASHBOARD --> ECO[EcoBoard]
 
     subgraph MyFridge["MyFridge Module"]
-        FRIDGE --> ADD[Add Product]
-        FRIDGE --> SCAN[Scan Receipt]
-        FRIDGE --> VIEW[Track Comsumption Waste]
-        FRIDGE --> |Sell Product| POINTS5[+5 Points]
-        ADD --> POINTS1[+2 Points]
-        SCAN -->|AI Processing| PARSE[Parse Items]
-        PARSE --> ADD
-        VIEW --> CONSUME{Action?}
-        CONSUME -->|Detect Products From Image| POINTS2[+5 Points]
-        CONSUME -->|Scan Food Waste| POINTS3[+10 Points]
-        CONSUME -->|Waste Analysis & Breakdown| POINTS4[+8 Points]
+       FRIDGE --> ADD[Add Product]
+       FRIDGE --> SCAN[Scan Receipt]
+       FRIDGE --> VIEW[Track Consumption & Waste]
+   
+       SCAN -->|AI Processing| PARSE[Parse Items]
+       PARSE --> ADD
+   
+       VIEW --> CONSUME{Action?}
+       CONSUME -->|Consumed| POINTS_CONSUMED[+5 Points]
+       CONSUME -->|Shared| POINTS_SHARED[+10 Points]
+       CONSUME -->|Sold| POINTS_SOLD[+8 Points]
+       CONSUME -->|Wasted| POINTS_WASTED[-3 Points]
+    end
+
     end
 
     subgraph Marketplace["Marketplace Module"]
@@ -104,6 +108,9 @@ flowchart TD
         MARKET --> MapView[Geolocation]
         CONTACT --> MESSAGE[Message Seller]
         CREATE --> PRODUCT[Get Product Recommendation]
+        
+        MARKET --> COMPLETE[Complete Listing (Sold)]
+        COMPLETE --> POINTS_SOLD[+8 Points]
     end
 
     subgraph Gamification["Gamification Module"]

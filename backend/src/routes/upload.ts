@@ -58,7 +58,7 @@ export function registerUploadRoutes(router: Router) {
 
       // Get all files from form data
       for (const [key, value] of formData.entries()) {
-        if (key.startsWith("image") && value instanceof File) {
+        if (key.startsWith("image") && typeof value !== "string") {
           files.push(value);
         }
       }

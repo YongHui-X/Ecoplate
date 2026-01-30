@@ -97,8 +97,8 @@ export const marketplaceService = {
   async completeListing(
     id: number,
     buyerId?: number
-  ): Promise<{ message: string }> {
-    return api.post<{ message: string }>(
+  ): Promise<{ message: string; pointsAwarded: number }> {
+    return api.post<{ message: string; pointsAwarded: number }>(
       `/marketplace/listings/${id}/complete`,
       { buyerId }
     );

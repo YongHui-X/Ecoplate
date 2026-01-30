@@ -23,8 +23,8 @@ export const users = sqliteTable("users", {
 export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
   productName: text("product_name").notNull(),
   category: text("category"),
   quantity: real("quantity").notNull(),
@@ -35,25 +35,34 @@ export const products = sqliteTable("products", {
   co2Emission: real("co2_emission"),
 });
 
-// ==================== Product Sustainability Metrics ====================
+// ==================== User Points (per LDM) ====================
 
-export const productSustainabilityMetrics = sqliteTable(
-  "product_sustainability_metrics",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    productId: integer("product_id")
+export const userPoints = sqliteTable("user_points", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
       .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
-    userId: integer("user_id")
-      .notNull()
+      .unique()
       .references(() => users.id, { onDelete: "cascade" }),
-    todayDate: integer("today_date", { mode: "timestamp" })
-      .notNull()
-      .$defaultFn(() => new Date()),
-    quantity: real("quantity").notNull(),
-    type: text("type").notNull(), // e.g., "consumed", "wasted", "sold"
-  }
-);
+  totalPoints: integer("total_points").notNull().default(0),
+  currentStreak: integer("current_streak").notNull().default(0),
+});
+
+// ==================== Product Sustainability Metrics (per LDM) ====================
+// Records each product action (consumed, wasted, shared, sold)
+
+export const ProductSustainabilityMetrics = sqliteTable("product_interaction", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  productId: integer("product_id")
+    .references(() => products.id, { onDelete: "cascade" }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  todayDate: integer("today_date", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  quantity: real("quantity").notNull(),
+  type: text("type").notNull(), // consumed, wasted, shared, sold
+});
 
 // ==================== Marketplace Listings ====================
 
@@ -121,14 +130,32 @@ export const messages = sqliteTable("messages", {
 
 // ==================== Relations ====================
 
-export const usersRelations = relations(users, ({ many }) => ({
-  products: many(products),
-  sustainabilityMetrics: many(productSustainabilityMetrics),
-  listings: many(marketplaceListings, { relationName: "seller" }),
-  purchases: many(marketplaceListings, { relationName: "buyer" }),
-  conversationsAsSeller: many(conversations, { relationName: "seller" }),
-  conversationsAsBuyer: many(conversations, { relationName: "buyer" }),
-  messages: many(messages),
+export const usersRelations = relations(users, ({ many, one }) => ({
+    listings: many(marketplaceListings, { relationName: "seller" }),
+    purchases: many(marketplaceListings, { relationName: "buyer" }),
+    conversationsAsSeller: many(conversations, { relationName: "seller" }),
+    conversationsAsBuyer: many(conversations, { relationName: "buyer" }),
+    messages: many(messages),
+  points: one(userPoints),
+  interactions: many(ProductSustainabilityMetrics),
+}));
+
+export const userPointsRelations = relations(userPoints, ({ one }) => ({
+  user: one(users, {
+    fields: [userPoints.userId],
+    references: [users.id],
+  }),
+}));
+
+export const ProductSustainabilityMetricsRelations = relations(ProductSustainabilityMetrics, ({ one }) => ({
+  product: one(products, {
+    fields: [ProductSustainabilityMetrics.productId],
+    references: [products.id],
+  }),
+  user: one(users, {
+    fields: [ProductSustainabilityMetrics.userId],
+    references: [users.id],
+  }),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -137,22 +164,8 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     references: [users.id],
   }),
   listings: many(marketplaceListings),
-  sustainabilityMetrics: many(productSustainabilityMetrics),
+  interactions: many(ProductSustainabilityMetrics),
 }));
-
-export const productSustainabilityMetricsRelations = relations(
-  productSustainabilityMetrics,
-  ({ one }) => ({
-    product: one(products, {
-      fields: [productSustainabilityMetrics.productId],
-      references: [products.id],
-    }),
-    user: one(users, {
-      fields: [productSustainabilityMetrics.userId],
-      references: [users.id],
-    }),
-  })
-);
 
 export const marketplaceListingsRelations = relations(
   marketplaceListings,
