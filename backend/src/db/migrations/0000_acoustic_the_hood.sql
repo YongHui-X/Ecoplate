@@ -1,3 +1,14 @@
+CREATE TABLE `product_interaction` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`product_id` integer,
+	`user_id` integer NOT NULL,
+	`today_date` integer NOT NULL,
+	`quantity` real NOT NULL,
+	`type` text NOT NULL,
+	FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `conversations` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`listing_id` integer NOT NULL,
@@ -58,6 +69,14 @@ CREATE TABLE `products` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE TABLE `user_points` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`user_id` integer NOT NULL,
+	`total_points` integer DEFAULT 0 NOT NULL,
+	`current_streak` integer DEFAULT 0 NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `users` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`email` text NOT NULL,
@@ -69,4 +88,5 @@ CREATE TABLE `users` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `user_points_user_id_unique` ON `user_points` (`user_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);

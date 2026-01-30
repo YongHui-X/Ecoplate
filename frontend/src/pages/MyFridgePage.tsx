@@ -69,7 +69,7 @@ export default function MyFridgePage() {
           ? "Product shared! +10 points"
           : action === "sold"
           ? "Product sold! +8 points"
-          : "Product logged as wasted",
+          : "Product logged as wasted. -3 points",
         action === "wasted" ? "error" : "success"
       );
       loadProducts();
@@ -355,7 +355,7 @@ function AddProductModal({
         expiryDate: expiryDate || undefined,
         storageLocation,
       });
-      addToast("Product added! +2 points", "success");
+      addToast("Product added!", "success");
       onAdded();
     } catch (error) {
       addToast("Failed to add product", "error");

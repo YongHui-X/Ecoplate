@@ -19,13 +19,15 @@
     "db:seed": "cd backend && bun run src/db/seed.ts"
   },
   "dependencies": {
-    "@capacitor/android": "^8.0.1",
+    "@capacitor/android": "^8.0.2",
     "@capacitor/geolocation": "^8.0.0",
+    "debug": "^4.4.3",
     "drizzle-kit": "^0.31.8",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "react-leaflet": "^5.0.0",
-    "react-leaflet-cluster": "^4.0.0"
+    "react-leaflet-cluster": "^4.0.0",
+    "supports-color": "^10.2.2"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

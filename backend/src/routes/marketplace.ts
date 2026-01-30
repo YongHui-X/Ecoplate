@@ -5,6 +5,8 @@ import { eq, and, desc, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
 import { calculateDistance, parseCoordinates, type Coordinates } from "../utils/distance";
+import { awardPoints, recordProductSustainabilityMetrics } from "../services/gamification-service";
+import { POINT_VALUES} from "../services/gamification-service";
 
 const listingSchema = z.object({
   productId: z.number().optional(),
@@ -290,7 +292,7 @@ export function registerMarketplaceRoutes(router: Router) {
         })
         .returning();
 
-      return json(listing);
+      return json({ ...listing});
     } catch (e: any) {
       if (e instanceof z.ZodError) {
         console.error("Create listing validation error:", e.errors);
@@ -429,7 +431,21 @@ export function registerMarketplaceRoutes(router: Router) {
         })
         .where(eq(marketplaceListings.id, listingId));
 
-      return json({ message: "Listing marked as completed" });
+      // Record the sale in sustainability metrics
+      await recordProductSustainabilityMetrics(
+        listing.productId ?? null,
+        user.id,
+        listing.quantity,
+        "sold"
+      );
+
+      // Award points to seller for completing sale
+      const pointResult = await awardPoints(user.id, "sold");
+
+      return json({
+        message: `Listing marked as completed`,
+        pointsAwarded: pointResult.amount,
+      });
     } catch (e) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);
