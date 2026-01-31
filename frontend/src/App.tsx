@@ -13,6 +13,7 @@ import MyListingsPage from "./pages/MyListingsPage";
 import MessagesPage from "./pages/MessagesPage";
 import ConversationPage from "./pages/ConversationPage";
 import EcoBoardPage from "./pages/EcoBoardPage";
+import EcopointsPage from "./pages/Ecopoints";
 import BadgesPage from "./pages/BadgesPage";
 import AccountPage from "./pages/AccountPage";
 
@@ -57,6 +58,7 @@ function App() {
         <Route path="messages" element={<MessagesPage />} />
         <Route path="messages/:conversationId" element={<ConversationPage />} />
         <Route path="ecoboard" element={<EcoBoardPage />} />
+        <Route path="ecopoints" element={<EcopointsPage />} />
         <Route path="badges" element={<BadgesPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>

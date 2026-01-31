@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: {
     // For development, connect to local backend
     // Comment out for production builds
-    url: 'http://10.0.2.2:5173',  
+    url: 'http://10.0.2.2:5173',  // 10.0.2.2 是 Android 模拟器访问宿主机的地址
     cleartext: true,
   },
   plugins: {

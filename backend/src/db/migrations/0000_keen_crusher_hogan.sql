@@ -1,3 +1,14 @@
+CREATE TABLE `badges` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`code` text NOT NULL,
+	`name` text NOT NULL,
+	`description` text,
+	`category` text,
+	`points_awarded` integer DEFAULT 0 NOT NULL,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	`badge_image_url` text
+);
+--> statement-breakpoint
 CREATE TABLE `conversations` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`listing_id` integer NOT NULL,
@@ -8,6 +19,13 @@ CREATE TABLE `conversations` (
 	FOREIGN KEY (`listing_id`) REFERENCES `marketplace_listings`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`seller_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`buyer_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE TABLE `listing_images` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`listing_id` integer NOT NULL,
+	`image_url` text NOT NULL,
+	FOREIGN KEY (`listing_id`) REFERENCES `marketplace_listings`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE TABLE `marketplace_listings` (
@@ -44,6 +62,28 @@ CREATE TABLE `messages` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE TABLE `pending_consumption_records` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`user_id` integer NOT NULL,
+	`raw_photo` text NOT NULL,
+	`ingredients` text NOT NULL,
+	`status` text DEFAULT 'PENDING_WASTE_PHOTO' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE TABLE `product_sustainability_metrics` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`product_id` integer,
+	`user_id` integer NOT NULL,
+	`today_date` text,
+	`quantity` real,
+	`type` text,
+	FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `products` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` integer NOT NULL,
@@ -58,6 +98,23 @@ CREATE TABLE `products` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE TABLE `user_badges` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`user_id` integer NOT NULL,
+	`badge_id` integer NOT NULL,
+	`earned_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`badge_id`) REFERENCES `badges`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE TABLE `user_points` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`user_id` integer NOT NULL,
+	`total_points` integer DEFAULT 0 NOT NULL,
+	`current_streak` integer DEFAULT 0 NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `users` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`email` text NOT NULL,
@@ -69,4 +126,6 @@ CREATE TABLE `users` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `badges_code_unique` ON `badges` (`code`);--> statement-breakpoint
+CREATE UNIQUE INDEX `user_points_user_id_unique` ON `user_points` (`user_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);

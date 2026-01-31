@@ -7,7 +7,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev:backend": "cd backend && bun --watch src/index.ts",
+    "dev:backend": "lsof -ti :3000 | xargs kill -9 2>/dev/null || true; cd backend && bun --watch src/index.ts",
     "dev:frontend": "cd frontend && bun run dev",
     "dev:recommendation": "cd recommendation-engine && python app.py",
     "build": "cd frontend && bun run build",
@@ -22,11 +22,13 @@
     "@capacitor/android": "^8.0.1",
     "@capacitor/core": "^8.0.2",
     "@capacitor/geolocation": "^8.0.0",
+    "debug": "^4.4.3",
     "drizzle-kit": "^0.31.8",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "react-leaflet": "^5.0.0",
-    "react-leaflet-cluster": "^4.0.0"
+    "react-leaflet-cluster": "^4.0.0",
+    "supports-color": "^10.2.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.2",

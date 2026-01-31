@@ -1,47 +1,112 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { marketplaceService } from "../services/marketplace";
+import { useState, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { api } from "../services/api";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { ArrowLeft, Plus } from "lucide-react";
-import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
-import { PRODUCT_UNITS } from "../constants/units";
+import { ArrowLeft, ImagePlus, X } from "lucide-react";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
-import { ImagePicker } from "../components/common/ImagePicker";
+
+interface Product {
+  id: number;
+  productName: string;
+  category: string | null;
+  quantity: number;
+  unitPrice: number | null;
+  purchaseDate: string | null;
+  description: string | null;
+  co2Emission: number | null;
+}
 
 export default function CreateListingPage() {
+  const location = useLocation();
+  const product = (location.state as { product?: Product })?.product;
+
+  const [title, setTitle] = useState(product?.productName || "");
+  const [description, setDescription] = useState(product?.description || "");
+  const [category, setCategory] = useState(product?.category || "");
+  const [quantity, setQuantity] = useState(product?.quantity || 1);
+  const [unit, setUnit] = useState("item");
+  const [price, setPrice] = useState<string>("");
+  const [originalPrice, setOriginalPrice] = useState<string>(
+    product?.unitPrice ? product.unitPrice.toString() : ""
+  );
+  const [expiryDate, setExpiryDate] = useState("");
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | undefined>();
+  const [pickupInstructions, setPickupInstructions] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    category: "",
-    quantity: "1",
-    unit: "",
-    price: "",
-    originalPrice: "",
-    expiryDate: "",
-    pickupLocation: "",
-  });
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + selectedImages.length > 5) {
+      addToast("Maximum 5 images allowed", "error");
+      return;
+    }
 
-  const [coordinates, setCoordinates] = useState<
-    { latitude: number; longitude: number } | undefined
-  >();
+    const validFiles = files.filter(file => {
+      if (!file.type.startsWith("image/")) {
+        addToast(`${file.name} is not an image`, "error");
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        addToast(`${file.name} is too large (max 5MB)`, "error");
+        return false;
+      }
+      return true;
+    });
 
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
+    setSelectedImages(prev => [...prev, ...validFiles]);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    // Create previews
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreviews(prev => [...prev, e.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (selectedImages.length === 0) return [];
+
+    setUploadingImages(true);
+    try {
+      const formData = new FormData();
+      selectedImages.forEach(file => formData.append("images", file));
+
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/v1/marketplace/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload images");
+      }
+
+      const data = await response.json();
+      return data.urls;
+    } finally {
+      setUploadingImages(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,42 +114,28 @@ export default function CreateListingPage() {
     setLoading(true);
 
     try {
-      // Validate required fields
-      if (!formData.title.trim()) {
-        addToast("Please enter a title", "error");
-        setLoading(false);
-        return;
-      }
+      // Upload images first
+      const imageUrls = await uploadImages();
 
-      if (!formData.quantity || parseFloat(formData.quantity) <= 0) {
-        addToast("Please enter a valid quantity", "error");
-        setLoading(false);
-        return;
-      }
-
-      // Prepare data
-      const data = {
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        category: formData.category || undefined,
-        quantity: parseFloat(formData.quantity),
-        unit: formData.unit || undefined,
-        price: formData.price && formData.price.trim() !== "" ? parseFloat(formData.price) : null,
-        originalPrice: formData.originalPrice && formData.originalPrice.trim() !== ""
-          ? parseFloat(formData.originalPrice)
-          : undefined,
-        expiryDate: formData.expiryDate && formData.expiryDate.trim() !== "" ? formData.expiryDate : undefined,
-        pickupLocation: formData.pickupLocation.trim() || undefined,
+      const listing = await api.post<{ id: number }>("/marketplace/listings", {
+        title,
+        description: description || undefined,
+        category: category || undefined,
+        quantity,
+        unit,
+        price: price === "" ? null : parseFloat(price),
+        originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
+        expiryDate: expiryDate || undefined,
+        pickupLocation: pickupLocation || undefined,
         coordinates: coordinates,
-        images: imageUrls.length > 0 ? imageUrls : undefined,
-      };
+        pickupInstructions: pickupInstructions || undefined,
+        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      });
 
-      const listing = await marketplaceService.createListing(data);
       addToast("Listing created successfully!", "success");
       navigate(`/marketplace/${listing.id}`);
-    } catch (error: any) {
-      console.error("Failed to create listing:", error);
-      addToast(error.message || "Failed to create listing", "error");
+    } catch (error) {
+      addToast("Failed to create listing", "error");
     } finally {
       setLoading(false);
     }
@@ -106,84 +157,126 @@ export default function CreateListingPage() {
           <CardTitle>Create Listing</CardTitle>
         </CardHeader>
         <CardContent>
+          {product && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Pre-filled from MyFridge:</strong> {product.productName}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Review and update the details below, then add photos and pricing information.
+              </p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Title */}
             <div className="space-y-2">
-              <Label htmlFor="title">
-                Title <span className="text-red-500">*</span>
-              </Label>
+              <Label htmlFor="title">Title *</Label>
               <Input
                 id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Fresh Organic Apples"
                 required
               />
             </div>
 
-            {/* Description */}
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <textarea
                 id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe your item..."
-                rows={4}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
             </div>
 
-            {/* Category and Expiry Date */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Product Images (Max 5)</Label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                multiple
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative aspect-square">
+                    <img
+                      src={preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-full object-cover rounded-md border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+
+                {selectedImages.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center hover:border-primary hover:bg-gray-50 transition-colors"
+                  >
+                    <ImagePlus className="h-6 w-6 text-gray-400" />
+                    <span className="text-xs text-gray-500 mt-1">Add</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">
+                Add up to 5 images. First image will be the cover photo.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <select
                   id="category"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="w-full h-10 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3"
                 >
-                  <option value="">Select a category</option>
-                  {MARKETPLACE_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </option>
-                  ))}
+                  <option value="">Select...</option>
+                  <option value="produce">Produce</option>
+                  <option value="dairy">Dairy</option>
+                  <option value="meat">Meat</option>
+                  <option value="bakery">Bakery</option>
+                  <option value="frozen">Frozen</option>
+                  <option value="beverages">Beverages</option>
+                  <option value="pantry">Pantry</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="expiryDate">Expiry Date</Label>
+                <Label htmlFor="expiry">Expiry Date</Label>
                 <Input
-                  id="expiryDate"
-                  name="expiryDate"
+                  id="expiry"
                   type="date"
-                  value={formData.expiryDate}
-                  onChange={handleChange}
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* Quantity and Unit */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="quantity">
-                  Quantity <span className="text-red-500">*</span>
-                </Label>
+                <Label htmlFor="quantity">Quantity</Label>
                 <Input
                   id="quantity"
-                  name="quantity"
                   type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={formData.quantity}
-                  onChange={handleChange}
-                  placeholder="e.g., 2.5"
-                  required
+                  min="0.1"
+                  step="0.1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseFloat(e.target.value))}
                 />
               </div>
 
@@ -191,37 +284,31 @@ export default function CreateListingPage() {
                 <Label htmlFor="unit">Unit</Label>
                 <select
                   id="unit"
-                  name="unit"
-                  value={formData.unit}
-                  onChange={handleChange}
-                  className="w-full h-10 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3"
                 >
-                  <option value="">Select unit (optional)</option>
-                  {PRODUCT_UNITS.map((unit) => (
-                    <option key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </option>
-                  ))}
+                  <option value="item">Item</option>
+                  <option value="kg">Kg</option>
+                  <option value="g">G</option>
+                  <option value="l">L</option>
+                  <option value="ml">mL</option>
+                  <option value="pack">Pack</option>
                 </select>
               </div>
             </div>
-            <p className="text-sm text-gray-500 -mt-3">
-              Specify the unit of measurement (e.g., kg, bottles, pcs)
-            </p>
 
-            {/* Prices */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="originalPrice">Original Price ($)</Label>
                 <Input
                   id="originalPrice"
-                  name="originalPrice"
                   type="number"
-                  step="0.01"
                   min="0"
-                  value={formData.originalPrice}
-                  onChange={handleChange}
-                  placeholder="Optional"
+                  step="0.01"
+                  value={originalPrice}
+                  onChange={(e) => setOriginalPrice(e.target.value)}
+                  placeholder="0.00"
                 />
               </div>
 
@@ -229,73 +316,50 @@ export default function CreateListingPage() {
                 <Label htmlFor="price">Selling Price ($)</Label>
                 <Input
                   id="price"
-                  name="price"
                   type="number"
-                  step="0.01"
                   min="0"
-                  value={formData.price}
-                  onChange={handleChange}
-                  placeholder="0 for free"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Leave empty for free"
                 />
-                <p className="text-sm text-gray-500">Leave as 0 for free</p>
+                <p className="text-xs text-gray-500">Leave empty to list as free</p>
               </div>
             </div>
 
-            {/* Pickup Location */}
             <LocationAutocomplete
-              value={formData.pickupLocation}
+              value={pickupLocation}
               onChange={(value, coords) => {
-                setFormData((prev) => ({ ...prev, pickupLocation: value }));
+                setPickupLocation(value);
                 setCoordinates(coords);
-                console.log("Location changed:", value, "Coordinates:", coords);
               }}
               label="Pickup Location"
               placeholder="Search for address, postal code, or landmark in Singapore"
             />
-            {/* Coordinates indicator */}
-            {coordinates ? (
-              <p className="text-xs text-green-600 mt-1">
-                Location coordinates captured (will appear on map)
-              </p>
-            ) : formData.pickupLocation.length > 0 ? (
-              <p className="text-xs text-orange-600 mt-1">
-                Please select a location from the dropdown to enable map display
-              </p>
-            ) : null}
 
-            {/* Product Images */}
             <div className="space-y-2">
-              <Label>Product Images</Label>
-              <ImagePicker
-                maxImages={5}
-                onImagesChange={setImageUrls}
-                initialImages={[]}
+              <Label htmlFor="pickupInstructions">Pickup Instructions</Label>
+              <textarea
+                id="pickupInstructions"
+                value={pickupInstructions}
+                onChange={(e) => setPickupInstructions(e.target.value)}
+                placeholder="e.g., Available evenings after 6pm, call before pickup"
+                className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
-              <p className="text-sm text-gray-500">
-                Add up to 5 images. You can take photos or choose from your gallery.
-              </p>
             </div>
 
-            {/* Submit Buttons */}
             <div className="flex gap-4 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate("/marketplace")}
                 className="flex-1"
-                disabled={loading}
+                disabled={loading || uploadingImages}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? (
-                  "Creating..."
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Listing
-                  </>
-                )}
+              <Button type="submit" disabled={loading || uploadingImages} className="flex-1">
+                {uploadingImages ? "Uploading images..." : loading ? "Creating..." : "Create Listing"}
               </Button>
             </div>
           </form>

@@ -3,13 +3,17 @@ const getApiBase = (): string => {
     (window as any).Capacitor !== undefined;
 
   if (isCapacitor) {
-    return import.meta.env.VITE_API_URL || 'https://api.ecoplate.app/api/v1';
+    const url = import.meta.env.VITE_API_URL || 'http://10.0.2.2:3000/api/v1';
+    console.log('[API] Capacitor mode, using:', url);
+    return url;
   }
 
+  console.log('[API] Web mode, using: /api/v1');
   return '/api/v1';
 };
 
 const API_BASE = getApiBase();
+console.log('[API] API_BASE:', API_BASE);
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {

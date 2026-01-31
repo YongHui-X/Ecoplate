@@ -1,58 +1,76 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Progress } from "../components/ui/progress";
-import { Badge } from "../components/ui/badge";
+import { Card, CardContent } from "../components/ui/card";
 import { Skeleton, SkeletonCard } from "../components/ui/skeleton";
-import { Refrigerator, Store, Trophy, AlertTriangle, TrendingUp, Leaf, ChevronRight, Sparkles } from "lucide-react";
-import { getDaysUntilExpiry, getExpiryStatus } from "../lib/utils";
+import { Leaf, Utensils, DollarSign, Star, Car, TreePine, Zap } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
-interface DashboardData {
-  products: {
-    total: number;
-    expiringToday: number;
-    expiringSoon: number;
+interface DashboardStats {
+  summary: {
+    totalCo2Reduced: number;
+    totalFoodSaved: number;
+    totalMoneySaved: number;
+    ecoPointsEarned: number;
   };
-  listings: {
-    active: number;
-    sold: number;
+  co2ChartData: Array<{ date: string; value: number }>;
+  foodChartData: Array<{ date: string; value: number }>;
+  impactEquivalence: {
+    carKmAvoided: number;
+    treesPlanted: number;
+    electricitySaved: number;
   };
-  gamification: {
-    points: number;
-    streak: number;
-    wasteReductionRate: number;
-    co2Saved: number;
-  };
-  expiringProducts: Array<{
-    id: number;
-    name: string;
-    expiryDate: string;
-  }>;
 }
 
+type Tab = "summary" | "co2" | "financial" | "food";
+type Period = "day" | "month" | "annual";
+
+const tabs: { key: Tab; label: string }[] = [
+  { key: "summary", label: "Summary" },
+  { key: "co2", label: "CO₂" },
+  { key: "financial", label: "Financial" },
+  { key: "food", label: "Food" },
+];
+
+const periods: { key: Period; label: string }[] = [
+  { key: "day", label: "Day" },
+  { key: "month", label: "Month" },
+  { key: "annual", label: "Annual" },
+];
+
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>("summary");
+  const [activePeriod, setActivePeriod] = useState<Period>("month");
   const { user } = useAuth();
 
   useEffect(() => {
-    loadDashboard();
-  }, []);
+    loadStats();
+  }, [activePeriod]);
 
-  const loadDashboard = async () => {
+  const loadStats = async () => {
     try {
-      const response = await api.get<DashboardData>("/gamification/dashboard");
+      setLoading(true);
+      const response = await api.get<DashboardStats>(
+        `/dashboard/stats?period=${activePeriod}`
+      );
       setData(response);
     } catch (error) {
-      console.error("Failed to load dashboard:", error);
+      console.error("Failed to load dashboard stats:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Get greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -63,229 +81,253 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        {/* Skeleton header */}
         <div className="space-y-2">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-4 w-64" />
         </div>
-        {/* Skeleton hero card */}
-        <Skeleton className="h-32 w-full rounded-2xl" />
-        {/* Skeleton stat cards */}
+        <Skeleton className="h-10 w-full rounded-xl" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
+        <Skeleton className="h-64 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
 
+  const summary = data?.summary;
+
+  const statCards = [
+    {
+      label: "Total CO₂ Reduced",
+      value: `${summary?.totalCo2Reduced ?? 0} kg`,
+      icon: Leaf,
+      color: "text-primary",
+      bg: "bg-primary/10",
+    },
+    {
+      label: "Total Food Saved",
+      value: `${summary?.totalFoodSaved ?? 0} kg`,
+      icon: Utensils,
+      color: "text-orange-500",
+      bg: "bg-orange-500/10",
+    },
+    {
+      label: "Total Money Saved",
+      value: `$${summary?.totalMoneySaved ?? 0}`,
+      icon: DollarSign,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+    },
+    {
+      label: "EcoPoints Earned",
+      value: `${summary?.ecoPointsEarned ?? 0}`,
+      icon: Star,
+      color: "text-yellow-500",
+      bg: "bg-yellow-500/10",
+    },
+  ];
+
+  const impactItems = [
+    {
+      label: "Car km avoided",
+      value: data?.impactEquivalence.carKmAvoided ?? 0,
+      unit: "km",
+      icon: Car,
+    },
+    {
+      label: "Trees planted equivalent",
+      value: data?.impactEquivalence.treesPlanted ?? 0,
+      unit: "",
+      icon: TreePine,
+    },
+    {
+      label: "Electricity saved",
+      value: data?.impactEquivalence.electricitySaved ?? 0,
+      unit: "kWh",
+      icon: Zap,
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header with greeting */}
+      {/* Header */}
       <div>
         <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
-          {getGreeting()}, {user?.name?.split(' ')[0]}!
+          {getGreeting()}, {user?.name?.split(" ")[0]}!
         </h1>
-        <p className="text-muted-foreground mt-1">Here's your sustainability overview</p>
+        <p className="text-muted-foreground mt-1">
+          Here's your sustainability overview
+        </p>
       </div>
 
-      {/* Hero Stats Card - Eco Points */}
-      <div>
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-accent p-6 text-primary-foreground">
-          {/* Decorative elements */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+      {/* Tab buttons + Period selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex bg-muted rounded-xl p-1 gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === tab.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="relative flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-primary-foreground/80 text-sm font-medium mb-1">
-                <Sparkles className="h-4 w-4" />
-                <span>Eco Points</span>
-              </div>
-              <div className="text-4xl lg:text-5xl font-bold">
-                {data?.gamification.points || 0}
-              </div>
-              <div className="flex items-center gap-3 mt-3">
-                <div className="flex items-center gap-1 bg-white/20 rounded-full px-3 py-1 text-sm">
-                  <Trophy className="h-3.5 w-3.5" />
-                  <span>{data?.gamification.streak || 0} day streak</span>
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-primary-foreground/80 text-sm mb-1">CO2 Saved</div>
-              <div className="text-3xl font-bold flex items-baseline gap-1">
-                {(data?.gamification.co2Saved || 0).toFixed(1)}
-                <span className="text-lg font-normal">kg</span>
-              </div>
-              <div className="flex items-center gap-1 text-sm text-primary-foreground/80 mt-1">
-                <TrendingUp className="h-3.5 w-3.5" />
-                <span>Helping the planet</span>
-              </div>
-            </div>
-          </div>
+        <div className="flex bg-muted rounded-xl p-1 gap-1">
+          {periods.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setActivePeriod(p.key)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                activePeriod === p.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <Card className="card-hover">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-primary/10">
-                <Refrigerator className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Fridge Items</p>
-                <p className="text-xl font-bold">{data?.products.total || 0}</p>
-              </div>
-            </div>
-            {(data?.products.expiringSoon || 0) > 0 && (
-              <p className="text-xs text-warning mt-2 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {data?.products.expiringSoon} expiring soon
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-secondary/10">
-                <Store className="h-5 w-5 text-secondary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Active Listings</p>
-                <p className="text-xl font-bold">{data?.listings.active || 0}</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {data?.listings.sold || 0} sold total
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-success/10">
-                <Leaf className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Waste Reduced</p>
-                <p className="text-xl font-bold">{(data?.gamification.wasteReductionRate || 0).toFixed(0)}%</p>
-              </div>
-            </div>
-            <Progress value={data?.gamification.wasteReductionRate || 0} className="mt-2 h-1.5" />
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-accent/10">
-                <Trophy className="h-5 w-5 text-accent" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Today's Expiring</p>
-                <p className="text-xl font-bold">{data?.products.expiringToday || 0}</p>
-              </div>
-            </div>
-            {(data?.products.expiringToday || 0) > 0 && (
-              <p className="text-xs text-destructive mt-2">Needs attention!</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Expiring Soon */}
-      {(data?.expiringProducts?.length || 0) > 0 && (
-        <Card className="overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-warning/10">
-                <AlertTriangle className="h-4 w-4 text-warning" />
-              </div>
-              <CardTitle className="text-base">Expiring Soon</CardTitle>
-            </div>
-            <Link to="/myfridge" className="text-sm text-primary font-medium flex items-center gap-1">
-              View all
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="space-y-2">
-              {data?.expiringProducts.slice(0, 4).map((product) => {
-                const days = getDaysUntilExpiry(product.expiryDate);
-                const status = getExpiryStatus(product.expiryDate);
-                return (
-                  <div
-                    key={product.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-muted/50"
-                  >
-                    <span className="font-medium text-sm">{product.name}</span>
-                    <Badge
-                      variant={
-                        status === "expired"
-                          ? "destructive"
-                          : status === "expiring-soon"
-                          ? "warning"
-                          : "success"
-                      }
-                      className="text-xs"
-                    >
-                      {days !== null && days < 0
-                        ? "Expired"
-                        : days === 0
-                        ? "Today"
-                        : `${days}d left`}
-                    </Badge>
+      {/* Stat Cards */}
+      {(activeTab === "summary" || activeTab === "co2" || activeTab === "financial" || activeTab === "food") && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+          {statCards.map((card) => (
+            <Card key={card.label} className="card-hover">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${card.bg}`}>
+                    <card.icon className={`h-5 w-5 ${card.color}`} />
                   </div>
-                );
-              })}
+                  <div>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {card.label}
+                    </p>
+                    <p className="text-xl font-bold">{card.value}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* CO2 Chart */}
+      {(activeTab === "summary" || activeTab === "co2") && (
+        <Card>
+          <CardContent className="p-4 lg:p-6">
+            <h3 className="text-base font-semibold mb-4">
+              CO₂ Reduction Over Time
+            </h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data?.co2ChartData || []}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 12 }} />
+                  <YAxis className="text-xs" tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    name="CO₂ (kg)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:gap-4">
-        <Link to="/myfridge">
-          <Card className="card-hover press-effect h-full">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
-                <Refrigerator className="h-6 w-6 text-primary" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold">Manage Fridge</h3>
-                <p className="text-sm text-muted-foreground">
-                  Add items or scan receipts
-                </p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </CardContent>
-          </Card>
-        </Link>
+      {/* Food Chart */}
+      {(activeTab === "summary" || activeTab === "food") && (
+        <Card>
+          <CardContent className="p-4 lg:p-6">
+            <h3 className="text-base font-semibold mb-4">
+              Food Saved Over Time
+            </h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data?.foodChartData || []}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 12 }} />
+                  <YAxis className="text-xs" tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#f97316"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    name="Food (kg)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        <Link to="/marketplace/create">
-          <Card className="card-hover press-effect h-full">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/5">
-                <Store className="h-6 w-6 text-secondary" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold">Share Food</h3>
-                <p className="text-sm text-muted-foreground">
-                  List items on marketplace
+      {/* Financial - show money saved chart placeholder on financial tab */}
+      {activeTab === "financial" && (
+        <Card>
+          <CardContent className="p-4 lg:p-6">
+            <h3 className="text-base font-semibold mb-4">
+              Money Saved Overview
+            </h3>
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+              <div className="text-center">
+                <DollarSign className="h-12 w-12 mx-auto mb-2 text-blue-500/50" />
+                <p className="text-2xl font-bold text-foreground">
+                  ${summary?.totalMoneySaved ?? 0}
                 </p>
+                <p className="text-sm mt-1">Total saved from marketplace sales</p>
               </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Impact Equivalence */}
+      {activeTab === "summary" && (
+        <Card>
+          <CardContent className="p-4 lg:p-6">
+            <h3 className="text-base font-semibold mb-4">Impact Equivalence</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {impactItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="text-center p-4 rounded-xl bg-muted/50"
+                >
+                  <item.icon className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="text-xl font-bold">
+                    {item.value}
+                    {item.unit && (
+                      <span className="text-sm font-normal ml-1">
+                        {item.unit}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {item.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

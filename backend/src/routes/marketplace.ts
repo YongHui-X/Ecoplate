@@ -5,14 +5,23 @@ import { eq, and, desc, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
 import { calculateDistance, parseCoordinates, type Coordinates } from "../utils/distance";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { awardPoints, POINT_VALUES } from "../services/gamification-service";
+
+// Ensure uploads directory exists
+const UPLOADS_DIR = join(import.meta.dir, "../../uploads/listings");
+if (!existsSync(UPLOADS_DIR)) {
+  await mkdir(UPLOADS_DIR, { recursive: true });
+}
 
 const listingSchema = z.object({
-  productId: z.number().optional(),
   title: z.string().min(1).max(200),
   description: z.string().optional(),
   category: z.string().optional(),
   quantity: z.number().positive().default(1),
-  unit: z.string().optional(), // e.g., "kg", "L", "pcs"
+  unit: z.string().default("item"),
   price: z.number().min(0).nullable().optional(),
   originalPrice: z.number().positive().optional(),
   expiryDate: z.string().optional(),
@@ -21,10 +30,54 @@ const listingSchema = z.object({
     latitude: z.number(),
     longitude: z.number(),
   }).optional(),
-  images: z.array(z.string()).max(5).optional(), // Array of image URLs, max 5
+  pickupInstructions: z.string().optional(),
+  imageUrls: z.array(z.string()).optional(),
 });
 
 export function registerMarketplaceRoutes(router: Router) {
+  // Upload image(s) for listing
+  router.post("/api/v1/marketplace/upload", async (req) => {
+    try {
+      const user = getUser(req);
+      const formData = await req.formData();
+      const files = formData.getAll("images") as File[];
+
+      if (!files || files.length === 0) {
+        return error("No images provided", 400);
+      }
+
+      if (files.length > 5) {
+        return error("Maximum 5 images allowed", 400);
+      }
+
+      const uploadedUrls: string[] = [];
+
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) {
+          return error("Only image files are allowed", 400);
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+          return error("Image size must be less than 5MB", 400);
+        }
+
+        const ext = file.name.split(".").pop() || "jpg";
+        const filename = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+        const filepath = join(UPLOADS_DIR, filename);
+
+        const buffer = await file.arrayBuffer();
+        await Bun.write(filepath, buffer);
+
+        uploadedUrls.push(`/uploads/listings/${filename}`);
+      }
+
+      return json({ urls: uploadedUrls });
+    } catch (e) {
+      console.error("Upload error:", e);
+      return error("Failed to upload images", 500);
+    }
+  });
+
   // Get all listings (excludes user's own listings - marketplace behavior)
   router.get("/api/v1/marketplace/listings", async (req) => {
     const user = getUser(req);
@@ -149,123 +202,12 @@ export function registerMarketplaceRoutes(router: Router) {
     return json(listing);
   });
 
-  // Get similar listings
-  router.get("/api/v1/marketplace/listings/:id/similar", async (req, params) => {
-    const user = getUser(req);
-    const listingId = parseInt(params.id, 10);
-    const url = new URL(req.url);
-    const limit = parseInt(url.searchParams.get("limit") || "6", 10);
-
-    // Fetch target listing
-    const listing = await db.query.marketplaceListings.findFirst({
-      where: eq(marketplaceListings.id, listingId),
-      with: {
-        seller: { columns: { id: true, name: true, avatarUrl: true } },
-      },
-    });
-
-    if (!listing) {
-      return error("Listing not found", 404);
-    }
-
-    // Fetch all active listings (excluding target and same seller)
-    const allListings = await db.query.marketplaceListings.findMany({
-      where: and(
-        ne(marketplaceListings.id, listingId),
-        ne(marketplaceListings.sellerId, listing.sellerId),
-        eq(marketplaceListings.status, "active")
-      ),
-      with: {
-        seller: { columns: { id: true, name: true, avatarUrl: true } },
-      },
-    });
-
-    // Calculate distances and days until expiry
-    const targetCoords = parseCoordinates(listing.pickupLocation);
-    const now = Date.now();
-    const targetDaysUntilExpiry = listing.expiryDate
-      ? Math.ceil((new Date(listing.expiryDate).getTime() - now) / (1000 * 60 * 60 * 24))
-      : null;
-
-    const candidates = allListings.map((l) => {
-      const coords = parseCoordinates(l.pickupLocation);
-      const distance = targetCoords && coords ? calculateDistance(targetCoords, coords) : null;
-      const daysUntilExpiry = l.expiryDate
-        ? Math.ceil((new Date(l.expiryDate).getTime() - now) / (1000 * 60 * 60 * 24))
-        : null;
-
-      return {
-        ...l,
-        distance_km: distance,
-        days_until_expiry: daysUntilExpiry,
-      };
-    });
-
-    try {
-      // Call recommendation engine
-      const recommendationUrl = process.env.RECOMMENDATION_ENGINE_URL || "http://localhost:5000";
-      const response = await fetch(`${recommendationUrl}/api/v1/recommendations/similar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          target: {
-            id: listing.id,
-            title: listing.title,
-            description: listing.description,
-            category: listing.category,
-            price: listing.price,
-            days_until_expiry: targetDaysUntilExpiry,
-            sellerId: listing.sellerId,
-          },
-          candidates,
-          limit,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Recommendation engine error");
-      }
-
-      const result = await response.json();
-      return json({
-        listings: result.similar_products,
-        targetListing: { id: listing.id, title: listing.title },
-        fallback: false,
-      });
-    } catch (e) {
-      // Fallback: simple category match
-      console.error("Recommendation engine unavailable, using fallback:", e);
-      const fallbackResults = candidates
-        .filter((c) => c.category === listing.category)
-        .slice(0, limit);
-
-      return json({
-        listings: fallbackResults,
-        targetListing: { id: listing.id, title: listing.title },
-        fallback: true,
-      });
-    }
-  });
-
   // Create listing
   router.post("/api/v1/marketplace/listings", async (req) => {
     try {
       const user = getUser(req);
-      console.log("Create listing - User:", user.id);
-
       const body = await parseBody(req);
-      console.log("Create listing - Body:", JSON.stringify(body, null, 2));
-
-      // Validate with Zod
-      const result = listingSchema.safeParse(body);
-      if (!result.success) {
-        console.error("Validation failed:", result.error.format());
-        const firstError = result.error.errors[0];
-        return error(`${firstError.path.join('.')}: ${firstError.message}`, 400);
-      }
-
-      const data = result.data;
-      console.log("Create listing - Validated data:", JSON.stringify(data, null, 2));
+      const data = listingSchema.parse(body);
 
       let pickupLocationValue = data.pickupLocation;
       if (data.coordinates && data.pickupLocation) {
@@ -276,7 +218,6 @@ export function registerMarketplaceRoutes(router: Router) {
         .insert(marketplaceListings)
         .values({
           sellerId: user.id,
-          productId: data.productId,
           title: data.title,
           description: data.description,
           category: data.category,
@@ -286,20 +227,17 @@ export function registerMarketplaceRoutes(router: Router) {
           originalPrice: data.originalPrice,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
           pickupLocation: pickupLocationValue,
-          images: data.images ? JSON.stringify(data.images) : null,
+          images: data.imageUrls ? JSON.stringify(data.imageUrls) : null,
         })
         .returning();
 
       return json(listing);
-    } catch (e: any) {
+    } catch (e) {
       if (e instanceof z.ZodError) {
-        console.error("Create listing validation error:", e.errors);
         return error(e.errors[0].message, 400);
       }
       console.error("Create listing error:", e);
-      console.error("Error message:", e?.message);
-      console.error("Error stack:", e?.stack);
-      return error(e?.message || "Failed to create listing", 500);
+      return error("Failed to create listing", 500);
     }
   });
 
@@ -309,18 +247,7 @@ export function registerMarketplaceRoutes(router: Router) {
       const user = getUser(req);
       const listingId = parseInt(params.id, 10);
       const body = await parseBody(req);
-      console.log("Update listing - Body:", JSON.stringify(body, null, 2));
-
-      // Validate with Zod
-      const result = listingSchema.partial().safeParse(body);
-      if (!result.success) {
-        console.error("Validation failed:", result.error.format());
-        const firstError = result.error.errors[0];
-        return error(`${firstError.path.join('.')}: ${firstError.message}`, 400);
-      }
-
-      const data = result.data;
-      console.log("Update listing - Validated data:", JSON.stringify(data, null, 2));
+      const data = listingSchema.partial().parse(body);
 
       const existing = await db.query.marketplaceListings.findFirst({
         where: and(
@@ -333,50 +260,34 @@ export function registerMarketplaceRoutes(router: Router) {
         return error("Listing not found", 404);
       }
 
-      // Build update object only with provided fields
-      const updateData: any = {};
-
-      if (data.productId !== undefined) updateData.productId = data.productId;
-      if (data.title !== undefined) updateData.title = data.title;
-      if (data.description !== undefined) updateData.description = data.description;
-      if (data.category !== undefined) updateData.category = data.category;
-      if (data.quantity !== undefined) updateData.quantity = data.quantity;
-      if (data.unit !== undefined) updateData.unit = data.unit;
-      if (data.price !== undefined) updateData.price = data.price;
-      if (data.originalPrice !== undefined) updateData.originalPrice = data.originalPrice;
-      if (data.expiryDate !== undefined) updateData.expiryDate = new Date(data.expiryDate);
-
-      // Handle pickup location with coordinates
-      if (data.pickupLocation !== undefined) {
-        if (data.coordinates) {
-          updateData.pickupLocation = `${data.pickupLocation}|${data.coordinates.latitude},${data.coordinates.longitude}`;
-        } else {
-          updateData.pickupLocation = data.pickupLocation;
-        }
-      }
-
-      // Handle images
-      if (data.images !== undefined) {
-        updateData.images = data.images.length > 0 ? JSON.stringify(data.images) : null;
+      let pickupLocationValue = data.pickupLocation;
+      if (data.coordinates && data.pickupLocation) {
+        pickupLocationValue = `${data.pickupLocation}|${data.coordinates.latitude},${data.coordinates.longitude}`;
       }
 
       const [updated] = await db
         .update(marketplaceListings)
-        .set(updateData)
+        .set({
+          title: data.title,
+          description: data.description,
+          category: data.category,
+          quantity: data.quantity,
+          unit: data.unit,
+          price: data.price,
+          originalPrice: data.originalPrice,
+          expiryDate: data.expiryDate ? new Date(data.expiryDate) : existing.expiryDate,
+          pickupLocation: pickupLocationValue ?? existing.pickupLocation,
+        })
         .where(eq(marketplaceListings.id, listingId))
         .returning();
 
-      console.log("Update listing - Success:", updated);
       return json(updated);
-    } catch (e: any) {
+    } catch (e) {
       if (e instanceof z.ZodError) {
-        console.error("Update listing validation error:", e.errors);
         return error(e.errors[0].message, 400);
       }
       console.error("Update listing error:", e);
-      console.error("Error message:", e?.message);
-      console.error("Error stack:", e?.stack);
-      return error(e?.message || "Failed to update listing", 500);
+      return error("Failed to update listing", 500);
     }
   });
 
@@ -401,40 +312,72 @@ export function registerMarketplaceRoutes(router: Router) {
     return json({ message: "Listing deleted" });
   });
 
-  // Complete transaction (mark as sold/completed)
-  router.post("/api/v1/marketplace/listings/:id/complete", async (req, params) => {
-    try {
-      const user = getUser(req);
-      const listingId = parseInt(params.id, 10);
-      const body = await parseBody(req);
-      const data = z.object({ buyerId: z.number().optional() }).parse(body);
+  // Reserve listing
+  router.post("/api/v1/marketplace/listings/:id/reserve", async (req, params) => {
+    const user = getUser(req);
+    const listingId = parseInt(params.id, 10);
 
-      const listing = await db.query.marketplaceListings.findFirst({
-        where: and(
-          eq(marketplaceListings.id, listingId),
-          eq(marketplaceListings.sellerId, user.id)
-        ),
-      });
+    const listing = await db.query.marketplaceListings.findFirst({
+      where: eq(marketplaceListings.id, listingId),
+    });
 
-      if (!listing) {
-        return error("Listing not found", 404);
-      }
-
-      await db
-        .update(marketplaceListings)
-        .set({
-          status: "completed",
-          buyerId: data.buyerId || null,
-          completedAt: new Date(),
-        })
-        .where(eq(marketplaceListings.id, listingId));
-
-      return json({ message: "Listing marked as completed" });
-    } catch (e) {
-      if (e instanceof z.ZodError) {
-        return error(e.errors[0].message, 400);
-      }
-      return error("Failed to complete listing", 500);
+    if (!listing) {
+      return error("Listing not found", 404);
     }
+
+    if (listing.status !== "active") {
+      return error("Listing is not available", 400);
+    }
+
+    if (listing.sellerId === user.id) {
+      return error("Cannot reserve your own listing", 400);
+    }
+
+    await db
+      .update(marketplaceListings)
+      .set({
+        status: "reserved",
+        buyerId: user.id,
+      })
+      .where(eq(marketplaceListings.id, listingId));
+
+    return json({ message: "Listing reserved" });
+  });
+
+  // Mark as sold
+  router.post("/api/v1/marketplace/listings/:id/sold", async (req, params) => {
+    const user = getUser(req);
+    const listingId = parseInt(params.id, 10);
+
+    const listing = await db.query.marketplaceListings.findFirst({
+      where: and(
+        eq(marketplaceListings.id, listingId),
+        eq(marketplaceListings.sellerId, user.id)
+      ),
+    });
+
+    if (!listing) {
+      return error("Listing not found", 404);
+    }
+
+    await db
+      .update(marketplaceListings)
+      .set({
+        status: "sold",
+        completedAt: new Date(),
+      })
+      .where(eq(marketplaceListings.id, listingId));
+
+    // Award points for selling (reduces food waste)
+    const pointsResult = await awardPoints(user.id, "sold");
+
+    return json({
+      message: "Listing marked as sold",
+      points: {
+        earned: pointsResult.amount,
+        action: pointsResult.action,
+        newTotal: pointsResult.newTotal,
+      },
+    });
   });
 }

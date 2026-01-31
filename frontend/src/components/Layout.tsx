@@ -38,6 +38,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/myfridge")) return "MyFridge";
   if (pathname.startsWith("/marketplace")) return "Marketplace";
   if (pathname.startsWith("/messages")) return "Messages";
+  if (pathname.startsWith("/ecopoints")) return "Eco Points";
   if (pathname.startsWith("/ecoboard")) return "EcoBoard";
   if (pathname.startsWith("/badges")) return "Badges";
   if (pathname.startsWith("/account")) return "Account";
@@ -58,7 +59,7 @@ export default function Layout() {
   const pageTitle = getPageTitle(location.pathname);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden max-w-full">
       {/* Mobile header - simplified, no hamburger */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b px-4 py-3 safe-area-top">
         <div className="flex items-center justify-center">
@@ -145,8 +146,8 @@ export default function Layout() {
         </aside>
 
         {/* Main content - adjusted for mobile header and bottom tabs, with left margin for fixed sidebar */}
-        <main className="flex-1 min-h-screen lg:ml-64">
-          <div className="pt-14 pb-20 lg:pt-8 lg:pb-8 p-4 lg:px-10 lg:py-8">
+        <main className="flex-1 min-h-screen lg:ml-64 overflow-x-hidden">
+          <div className="pt-[calc(env(safe-area-inset-top,0px)+56px)] pb-[calc(env(safe-area-inset-bottom,0px)+72px)] lg:pt-8 lg:pb-8 px-4 lg:px-10">
             <Outlet />
           </div>
         </main>

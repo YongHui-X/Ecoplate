@@ -92,14 +92,14 @@ export const marketplaceService = {
   },
 
   /**
-   * Mark a listing as completed/sold
+   * Mark a listing as sold
    */
   async completeListing(
     id: number,
     buyerId?: number
-  ): Promise<{ message: string }> {
-    return api.post<{ message: string }>(
-      `/marketplace/listings/${id}/complete`,
+  ): Promise<{ message: string; points: { earned: number; action: string; newTotal: number } }> {
+    return api.post<{ message: string; points: { earned: number; action: string; newTotal: number } }>(
+      `/marketplace/listings/${id}/sold`,
       { buyerId }
     );
   },

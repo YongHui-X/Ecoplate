@@ -12,8 +12,15 @@ interface BadgeData {
   description: string | null;
   category: string | null;
   pointsAwarded: number;
+  imageUrl: string | null;
   earned: boolean;
   earnedAt: string | null;
+}
+
+interface BadgesResponse {
+  badges: BadgeData[];
+  totalEarned: number;
+  totalAvailable: number;
 }
 
 const categoryLabels: Record<string, string> = {
@@ -41,8 +48,8 @@ export default function BadgesPage() {
 
   const loadBadges = async () => {
     try {
-      const data = await api.get<BadgeData[]>("/gamification/badges");
-      setBadges(data);
+      const data = await api.get<BadgesResponse>("/gamification/badges");
+      setBadges(data.badges);
     } catch (error) {
       console.error("Failed to load badges:", error);
     } finally {

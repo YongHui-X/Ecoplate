@@ -99,11 +99,14 @@ export default function EcoBoardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Panel 1: Points & Streak */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-500" />
               Eco Points
             </CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/ecopoints">View Details</Link>
+            </Button>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-center">
