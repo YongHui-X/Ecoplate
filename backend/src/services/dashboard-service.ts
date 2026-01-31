@@ -29,15 +29,16 @@ function formatDate(date: Date, period: Period): string {
 
 export async function getDashboardStats(userId: number, period: Period = "month") {
   const rangeStart = getDateRange(period);
+  const rangeStartStr = rangeStart.toISOString().slice(0, 10); // YYYY-MM-DD format
 
   // Get sustainability metrics for this user
   const metrics = db
     .select()
-    .from(schema.ProductSustainabilityMetrics)
+    .from(schema.productSustainabilityMetrics)
     .where(
       and(
-        eq(schema.ProductSustainabilityMetrics.userId, userId),
-        gte(schema.ProductSustainabilityMetrics.todayDate, rangeStart)
+        eq(schema.productSustainabilityMetrics.userId, userId),
+        gte(schema.productSustainabilityMetrics.todayDate, rangeStartStr)
       )
     )
     .all();

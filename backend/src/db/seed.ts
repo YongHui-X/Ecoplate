@@ -348,6 +348,74 @@ const sampleConversationMessages = [
   { text: "That works for me. See you then!", fromBuyer: false },
 ];
 
+// Sample badges
+const sampleBadges = [
+  {
+    code: "first_sale",
+    name: "First Sale",
+    description: "Sold your first item on the marketplace",
+    category: "marketplace",
+    pointsAwarded: 50,
+    sortOrder: 1,
+  },
+  {
+    code: "eco_warrior",
+    name: "Eco Warrior",
+    description: "Saved 10kg of food from going to waste",
+    category: "sustainability",
+    pointsAwarded: 100,
+    sortOrder: 2,
+  },
+  {
+    code: "streak_7",
+    name: "Week Warrior",
+    description: "Maintained a 7-day sustainability streak",
+    category: "streak",
+    pointsAwarded: 75,
+    sortOrder: 3,
+  },
+  {
+    code: "streak_30",
+    name: "Monthly Champion",
+    description: "Maintained a 30-day sustainability streak",
+    category: "streak",
+    pointsAwarded: 200,
+    sortOrder: 4,
+  },
+  {
+    code: "community_helper",
+    name: "Community Helper",
+    description: "Shared food with 5 different people",
+    category: "community",
+    pointsAwarded: 80,
+    sortOrder: 5,
+  },
+  {
+    code: "zero_waste",
+    name: "Zero Waste Hero",
+    description: "Achieved 100% waste reduction rate for a month",
+    category: "sustainability",
+    pointsAwarded: 150,
+    sortOrder: 6,
+  },
+  {
+    code: "marketplace_pro",
+    name: "Marketplace Pro",
+    description: "Successfully sold 10 items",
+    category: "marketplace",
+    pointsAwarded: 120,
+    sortOrder: 7,
+  },
+  {
+    code: "early_adopter",
+    name: "Early Adopter",
+    description: "Joined EcoPlate in its early days",
+    category: "special",
+    pointsAwarded: 50,
+    sortOrder: 8,
+  },
+];
+
 async function seed() {
   try {
     // Clear existing data in correct order (respecting foreign keys)
@@ -355,7 +423,12 @@ async function seed() {
     sqlite.exec("DELETE FROM messages");
     sqlite.exec("DELETE FROM conversations");
     sqlite.exec("DELETE FROM marketplace_listings");
+    sqlite.exec("DELETE FROM listing_images");
+    sqlite.exec("DELETE FROM product_sustainability_metrics");
     sqlite.exec("DELETE FROM products");
+    sqlite.exec("DELETE FROM user_badges");
+    sqlite.exec("DELETE FROM user_points");
+    sqlite.exec("DELETE FROM badges");
     sqlite.exec("DELETE FROM users");
     sqlite.exec("DELETE FROM sqlite_sequence");
 
@@ -377,6 +450,24 @@ async function seed() {
 
       createdUsers.push({ id: created.id, name: created.name });
       console.log(`  ✓ ${user.email}`);
+    }
+
+    // Create badges
+    console.log("\nCreating badges...");
+    for (const badge of sampleBadges) {
+      await db.insert(schema.badges).values(badge);
+      console.log(`  ✓ ${badge.name}`);
+    }
+
+    // Create user points for all users
+    console.log("\nInitializing user points...");
+    for (const user of createdUsers) {
+      await db.insert(schema.userPoints).values({
+        userId: user.id,
+        totalPoints: 0,
+        currentStreak: 0,
+      });
+      console.log(`  ✓ Points initialized for ${user.name}`);
     }
 
     // Create products (MyFridge items)

@@ -6,6 +6,9 @@ import { registerAuthRoutes } from "./routes/auth";
 import { registerMarketplaceRoutes } from "./routes/marketplace";
 import { registerMyFridgeRoutes } from "./routes/myfridge";
 import { registerConsumptionRoutes } from "./routes/consumption";
+import { registerMessageRoutes } from "./routes/messages";
+import { registerDashboardRoutes } from "./routes/dashboard";
+import { registerGamificationRoutes } from "./routes/gamification";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -27,6 +30,9 @@ registerAuthRoutes(publicRouter);
 registerMarketplaceRoutes(protectedRouter);
 registerMyFridgeRoutes(protectedRouter);
 registerConsumptionRoutes(protectedRouter, db);
+registerMessageRoutes(protectedRouter);
+registerDashboardRoutes(protectedRouter);
+registerGamificationRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));

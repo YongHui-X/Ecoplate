@@ -33,8 +33,14 @@ export async function getOrCreateUserPoints(userId: number) {
 
 /**
  * Award points to a user for an action
+ * Also records the sustainability metric for tracking
  */
-export async function awardPoints(userId: number, action: PointAction) {
+export async function awardPoints(
+  userId: number,
+  action: PointAction,
+  productId?: number | null,
+  quantity?: number
+) {
   const amount = POINT_VALUES[action];
   const userPoints = await getOrCreateUserPoints(userId);
 
@@ -44,6 +50,16 @@ export async function awardPoints(userId: number, action: PointAction) {
     .update(schema.userPoints)
     .set({ totalPoints: newTotal })
     .where(eq(schema.userPoints.userId, userId));
+
+  // Record the sustainability metric
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  await db.insert(schema.productSustainabilityMetrics).values({
+    productId: productId ?? null,
+    userId,
+    todayDate: today,
+    quantity: quantity ?? 1,
+    type: action,
+  });
 
   // Only update streak for positive sustainability actions (not wasted)
   const streakActions = ["consumed", "shared", "sold"];
@@ -77,12 +93,12 @@ export async function updateStreak(userId: number) {
   const streakActions = ["consumed", "shared", "sold"];
 
   // Fetch all qualifying interactions for this user
-  const allInteractions = await db.query.ProductSustainabilityMetrics.findMany({
+  const allInteractions = await db.query.productSustainabilityMetrics.findMany({
     where: and(
-      eq(schema.ProductSustainabilityMetrics.userId, userId),
-      inArray(schema.ProductSustainabilityMetrics.type, streakActions)
+      eq(schema.productSustainabilityMetrics.userId, userId),
+      inArray(schema.productSustainabilityMetrics.type, streakActions)
     ),
-    orderBy: [desc(schema.ProductSustainabilityMetrics.todayDate)],
+    orderBy: [desc(schema.productSustainabilityMetrics.todayDate)],
   });
 
   // Filter today's interactions in JavaScript (avoids timestamp format issues)
@@ -137,7 +153,7 @@ export async function recordProductSustainabilityMetrics(
   quantity: number,
   type: "consumed" | "wasted" | "shared" | "sold"
 ) {
-  await db.insert(schema.ProductSustainabilityMetrics).values({
+  await db.insert(schema.productSustainabilityMetrics).values({
     productId,
     userId,
     quantity,
@@ -150,9 +166,9 @@ export async function recordProductSustainabilityMetrics(
  * Computes streaks, time-windowed points, and breakdown by action type.
  */
 export async function getDetailedPointsStats(userId: number) {
-  const allInteractions = await db.query.ProductSustainabilityMetrics.findMany({
-    where: eq(schema.ProductSustainabilityMetrics.userId, userId),
-    orderBy: [desc(schema.ProductSustainabilityMetrics.todayDate)],
+  const allInteractions = await db.query.productSustainabilityMetrics.findMany({
+    where: eq(schema.productSustainabilityMetrics.userId, userId),
+    orderBy: [desc(schema.productSustainabilityMetrics.todayDate)],
   });
 
   const streakActions = ["consumed", "shared", "sold"];
@@ -281,8 +297,8 @@ export async function getDetailedPointsStats(userId: number) {
  * -yh
  */
 export async function getUserMetrics(userId: number) {
-  const interactions = await db.query.ProductSustainabilityMetrics.findMany({
-    where: eq(schema.ProductSustainabilityMetrics.userId, userId),
+  const interactions = await db.query.productSustainabilityMetrics.findMany({
+    where: eq(schema.productSustainabilityMetrics.userId, userId),
   });
 
   const metrics = {

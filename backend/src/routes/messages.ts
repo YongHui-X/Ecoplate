@@ -59,28 +59,41 @@ export function registerMessageRoutes(router: Router) {
         orderBy: [desc(conversations.updatedAt)],
       });
 
-      // Build response with unread counts
+      // Build response with unread counts (return ALL conversations, frontend filters)
       const response = await Promise.all(
         userConversations.map(async (conv) => {
-          // Count unread messages not sent by this user
-          const unreadResult = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(messages)
-            .where(
-              and(
-                eq(messages.conversationId, conv.id),
-                sql`${messages.userId} != ${user.id}`,
-                eq(messages.isRead, false)
-              )
-            );
+          const isArchived = conv.listing?.status === "sold";
+
+          // Count unread messages not sent by this user (only for non-archived)
+          let unreadCount = 0;
+          if (!isArchived) {
+            const unreadResult = await db
+              .select({ count: sql<number>`count(*)` })
+              .from(messages)
+              .where(
+                and(
+                  eq(messages.conversationId, conv.id),
+                  sql`${messages.userId} != ${user.id}`,
+                  eq(messages.isRead, false)
+                )
+              );
+            unreadCount = unreadResult[0]?.count ?? 0;
+          }
 
           const lastMessage = conv.messages[0] ?? null;
 
           const isSeller = conv.sellerId === user.id;
+
+          // Map "sold" to "completed" for frontend compatibility
+          const listingWithStatus = conv.listing ? {
+            ...conv.listing,
+            status: conv.listing.status === "sold" ? "completed" : conv.listing.status,
+          } : null;
+
           return {
             id: conv.id,
             listingId: conv.listingId,
-            listing: conv.listing,
+            listing: listingWithStatus,
             seller: conv.seller,
             buyer: conv.buyer,
             role: isSeller ? "selling" : "buying",
@@ -95,7 +108,7 @@ export function registerMessageRoutes(router: Router) {
                   user: lastMessage.user,
                 }
               : null,
-            unreadCount: unreadResult[0]?.count ?? 0,
+            unreadCount,
             updatedAt: conv.updatedAt.toISOString(),
           };
         })
@@ -194,10 +207,17 @@ export function registerMessageRoutes(router: Router) {
       await markConversationAsRead(conversationId, user.id);
 
       const isSeller = conversation.sellerId === user.id;
+
+      // Map "sold" to "completed" for frontend compatibility
+      const listingWithStatus = conversation.listing ? {
+        ...conversation.listing,
+        status: conversation.listing.status === "sold" ? "completed" : conversation.listing.status,
+      } : null;
+
       return json({
         id: conversation.id,
         listingId: conversation.listingId,
-        listing: conversation.listing,
+        listing: listingWithStatus,
         seller: conversation.seller,
         buyer: conversation.buyer,
         role: isSeller ? "selling" : "buying",

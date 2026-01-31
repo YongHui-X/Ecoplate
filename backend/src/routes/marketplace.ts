@@ -8,6 +8,7 @@ import { calculateDistance, parseCoordinates, type Coordinates } from "../utils/
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import { awardPoints, POINT_VALUES } from "../services/gamification-service";
 
 // Ensure uploads directory exists
 const UPLOADS_DIR = join(import.meta.dir, "../../uploads/listings");
@@ -93,7 +94,6 @@ export function registerMarketplaceRoutes(router: Router) {
         seller: {
           columns: { id: true, name: true, avatarUrl: true },
         },
-        images: true,
       },
       orderBy: [desc(marketplaceListings.createdAt)],
     });
@@ -138,7 +138,6 @@ export function registerMarketplaceRoutes(router: Router) {
         seller: {
           columns: { id: true, name: true, avatarUrl: true },
         },
-        images: true,
       },
       orderBy: [desc(marketplaceListings.createdAt)],
     });
@@ -177,9 +176,6 @@ export function registerMarketplaceRoutes(router: Router) {
 
     const listings = await db.query.marketplaceListings.findMany({
       where: eq(marketplaceListings.sellerId, user.id),
-      with: {
-        images: true,
-      },
       orderBy: [desc(marketplaceListings.createdAt)],
     });
 
@@ -196,19 +192,12 @@ export function registerMarketplaceRoutes(router: Router) {
         seller: {
           columns: { id: true, name: true, avatarUrl: true },
         },
-        images: true,
       },
     });
 
     if (!listing) {
       return error("Listing not found", 404);
     }
-
-    // Increment view count
-    await db
-      .update(marketplaceListings)
-      .set({ viewCount: (listing.viewCount || 0) + 1 })
-      .where(eq(marketplaceListings.id, listingId));
 
     return json(listing);
   });
@@ -288,8 +277,6 @@ export function registerMarketplaceRoutes(router: Router) {
           originalPrice: data.originalPrice,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : existing.expiryDate,
           pickupLocation: pickupLocationValue ?? existing.pickupLocation,
-          pickupInstructions: data.pickupInstructions,
-          updatedAt: new Date(),
         })
         .where(eq(marketplaceListings.id, listingId))
         .returning();
@@ -350,9 +337,7 @@ export function registerMarketplaceRoutes(router: Router) {
       .update(marketplaceListings)
       .set({
         status: "reserved",
-        reservedBy: user.id,
-        reservedAt: new Date(),
-        updatedAt: new Date(),
+        buyerId: user.id,
       })
       .where(eq(marketplaceListings.id, listingId));
 
@@ -379,11 +364,20 @@ export function registerMarketplaceRoutes(router: Router) {
       .update(marketplaceListings)
       .set({
         status: "sold",
-        soldAt: new Date(),
-        updatedAt: new Date(),
+        completedAt: new Date(),
       })
       .where(eq(marketplaceListings.id, listingId));
 
-    return json({ message: "Listing marked as sold" });
+    // Award points for selling (reduces food waste)
+    const pointsResult = await awardPoints(user.id, "sold");
+
+    return json({
+      message: "Listing marked as sold",
+      points: {
+        earned: pointsResult.amount,
+        action: pointsResult.action,
+        newTotal: pointsResult.newTotal,
+      },
+    });
   });
 }
