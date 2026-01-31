@@ -181,6 +181,9 @@ export const messages = sqliteTable("messages", {
     .$defaultFn(() => new Date()),
 });
 
+// Alias for services that use PascalCase
+export const ProductSustainabilityMetrics = productSustainabilityMetrics;
+
 // ==================== Relations ====================
 
 export const usersRelations = relations(users, ({ one, many }) => ({
