@@ -66,3 +66,6 @@ ios/
 !android/.gitignore  # Keep the Android .gitignore
 !ios/.gitignore      # Keep the iOS .gitignore
 design/
+backend/db-full-reset.ts
+backend/db-reset.ts
+backend/test-db.ts

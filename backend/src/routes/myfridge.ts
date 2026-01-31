@@ -10,6 +10,7 @@ const productSchema = z.object({
   productName: z.string().min(1).max(200),
   category: z.string().optional(),
   quantity: z.number().positive().default(1),
+  unit: z.string().optional(),
   unitPrice: z.number().optional(),
   purchaseDate: z.string().optional(),
   description: z.string().optional(),
@@ -72,15 +73,26 @@ export function registerMyFridgeRoutes(router: Router) {
           productName: data.productName,
           category: data.category,
           quantity: data.quantity,
+          unit: data.unit,
           unitPrice: data.unitPrice,
-          purchaseDate: data.purchaseDate,
+          purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
           description: data.description,
           co2Emission: data.co2Emission,
         })
         .returning();
 
+      // Log "Add" interaction for sustainability tracking
+      const todayDate = new Date().toISOString().split("T")[0];
+      await db.insert(productSustainabilityMetrics).values({
+        productId: product.id,
+        userId: user.id,
+        todayDate,
+        quantity: data.quantity,
+        type: "Add",
+      });
+
       // Award points for adding a product
-      await awardPoints(user.id, POINTS.addProduct);
+      await awardPoints(user.id, POINTS.Add);
 
       return json(product);
     } catch (e) {
@@ -124,9 +136,15 @@ export function registerMyFridgeRoutes(router: Router) {
         return error("Product not found", 404);
       }
 
+      // Convert purchaseDate string to Date if provided
+      const updateData: Record<string, unknown> = { ...data };
+      if (data.purchaseDate) {
+        updateData.purchaseDate = new Date(data.purchaseDate);
+      }
+
       const [updated] = await db
         .update(products)
-        .set(data)
+        .set(updateData)
         .where(eq(products.id, productId))
         .returning();
 
@@ -135,8 +153,8 @@ export function registerMyFridgeRoutes(router: Router) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);
       }
-      console.error("Create product error:", e);
-      return error("Failed to create product", 500);
+      console.error("Update product error:", e);
+      return error("Failed to update product", 500);
     }
   });
 

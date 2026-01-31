@@ -304,7 +304,7 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-4 lg:p-6">
             <h3 className="text-base font-semibold mb-4">Impact Equivalence</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {impactItems.map((item) => (
                 <div
                   key={item.label}

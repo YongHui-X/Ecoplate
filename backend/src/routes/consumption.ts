@@ -1,12 +1,11 @@
 import { Router, json, error, parseBody } from "../utils/router";
-import { products } from "../db/schema";
+import { products, productSustainabilityMetrics, pendingConsumptionRecords } from "../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
 import OpenAI from "openai";
 import {
   calculateWasteMetrics,
-  recordConsumptionInteractions,
   type IngredientInput,
 } from "../services/consumption-service";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
@@ -30,6 +29,36 @@ const ingredientSchema = z.object({
 const analyzeWasteSchema = z.object({
   imageBase64: z.string().min(1, "Image is required"),
   ingredients: z.array(ingredientSchema).min(1, "Ingredients are required"),
+});
+
+const confirmIngredientsSchema = z.object({
+  ingredients: z.array(z.object({
+    productId: z.number(),
+    productName: z.string(),
+    quantityUsed: z.number().positive(),
+    category: z.string(),
+    unitPrice: z.number(),
+    co2Emission: z.number().optional(),
+  })).min(1, "Ingredients are required"),
+  pendingRecordId: z.number().optional(),
+});
+
+const confirmWasteSchema = z.object({
+  ingredients: z.array(z.object({
+    productId: z.number(),
+    productName: z.string(),
+    quantityUsed: z.number().positive(),
+    interactionId: z.number().optional(),
+    category: z.string(),
+    unitPrice: z.number(),
+    co2Emission: z.number().optional(),
+  })).min(1, "Ingredients are required"),
+  wasteItems: z.array(z.object({
+    productId: z.number(),
+    productName: z.string(),
+    quantityWasted: z.number(),
+  })),
+  pendingRecordId: z.number().optional(),
 });
 
 // ==================== Route Registration ====================
@@ -313,7 +342,121 @@ Return JSON:
       console.log("Refusal:", response.choices[0]?.message?.refusal);
       const wasteAnalysis = JSON.parse(content);
 
-      // Calculate metrics
+      // Only return AI detection results - no recording here
+      // Recording happens in confirm-waste endpoint
+      return json({
+        wasteAnalysis,
+      });
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        return error(e.errors[0].message, 400);
+      }
+      console.error("Consumption analyze-waste error:", e);
+      return error("Failed to analyze waste", 500);
+    }
+  });
+
+  // API 3: Confirm ingredients - records Consume interactions and deducts from products
+  router.post("/api/v1/consumption/confirm-ingredients", async (req) => {
+    try {
+      const user = getUser(req);
+      const body = await parseBody(req);
+
+      const parsed = confirmIngredientsSchema.safeParse(body);
+      if (!parsed.success) {
+        return error(parsed.error.errors[0].message, 400);
+      }
+
+      const { ingredients, pendingRecordId } = parsed.data;
+      const interactionIds: number[] = [];
+      const todayDate = new Date().toISOString().split("T")[0];
+
+      for (const ing of ingredients) {
+        // 1. Record Consume interaction with full quantity
+        const [interaction] = await db.insert(productSustainabilityMetrics).values({
+          productId: ing.productId,
+          userId: user.id,
+          todayDate,
+          quantity: ing.quantityUsed,
+          type: "Consume",
+        }).returning();
+
+        interactionIds.push(interaction.id);
+
+        // 2. Deduct from product quantity
+        const product = await db.query.products.findFirst({
+          where: eq(products.id, ing.productId)
+        });
+        if (product) {
+          await db.update(products)
+            .set({ quantity: Math.max(0, product.quantity - ing.quantityUsed) })
+            .where(eq(products.id, ing.productId));
+        }
+      }
+
+      // 3. Update pending record with interaction IDs (for later waste adjustment)
+      if (pendingRecordId) {
+        await db.update(pendingConsumptionRecords)
+          .set({
+            ingredients: JSON.stringify(ingredients.map((ing, i) => ({
+              ...ing,
+              interactionId: interactionIds[i]
+            }))),
+            status: "PENDING_WASTE_PHOTO"
+          })
+          .where(eq(pendingConsumptionRecords.id, pendingRecordId));
+      }
+
+      return json({ interactionIds, success: true });
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        return error(e.errors[0].message, 400);
+      }
+      console.error("Consumption confirm-ingredients error:", e);
+      return error("Failed to confirm ingredients", 500);
+    }
+  });
+
+  // API 4: Confirm waste - adjusts Consume interactions and creates Waste interactions
+  router.post("/api/v1/consumption/confirm-waste", async (req) => {
+    try {
+      const user = getUser(req);
+      const body = await parseBody(req);
+
+      const parsed = confirmWasteSchema.safeParse(body);
+      if (!parsed.success) {
+        return error(parsed.error.errors[0].message, 400);
+      }
+
+      const { ingredients, wasteItems, pendingRecordId } = parsed.data;
+      const todayDate = new Date().toISOString().split("T")[0];
+
+      for (const ing of ingredients) {
+        // Find waste for this ingredient
+        const waste = wasteItems.find(w => w.productId === ing.productId);
+        const wastedQty = waste?.quantityWasted || 0;
+        const consumedQty = ing.quantityUsed - wastedQty;
+
+        // 1. Update existing Consume interaction (reduce to actual consumed)
+        if (ing.interactionId) {
+          await db.update(productSustainabilityMetrics)
+            .set({ quantity: consumedQty })
+            .where(eq(productSustainabilityMetrics.id, ing.interactionId));
+        }
+
+        // 2. Create Waste interaction if any waste
+        if (wastedQty > 0) {
+          await db.insert(productSustainabilityMetrics).values({
+            productId: ing.productId,
+            userId: user.id,
+            todayDate,
+            quantity: wastedQty,
+            type: "Waste",
+          });
+        }
+      }
+
+      // 3. Calculate metrics
       const ingredientInputs: IngredientInput[] = ingredients.map((i) => ({
         productId: i.productId,
         productName: i.productName,
@@ -325,28 +468,26 @@ Return JSON:
 
       const metrics = calculateWasteMetrics(
         ingredientInputs,
-        wasteAnalysis.wasteItems
+        wasteItems.map(w => ({
+          productId: w.productId,
+          productName: w.productName,
+          quantityWasted: w.quantityWasted,
+        }))
       );
 
-      // Record interactions in the database
-      const interactions = await recordConsumptionInteractions(
-        db,
-        user.id,
-        ingredientInputs,
-        wasteAnalysis.wasteItems
-      );
+      // 4. Delete pending record
+      if (pendingRecordId) {
+        await db.delete(pendingConsumptionRecords)
+          .where(eq(pendingConsumptionRecords.id, pendingRecordId));
+      }
 
-      return json({
-        metrics,
-        wasteAnalysis,
-        interactions,
-      });
+      return json({ metrics, success: true });
     } catch (e) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);
       }
-      console.error("Consumption analyze-waste error:", e);
-      return error("Failed to analyze waste", 500);
+      console.error("Consumption confirm-waste error:", e);
+      return error("Failed to confirm waste", 500);
     }
   });
 }

@@ -12,4 +12,4 @@ On the third screen, the user will be able to upload a picture of the waste food
 
 If an interruption happens here after the user uploads a picture, without seeing the final meal report, the user will be brought back to the homescreen, as they will be able to access that final meal report at another time. 
 
-The last screen, the user will be able to see a dashboard detailing, the environmental impact of their meal with some metrics.
+The last screen, the user will be able to see a report detailing, the environmental impact of their meal with some metrics. the metrics are Total CO2 Wasted, $ Food wasted.
