@@ -428,6 +428,17 @@ cd frontend/android && ./gradlew assembleDebug
 
 APK location: `frontend/android/app/build/outputs/apk/debug/app-debug.apk`
 
+### Known Issues & Fixes
+
+Our project automatically handles Capacitor 6.x + Android Gradle Plugin 9.0+ compatibility. The ProGuard configuration is fixed via:
+1. **Gradle build override** (primary) - Configured in `frontend/android/build.gradle`
+2. **patch-package** (fallback) - For complex patches
+3. **Postinstall script** (safety net) - Runs after `bun install`
+
+**For new team members:** Just run `bun install` and the fixes apply automatically.
+
+**For troubleshooting:** See `docs/android-build-patching.md` for detailed documentation.
+
 ### Optional - Building for iOS (macOS only)
 
 ```bash

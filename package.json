@@ -7,6 +7,7 @@
     "frontend"
   ],
   "scripts": {
+    "postinstall": "patch-package && bash scripts/fix-capacitor-proguard.sh",
     "dev:backend": "lsof -ti :3000 | xargs kill -9 2>/dev/null || true; cd backend && bun --watch src/index.ts",
     "dev:frontend": "cd frontend && bun run dev",
     "dev:recommendation": "cd recommendation-engine && python app.py",
@@ -19,11 +20,11 @@
     "db:seed": "cd backend && bun run src/db/seed.ts"
   },
   "dependencies": {
-    "@capacitor/android": "^8.0.1",
-    "@capacitor/core": "^8.0.2",
-    "@capacitor/geolocation": "^8.0.0",
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/geolocation": "^6.0.0",
     "debug": "^4.4.3",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^0.12.8",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "react-leaflet": "^5.0.0",
@@ -31,7 +32,7 @@
     "supports-color": "^10.2.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.0.2",
+    "@capacitor/cli": "^6.2.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -39,6 +40,7 @@
     "@types/leaflet.markercluster": "^1.5.6",
     "@vitest/ui": "^4.0.18",
     "jsdom": "^27.4.0",
+    "patch-package": "^8.0.1",
     "vitest": "^4.0.18"
   }
 }
