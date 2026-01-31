@@ -1,9 +1,15 @@
+import { Capacitor } from "@capacitor/core";
+
 /**
  * Image Upload Service
  * Handles image uploads to the backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// Use relative URLs on web (goes through Vite proxy), full URL on mobile
+const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+const API_BASE_URL = isNative
+  ? (import.meta.env.VITE_API_URL || "http://10.0.2.2:3000")
+  : "";
 
 export interface UploadImageResponse {
   imageUrl: string;
@@ -96,6 +102,10 @@ export const uploadService = {
   getImageUrl(imageUrl: string): string {
     if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
       return imageUrl; // Already absolute URL
+    }
+    // Handle URLs that already start with /
+    if (imageUrl.startsWith("/")) {
+      return `${API_BASE_URL}${imageUrl}`;
     }
     return `${API_BASE_URL}/${imageUrl}`;
   },

@@ -10,8 +10,8 @@ import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { awardPoints, POINT_VALUES } from "../services/gamification-service";
 
-// Ensure uploads directory exists
-const UPLOADS_DIR = join(import.meta.dir, "../../uploads/listings");
+// Ensure uploads directory exists - inside public folder for static serving
+const UPLOADS_DIR = join(import.meta.dir, "../../public/uploads/listings");
 if (!existsSync(UPLOADS_DIR)) {
   await mkdir(UPLOADS_DIR, { recursive: true });
 }
@@ -68,7 +68,7 @@ export function registerMarketplaceRoutes(router: Router) {
         const buffer = await file.arrayBuffer();
         await Bun.write(filepath, buffer);
 
-        uploadedUrls.push(`/uploads/listings/${filename}`);
+        uploadedUrls.push(`uploads/listings/${filename}`);
       }
 
       return json({ urls: uploadedUrls });
@@ -170,7 +170,7 @@ export function registerMarketplaceRoutes(router: Router) {
     return json(listingsWithDistance);
   });
 
-  // Get user's own listings
+  // Get user's own listings (as seller)
   router.get("/api/v1/marketplace/my-listings", async (req) => {
     const user = getUser(req);
 
@@ -180,6 +180,23 @@ export function registerMarketplaceRoutes(router: Router) {
     });
 
     return json(listings);
+  });
+
+  // Get user's purchase history (as buyer)
+  router.get("/api/v1/marketplace/my-purchases", async (req) => {
+    const user = getUser(req);
+
+    const purchases = await db.query.marketplaceListings.findMany({
+      where: eq(marketplaceListings.buyerId, user.id),
+      with: {
+        seller: {
+          columns: { id: true, name: true, avatarUrl: true },
+        },
+      },
+      orderBy: [desc(marketplaceListings.completedAt)],
+    });
+
+    return json(purchases);
   });
 
   // Get single listing
@@ -200,6 +217,96 @@ export function registerMarketplaceRoutes(router: Router) {
     }
 
     return json(listing);
+  });
+
+  // Get similar listings (recommendation engine)
+  router.get("/api/v1/marketplace/listings/:id/similar", async (req, params) => {
+    const user = getUser(req);
+    const listingId = parseInt(params.id, 10);
+    const url = new URL(req.url);
+    const limit = parseInt(url.searchParams.get("limit") || "6", 10);
+
+    const listing = await db.query.marketplaceListings.findFirst({
+      where: eq(marketplaceListings.id, listingId),
+    });
+
+    if (!listing) {
+      return error("Listing not found", 404);
+    }
+
+    // Get all active listings except the current one and user's own
+    const allListings = await db.query.marketplaceListings.findMany({
+      where: and(
+        ne(marketplaceListings.id, listingId),
+        ne(marketplaceListings.sellerId, user.id),
+        eq(marketplaceListings.status, "active")
+      ),
+      with: {
+        seller: {
+          columns: { id: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    if (allListings.length === 0) {
+      return json({ listings: [], fallback: false });
+    }
+
+    // Try to use recommendation engine
+    const recommendationUrl = process.env.RECOMMENDATION_ENGINE_URL || "http://localhost:5000";
+
+    try {
+      const response = await fetch(`${recommendationUrl}/api/v1/recommendations/similar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          listing: {
+            id: listing.id,
+            title: listing.title,
+            description: listing.description,
+            category: listing.category,
+            price: listing.price,
+            expiryDate: listing.expiryDate,
+          },
+          candidates: allListings.map((l) => ({
+            id: l.id,
+            title: l.title,
+            description: l.description,
+            category: l.category,
+            price: l.price,
+            expiryDate: l.expiryDate,
+          })),
+          limit,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json() as { recommendations: Array<{ id: number; score: number }> };
+        const recommendedIds = data.recommendations.map((r) => r.id);
+        const recommended = recommendedIds
+          .map((id) => allListings.find((l) => l.id === id))
+          .filter(Boolean);
+        return json({ listings: recommended, fallback: false });
+      }
+    } catch (e) {
+      console.error("Recommendation engine error:", e);
+    }
+
+    // Fallback: return listings in same category
+    const sameCategory = allListings
+      .filter((l) => l.category === listing.category)
+      .slice(0, limit);
+
+    if (sameCategory.length >= limit) {
+      return json({ listings: sameCategory, fallback: true });
+    }
+
+    // If not enough in same category, add others
+    const others = allListings
+      .filter((l) => l.category !== listing.category)
+      .slice(0, limit - sameCategory.length);
+
+    return json({ listings: [...sameCategory, ...others], fallback: true });
   });
 
   // Create listing
@@ -277,6 +384,7 @@ export function registerMarketplaceRoutes(router: Router) {
           originalPrice: data.originalPrice,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : existing.expiryDate,
           pickupLocation: pickupLocationValue ?? existing.pickupLocation,
+          images: data.imageUrls ? JSON.stringify(data.imageUrls) : existing.images,
         })
         .where(eq(marketplaceListings.id, listingId))
         .returning();
@@ -349,6 +457,17 @@ export function registerMarketplaceRoutes(router: Router) {
     const user = getUser(req);
     const listingId = parseInt(params.id, 10);
 
+    // Parse optional buyerId from request body
+    let buyerId: number | null = null;
+    try {
+      const body = await parseBody(req);
+      if (body && typeof body.buyerId === "number") {
+        buyerId = body.buyerId;
+      }
+    } catch {
+      // No body or invalid body, continue without buyerId
+    }
+
     const listing = await db.query.marketplaceListings.findFirst({
       where: and(
         eq(marketplaceListings.id, listingId),
@@ -360,11 +479,15 @@ export function registerMarketplaceRoutes(router: Router) {
       return error("Listing not found", 404);
     }
 
+    // Use provided buyerId, or keep existing one (from reservation)
+    const finalBuyerId = buyerId || listing.buyerId;
+
     await db
       .update(marketplaceListings)
       .set({
         status: "sold",
         completedAt: new Date(),
+        buyerId: finalBuyerId,
       })
       .where(eq(marketplaceListings.id, listingId));
 

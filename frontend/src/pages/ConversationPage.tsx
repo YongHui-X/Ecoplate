@@ -101,7 +101,11 @@ export default function ConversationPage() {
 
     setMarkingSold(true);
     try {
-      const result = await marketplaceService.completeListing(conversation.listingId);
+      // Pass the buyer's ID from the conversation
+      const result = await marketplaceService.completeListing(
+        conversation.listingId,
+        conversation.buyer.id
+      );
       addToast(`Listing marked as sold! +${result.points.earned} points`, "success");
       await loadConversation();
     } catch (error: unknown) {

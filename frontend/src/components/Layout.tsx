@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUnreadCount } from "../contexts/UnreadCountContext";
@@ -45,16 +46,45 @@ function getPageTitle(pathname: string): string {
   return "EcoPlate";
 }
 
+// Avatar mapping helper
+const AVATAR_MAP: Record<string, string> = {
+  'avatar1': '🌱',
+  'avatar2': '🌿',
+  'avatar3': '🍃',
+  'avatar4': '🌾',
+  'avatar5': '🥬',
+  'avatar6': '🥕',
+  'avatar7': '🍎',
+  'avatar8': '🥑',
+};
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const { unreadCount } = useUnreadCount();
   const navigate = useNavigate();
   const location = useLocation();
+  const [, forceUpdate] = useState(0);
+
+  // Listen for profile updates to ensure avatar refreshes
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      forceUpdate((n) => n + 1);
+    };
+    window.addEventListener("auth:profileUpdate", handleProfileUpdate);
+    return () => window.removeEventListener("auth:profileUpdate", handleProfileUpdate);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
+
+  const getAvatarEmoji = useCallback((avatarUrl: string | null | undefined) => {
+    if (avatarUrl && avatarUrl.startsWith('avatar')) {
+      return AVATAR_MAP[avatarUrl] || '🌱';
+    }
+    return null;
+  }, []);
 
   const pageTitle = getPageTitle(location.pathname);
 
@@ -113,22 +143,7 @@ export default function Layout() {
               }
             >
               <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-lg">
-                {user?.avatarUrl && user.avatarUrl.startsWith('avatar')
-                  ? (() => {
-                      const avatarMap: Record<string, string> = {
-                        'avatar1': '🌱',
-                        'avatar2': '🌿',
-                        'avatar3': '🍃',
-                        'avatar4': '🌾',
-                        'avatar5': '🥬',
-                        'avatar6': '🥕',
-                        'avatar7': '🍎',
-                        'avatar8': '🥑',
-                      };
-                      return avatarMap[user.avatarUrl] || user.name.charAt(0).toUpperCase();
-                    })()
-                  : user?.name.charAt(0).toUpperCase()
-                }
+                {getAvatarEmoji(user?.avatarUrl) || user?.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{user?.name}</p>

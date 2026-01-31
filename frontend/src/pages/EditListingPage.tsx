@@ -130,7 +130,7 @@ export default function EditListingPage() {
         expiryDate: formData.expiryDate && formData.expiryDate.trim() !== "" ? formData.expiryDate : undefined,
         pickupLocation: formData.pickupLocation.trim() || undefined,
         coordinates: coordinates,
-        images: imageUrls.length > 0 ? imageUrls : undefined,
+        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       };
 
       await marketplaceService.updateListing(Number(id), data);

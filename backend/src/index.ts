@@ -9,6 +9,7 @@ import { registerConsumptionRoutes } from "./routes/consumption";
 import { registerMessageRoutes } from "./routes/messages";
 import { registerDashboardRoutes } from "./routes/dashboard";
 import { registerGamificationRoutes } from "./routes/gamification";
+import { registerUploadRoutes } from "./routes/upload";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -33,6 +34,7 @@ registerConsumptionRoutes(protectedRouter, db);
 registerMessageRoutes(protectedRouter);
 registerDashboardRoutes(protectedRouter);
 registerGamificationRoutes(protectedRouter);
+registerUploadRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));
@@ -60,11 +62,10 @@ function getMimeType(path: string): string {
 
 async function serveStatic(path: string): Promise<Response | null> {
   const publicDir = join(import.meta.dir, "../public");
-  const uploadsDir = join(import.meta.dir, "../uploads");
 
-  // Handle uploads directory
+  // Handle uploads directory (stored in public/uploads/)
   if (path.startsWith("/uploads/")) {
-    const uploadPath = join(uploadsDir, path.replace("/uploads/", ""));
+    const uploadPath = join(publicDir, path);
     if (existsSync(uploadPath)) {
       const file = Bun.file(uploadPath);
       return new Response(file, {
