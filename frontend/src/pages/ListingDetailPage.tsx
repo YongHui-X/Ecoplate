@@ -69,7 +69,7 @@ export default function ListingDetailPage() {
     setActionLoading(true);
     try {
       const result = await marketplaceService.completeListing(Number(id));
-      addToast(`Listing marked as completed! +${result.pointsAwarded} points`, "success");
+      addToast(`Listing marked as sold! +${result.points.earned} points`, "success");
       loadListing();
     } catch (error: any) {
       addToast(error.message || "Failed to complete listing", "error");

@@ -118,23 +118,33 @@ export async function getConversationById(
 }
 
 /**
- * Get unread message count for a user
+ * Get unread message count for a user (excludes archived/sold conversations)
  */
 export async function getUnreadCountForUser(userId: number): Promise<number> {
-  // Get all conversations where user is a participant
+  // Get all conversations where user is a participant, excluding sold listings
   const userConversations = await db.query.conversations.findMany({
     where: or(
       eq(conversations.sellerId, userId),
       eq(conversations.buyerId, userId)
     ),
     columns: { id: true },
+    with: {
+      listing: {
+        columns: { status: true },
+      },
+    },
   });
 
-  if (userConversations.length === 0) {
+  // Filter out conversations for sold listings (archived)
+  const activeConversations = userConversations.filter(
+    (c) => c.listing?.status !== "sold"
+  );
+
+  if (activeConversations.length === 0) {
     return 0;
   }
 
-  const conversationIds = userConversations.map((c) => c.id);
+  const conversationIds = activeConversations.map((c) => c.id);
 
   // Count unread messages in those conversations that were NOT sent by the user
   const result = await db

@@ -35,19 +35,68 @@ export const products = sqliteTable("products", {
   co2Emission: real("co2_emission"),
 });
 
+// ==================== User Points ====================
+
+export const userPoints = sqliteTable("user_points", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  totalPoints: integer("total_points").notNull().default(0),
+  currentStreak: integer("current_streak").notNull().default(0),
+});
+
+// ==================== Badges ====================
+
+export const badges = sqliteTable("badges", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"),
+  pointsAwarded: integer("points_awarded").notNull().default(0),
+  sortOrder: integer("sort_order").notNull().default(0),
+  badgeImageUrl: text("badge_image_url"),
+});
+
+// ==================== User Badges ====================
+
+export const userBadges = sqliteTable("user_badges", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  badgeId: integer("badge_id")
+    .notNull()
+    .references(() => badges.id, { onDelete: "cascade" }),
+  earnedAt: integer("earned_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+// ==================== Listing Images ====================
+
+export const listingImages = sqliteTable("listing_images", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  listingId: integer("listing_id")
+    .notNull()
+    .references(() => marketplaceListings.id, { onDelete: "cascade" }),
+  imageUrl: text("image_url").notNull(),
+});
+
 // ==================== Product Sustainability Metrics ====================
 
 export const productSustainabilityMetrics = sqliteTable("product_sustainability_metrics", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   productId: integer("product_id")
-    .notNull()
-    .references(() => products.id, { onDelete: "cascade" }),
+    .references(() => products.id, { onDelete: "cascade" }), // Nullable for marketplace actions
   userId: integer("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   todayDate: text("today_date"), // YYYY-MM-DD format
   quantity: real("quantity"),
-  type: text("type"), // e.g., "Add", "Consume", "Waste"
+  type: text("type"), // e.g., "consumed", "wasted", "shared", "sold"
 });
 
 // ==================== Pending Consumption Records ====================
@@ -149,7 +198,7 @@ export const ProductSustainabilityMetrics = productSustainabilityMetrics;
 
 // ==================== Relations ====================
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   products: many(products),
   productSustainabilityMetrics: many(productSustainabilityMetrics),
   pendingConsumptionRecords: many(pendingConsumptionRecords),
@@ -158,6 +207,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   conversationsAsSeller: many(conversations, { relationName: "seller" }),
   conversationsAsBuyer: many(conversations, { relationName: "buyer" }),
   messages: many(messages),
+  points: one(userPoints),
+  badges: many(userBadges),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -187,6 +238,7 @@ export const marketplaceListingsRelations = relations(
       references: [products.id],
     }),
     conversations: many(conversations),
+    images: many(listingImages),
   })
 );
 
@@ -236,6 +288,13 @@ export const productSustainabilityMetricsRelations = relations(
   })
 );
 
+export const userPointsRelations = relations(userPoints, ({ one }) => ({
+  user: one(users, {
+    fields: [userPoints.userId],
+    references: [users.id],
+  }),
+}));
+
 export const pendingConsumptionRecordsRelations = relations(
   pendingConsumptionRecords,
   ({ one }) => ({
@@ -245,3 +304,25 @@ export const pendingConsumptionRecordsRelations = relations(
     }),
   })
 );
+
+export const badgesRelations = relations(badges, ({ many }) => ({
+  userBadges: many(userBadges),
+}));
+
+export const userBadgesRelations = relations(userBadges, ({ one }) => ({
+  user: one(users, {
+    fields: [userBadges.userId],
+    references: [users.id],
+  }),
+  badge: one(badges, {
+    fields: [userBadges.badgeId],
+    references: [badges.id],
+  }),
+}));
+
+export const listingImagesRelations = relations(listingImages, ({ one }) => ({
+  listing: one(marketplaceListings, {
+    fields: [listingImages.listingId],
+    references: [marketplaceListings.id],
+  }),
+}));

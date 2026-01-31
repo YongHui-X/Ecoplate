@@ -3,7 +3,7 @@ import { db } from "../index";
 import * as schema from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getUser } from "../middleware/auth";
-import { getOrCreateUserPoints, getUserMetrics } from "../services/gamification-service";
+import { getOrCreateUserPoints, getUserMetrics, getDetailedPointsStats } from "../services/gamification-service";
 import { POINT_VALUES } from "../services/gamification-service";
 
 export function registerGamificationRoutes(router: Router) {
@@ -14,11 +14,12 @@ export function registerGamificationRoutes(router: Router) {
     const user = getUser(req);
 
     const points = await getOrCreateUserPoints(user.id);
+    const detailedStats = await getDetailedPointsStats(user.id);
 
     // Get recent interactions as "transactions" for the UI
-    const recentInteractions = await db.query.ProductSustainabilityMetrics.findMany({
-      where: eq(schema.ProductSustainabilityMetrics.userId, user.id),
-      orderBy: [desc(schema.ProductSustainabilityMetrics.todayDate)],
+    const recentInteractions = await db.query.productSustainabilityMetrics.findMany({
+      where: eq(schema.productSustainabilityMetrics.userId, user.id),
+      orderBy: [desc(schema.productSustainabilityMetrics.todayDate)],
       limit: 20,
       with: {
         product: {
@@ -43,11 +44,22 @@ export function registerGamificationRoutes(router: Router) {
     return json({
       points: {
         total: points.totalPoints,
-        available: points.totalPoints, // Same as total in simplified model
+        available: points.totalPoints,
         lifetime: points.totalPoints,
         currentStreak: points.currentStreak,
-        longestStreak: points.currentStreak, // Track separately if needed
+        longestStreak: detailedStats.longestStreak,
       },
+      stats: {
+        totalActiveDays: detailedStats.totalActiveDays,
+        lastActiveDate: detailedStats.lastActiveDate,
+        firstActivityDate: detailedStats.firstActivityDate,
+        pointsToday: detailedStats.pointsToday,
+        pointsThisWeek: detailedStats.pointsThisWeek,
+        pointsThisMonth: detailedStats.pointsThisMonth,
+        bestDayPoints: detailedStats.bestDayPoints,
+        averagePointsPerActiveDay: detailedStats.averagePointsPerActiveDay,
+      },
+      breakdown: detailedStats.breakdownByType,
       transactions,
     });
   });
@@ -87,6 +99,47 @@ export function registerGamificationRoutes(router: Router) {
     }));
 
     return json(leaderboard);
+  });
+
+  // ================================
+  // GET /api/v1/gamification/badges
+  // ================================
+  router.get("/api/v1/gamification/badges", async (req) => {
+    const user = getUser(req);
+
+    // Get all badges
+    const allBadges = await db.query.badges.findMany({
+      orderBy: [schema.badges.sortOrder],
+    });
+
+    // Get user's earned badges
+    const earnedBadges = await db.query.userBadges.findMany({
+      where: eq(schema.userBadges.userId, user.id),
+      with: {
+        badge: true,
+      },
+    });
+
+    const earnedBadgeIds = new Set(earnedBadges.map((ub) => ub.badgeId));
+
+    // Combine all badges with earned status
+    const badgesWithStatus = allBadges.map((badge) => ({
+      id: badge.id,
+      code: badge.code,
+      name: badge.name,
+      description: badge.description,
+      category: badge.category,
+      pointsAwarded: badge.pointsAwarded,
+      imageUrl: badge.badgeImageUrl,
+      earned: earnedBadgeIds.has(badge.id),
+      earnedAt: earnedBadges.find((ub) => ub.badgeId === badge.id)?.earnedAt || null,
+    }));
+
+    return json({
+      badges: badgesWithStatus,
+      totalEarned: earnedBadges.length,
+      totalAvailable: allBadges.length,
+    });
   });
 
   // ================================

@@ -6,17 +6,26 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Skeleton, SkeletonCard } from "../components/ui/skeleton";
 import {
-  Trophy,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
+import {
   ArrowLeft,
-  Coins,
-  Star,
-  Sparkles,
+  Flame,
+  Trophy,
+  TrendingUp,
+  CalendarDays,
+  Lightbulb,
   Check,
   Share,
   DollarSign,
   X,
-  Lightbulb,
-  Gift,
+  ChevronDown,
+  ChevronUp,
+  Leaf,
 } from "lucide-react";
 
 interface PointsData {
@@ -27,6 +36,17 @@ interface PointsData {
     currentStreak: number;
     longestStreak: number;
   };
+  stats: {
+    totalActiveDays: number;
+    lastActiveDate: string | null;
+    firstActivityDate: string | null;
+    pointsToday: number;
+    pointsThisWeek: number;
+    pointsThisMonth: number;
+    bestDayPoints: number;
+    averagePointsPerActiveDay: number;
+  };
+  breakdown: Record<string, { count: number; totalPoints: number }>;
   transactions: Array<{
     id: number;
     amount: number;
@@ -44,6 +64,7 @@ const ACTION_CONFIG: Record<
     points: number;
     color: string;
     bgColor: string;
+    chartColor: string;
     description: string;
   }
 > = {
@@ -53,6 +74,7 @@ const ACTION_CONFIG: Record<
     points: 5,
     color: "text-success",
     bgColor: "bg-success/10",
+    chartColor: "hsl(var(--success))",
     description: "Eat food before it expires",
   },
   shared: {
@@ -61,7 +83,8 @@ const ACTION_CONFIG: Record<
     points: 10,
     color: "text-primary",
     bgColor: "bg-primary/10",
-    description: "Share food with others in the community",
+    chartColor: "hsl(var(--primary))",
+    description: "Share excess food with others",
   },
   sold: {
     label: "Sold",
@@ -69,7 +92,8 @@ const ACTION_CONFIG: Record<
     points: 8,
     color: "text-secondary",
     bgColor: "bg-secondary/10",
-    description: "Sell items on the marketplace",
+    chartColor: "hsl(var(--secondary))",
+    description: "Sell products on the marketplace",
   },
   wasted: {
     label: "Wasted",
@@ -77,28 +101,17 @@ const ACTION_CONFIG: Record<
     points: -3,
     color: "text-destructive",
     bgColor: "bg-destructive/10",
-    description: "Letting food go to waste loses points",
+    chartColor: "hsl(var(--destructive))",
+    description: "Wasting food costs you points",
   },
 };
 
-function getActionBreakdown(transactions: PointsData["transactions"]) {
-  const grouped: Record<string, { count: number; totalPoints: number }> = {};
-
-  for (const tx of transactions) {
-    const action = tx.action;
-    if (!grouped[action]) {
-      grouped[action] = { count: 0, totalPoints: 0 };
-    }
-    grouped[action].count++;
-    grouped[action].totalPoints += tx.amount;
-  }
-
-  return grouped;
-}
+const INITIAL_TX_COUNT = 10;
 
 export default function EcopointsPage() {
   const [pointsData, setPointsData] = useState<PointsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAllTx, setShowAllTx] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -122,11 +135,7 @@ export default function EcopointsPage() {
           <Skeleton className="h-10 w-10 rounded-xl" />
           <Skeleton className="h-8 w-40" />
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          {[1, 2, 3].map((i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </div>
+        <SkeletonCard />
         <SkeletonCard />
         <SkeletonCard />
         <SkeletonCard />
@@ -134,8 +143,24 @@ export default function EcopointsPage() {
     );
   }
 
-  const breakdown = getActionBreakdown(pointsData?.transactions || []);
-  const recentTransactions = (pointsData?.transactions || []).slice(0, 20);
+  const breakdown = pointsData?.breakdown || {};
+  const transactions = pointsData?.transactions || [];
+  const visibleTx = showAllTx ? transactions : transactions.slice(0, INITIAL_TX_COUNT);
+
+  // Pie chart data -- only include types with positive counts
+  const pieData = Object.entries(ACTION_CONFIG)
+    .filter(([action]) => (breakdown[action]?.count || 0) > 0)
+    .map(([action, config]) => ({
+      name: config.label,
+      value: breakdown[action]?.totalPoints || 0,
+      count: breakdown[action]?.count || 0,
+      color: config.chartColor,
+      action,
+    }));
+
+  const totalPoints = pieData.reduce((sum, d) => sum + Math.abs(d.value), 0);
+  const totalItems = Object.values(breakdown).reduce((sum, b) => sum + b.count, 0);
+  const hasPieData = pieData.length > 0;
 
   return (
     <div className="space-y-6">
@@ -149,127 +174,220 @@ export default function EcopointsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Eco Points</h1>
           <p className="text-muted-foreground text-sm">
-            Your full points breakdown
+            Track Your Eco Wins
           </p>
         </div>
       </div>
 
-      {/* Points Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="mx-auto mb-2 w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Trophy className="h-5 w-5 text-primary" />
-            </div>
-            <p className="text-2xl font-bold text-foreground">
+      {/* Points Summary Card */}
+      <Card>
+        <CardContent className="p-4 sm:p-6">
+          {/* Total Points - Large Display */}
+          <div className="text-center mb-6">
+            <p className="text-5xl sm:text-6xl font-bold text-primary">
               {pointsData?.points.total || 0}
             </p>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </CardContent>
-        </Card>
+            <p className="text-sm text-muted-foreground mt-1">Total Points</p>
+          </div>
 
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="mx-auto mb-2 w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
-              <Coins className="h-5 w-5 text-success" />
-            </div>
-            <p className="text-2xl font-bold text-foreground">
-              {pointsData?.points.available || 0}
-            </p>
-            <p className="text-xs text-muted-foreground">Available</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="mx-auto mb-2 w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
-              <Star className="h-5 w-5 text-secondary" />
-            </div>
-            <p className="text-2xl font-bold text-foreground">
-              {pointsData?.points.lifetime || 0}
-            </p>
-            <p className="text-xs text-muted-foreground">Lifetime</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Points Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Points Breakdown
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {Object.entries(ACTION_CONFIG).map(([action, config]) => {
-            const data = breakdown[action];
-            const Icon = config.icon;
-            return (
-              <div
-                key={action}
-                className={`flex items-center justify-between p-3 rounded-xl ${config.bgColor}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-card flex items-center justify-center">
-                    <Icon className={`h-4 w-4 ${config.color}`} />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {config.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {data?.count || 0} transaction{(data?.count || 0) !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className={`font-bold ${config.color}`}>
-                    {(data?.totalPoints || 0) > 0 ? "+" : ""}
-                    {data?.totalPoints || 0}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {config.points > 0 ? "+" : ""}
-                    {config.points} per item
-                  </p>
-                </div>
+          {/* 2x2 Stats Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Day Streak */}
+            <div className="flex items-start gap-3 p-3 sm:p-4 bg-warning/10 rounded-xl">
+              <div className="w-10 h-10 bg-warning/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <Flame className="w-5 h-5 text-warning" />
               </div>
-            );
-          })}
+              <div>
+                <p className="text-xl sm:text-2xl font-bold text-foreground">
+                  {pointsData?.points.currentStreak || 0}
+                </p>
+                <p className="text-xs text-muted-foreground">Day Streak</p>
+              </div>
+            </div>
+
+            {/* Best Streak */}
+            <div className="flex items-start gap-3 p-3 sm:p-4 bg-accent/10 rounded-xl">
+              <div className="w-10 h-10 bg-accent/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-bold text-foreground">
+                  {pointsData?.points.longestStreak || 0}
+                </p>
+                <p className="text-xs text-muted-foreground">Best Streak</p>
+              </div>
+            </div>
+
+            {/* Total Items */}
+            <div className="flex items-start gap-3 p-3 sm:p-4 bg-primary/10 rounded-xl">
+              <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-bold text-foreground">
+                  {totalItems}
+                </p>
+                <p className="text-xs text-muted-foreground">Total Items</p>
+              </div>
+            </div>
+
+            {/* This Month */}
+            <div className="flex items-start gap-3 p-3 sm:p-4 bg-success/10 rounded-xl">
+              <div className="w-10 h-10 bg-success/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <CalendarDays className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-bold text-foreground">
+                  {pointsData?.stats.pointsThisMonth || 0}
+                </p>
+                <p className="text-xs text-muted-foreground">Points earned this Month</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Recent Transactions */}
+      {/* Points Breakdown Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent Transactions</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Leaf className="h-5 w-5 text-primary" />
+            Points Breakdown
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {recentTransactions.length === 0 ? (
+          {hasPieData ? (
+            <div className="flex flex-col lg:flex-row items-center gap-6">
+              {/* Pie Chart */}
+              <div className="w-full lg:w-1/2 h-[200px] sm:h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      dataKey="value"
+                      label={(props: { name?: string; percent?: number }) =>
+                        `${props.name ?? ""} ${((props.percent ?? 0) * 100).toFixed(0)}%`
+                      }
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: unknown, name: unknown) => [
+                        `${Math.abs(Number(value) || 0)} pts`,
+                        String(name ?? ""),
+                      ]}
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "1px solid hsl(var(--border))",
+                        background: "hsl(var(--card))",
+                        color: "hsl(var(--foreground))",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Breakdown List */}
+              <div className="w-full lg:w-1/2 space-y-3">
+                {pieData.map((entry) => {
+                  const pct =
+                    totalPoints > 0
+                      ? ((Math.abs(entry.value) / totalPoints) * 100).toFixed(1)
+                      : "0";
+                  const config = ACTION_CONFIG[entry.action];
+                  const Icon = config?.icon || Check;
+
+                  return (
+                    <div key={entry.name} className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `color-mix(in srgb, ${entry.color} 15%, transparent)` }}
+                      >
+                        <Icon className="w-5 h-5" style={{ color: entry.color }} />
+                      </div>
+
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-foreground text-sm">
+                            {entry.name}
+                          </span>
+                          <span
+                            className="font-bold text-sm"
+                            style={{ color: entry.color }}
+                          >
+                            {entry.value > 0 ? "+" : ""}
+                            {entry.value} pts
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: entry.color,
+                            }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {pct}% &middot; {entry.count} items
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Leaf className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground">
+                No activity yet. Start earning points!
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Points History Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Points History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transactions.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               No transactions yet
             </p>
           ) : (
-            <div className="space-y-2">
-              {recentTransactions.map((tx) => {
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {visibleTx.map((tx) => {
                 const config = ACTION_CONFIG[tx.action];
                 const Icon = config?.icon || Check;
                 const color = config?.color || "text-muted-foreground";
+                const bgColor = config?.bgColor || "bg-muted";
                 return (
                   <div
                     key={tx.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-muted/50"
+                    className="flex items-center gap-3 p-3 rounded-xl bg-muted/50"
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className={`h-4 w-4 ${color}`} />
-                      <div>
-                        <p className="font-medium text-sm capitalize text-foreground">
-                          {tx.action.replace(/_/g, " ")}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(tx.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${bgColor}`}
+                    >
+                      <Icon className={`h-5 w-5 ${color}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm capitalize text-foreground truncate">
+                        {tx.action.replace(/_/g, " ")}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(tx.createdAt).toLocaleDateString()}
+                      </p>
                     </div>
                     <Badge
                       variant={tx.amount > 0 ? "success" : "destructive"}
@@ -281,6 +399,25 @@ export default function EcopointsPage() {
                   </div>
                 );
               })}
+              {transactions.length > INITIAL_TX_COUNT && (
+                <Button
+                  variant="ghost"
+                  className="w-full mt-2"
+                  onClick={() => setShowAllTx(!showAllTx)}
+                >
+                  {showAllTx ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-1" />
+                      Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-1" />
+                      Show All ({transactions.length})
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -294,82 +431,37 @@ export default function EcopointsPage() {
             How to Earn More Points
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {Object.entries(ACTION_CONFIG).map(([action, config]) => {
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {Object.entries(ACTION_CONFIG).map(([key, config]) => {
               const Icon = config.icon;
               return (
                 <div
-                  key={action}
-                  className={`p-3 rounded-xl ${config.bgColor}`}
+                  key={key}
+                  className={`p-3 sm:p-4 rounded-xl ${config.bgColor}`}
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Icon className={`h-4 w-4 ${config.color}`} />
-                    <span className="font-medium text-sm text-foreground">
-                      {config.label}
-                    </span>
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full ${config.bgColor} flex items-center justify-center flex-shrink-0`}
+                    >
+                      <Icon className={`w-5 h-5 ${config.color}`} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground text-sm">
+                        {config.label}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {config.description}
+                      </p>
+                      <p className={`font-bold text-sm mt-2 ${config.color}`}>
+                        {config.points > 0 ? "+" : ""}
+                        {config.points} pts per item
+                      </p>
+                    </div>
                   </div>
-                  <p className={`text-lg font-bold ${config.color}`}>
-                    {config.points > 0 ? "+" : ""}
-                    {config.points} pts
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {config.description}
-                  </p>
                 </div>
               );
             })}
-          </div>
-
-          <div className="border-t pt-4">
-            <p className="font-medium text-sm text-foreground mb-2">
-              Tips to maximize your points:
-            </p>
-            <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-              <li>
-                <span className="font-medium text-primary">Share food</span> --
-                highest reward at +10 points per item
-              </li>
-              <li>
-                <span className="font-medium text-secondary">Sell on marketplace</span> --
-                earn +8 points while reducing waste
-              </li>
-              <li>
-                <span className="font-medium text-success">Consume items</span> --
-                +5 points for eating food before it expires
-              </li>
-              <li>
-                <span className="font-medium text-destructive">Avoid waste</span> --
-                wasting food costs you -3 points
-              </li>
-            </ol>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Redeem Points */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Gift className="h-5 w-5 text-accent" />
-            Redeem Points
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
-              <Gift className="h-8 w-8 text-accent" />
-            </div>
-            <p className="text-2xl font-bold text-foreground mb-1">
-              {pointsData?.points.available || 0} points available
-            </p>
-            <p className="text-muted-foreground text-sm mb-4">
-              Redemption options coming soon! Keep earning points to unlock
-              rewards when this feature launches.
-            </p>
-            <Button variant="outline" disabled>
-              Coming Soon
-            </Button>
           </div>
         </CardContent>
       </Card>

@@ -33,8 +33,14 @@ export async function getOrCreateUserPoints(userId: number) {
 
 /**
  * Award points to a user for an action
+ * Also records the sustainability metric for tracking
  */
-export async function awardPoints(userId: number, action: PointAction) {
+export async function awardPoints(
+  userId: number,
+  action: PointAction,
+  productId?: number | null,
+  quantity?: number
+) {
   const amount = POINT_VALUES[action];
   const userPoints = await getOrCreateUserPoints(userId);
 
@@ -44,6 +50,16 @@ export async function awardPoints(userId: number, action: PointAction) {
     .update(schema.userPoints)
     .set({ totalPoints: newTotal })
     .where(eq(schema.userPoints.userId, userId));
+
+  // Record the sustainability metric
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  await db.insert(schema.productSustainabilityMetrics).values({
+    productId: productId ?? null,
+    userId,
+    todayDate: today,
+    quantity: quantity ?? 1,
+    type: action,
+  });
 
   // Only update streak for positive sustainability actions (not wasted)
   const streakActions = ["consumed", "shared", "sold"];
@@ -77,12 +93,12 @@ export async function updateStreak(userId: number) {
   const streakActions = ["consumed", "shared", "sold"];
 
   // Fetch all qualifying interactions for this user
-  const allInteractions = await db.query.ProductSustainabilityMetrics.findMany({
+  const allInteractions = await db.query.productSustainabilityMetrics.findMany({
     where: and(
-      eq(schema.ProductSustainabilityMetrics.userId, userId),
-      inArray(schema.ProductSustainabilityMetrics.type, streakActions)
+      eq(schema.productSustainabilityMetrics.userId, userId),
+      inArray(schema.productSustainabilityMetrics.type, streakActions)
     ),
-    orderBy: [desc(schema.ProductSustainabilityMetrics.todayDate)],
+    orderBy: [desc(schema.productSustainabilityMetrics.todayDate)],
   });
 
   // Filter today's interactions in JavaScript (avoids timestamp format issues)
@@ -137,7 +153,7 @@ export async function recordProductSustainabilityMetrics(
   quantity: number,
   type: "consumed" | "wasted" | "shared" | "sold"
 ) {
-  await db.insert(schema.ProductSustainabilityMetrics).values({
+  await db.insert(schema.productSustainabilityMetrics).values({
     productId,
     userId,
     quantity,
@@ -146,13 +162,143 @@ export async function recordProductSustainabilityMetrics(
 }
 
 /**
+ * Get detailed points stats for the EcoPoints dashboard.
+ * Computes streaks, time-windowed points, and breakdown by action type.
+ */
+export async function getDetailedPointsStats(userId: number) {
+  const allInteractions = await db.query.productSustainabilityMetrics.findMany({
+    where: eq(schema.productSustainabilityMetrics.userId, userId),
+    orderBy: [desc(schema.productSustainabilityMetrics.todayDate)],
+  });
+
+  const streakActions = ["consumed", "shared", "sold"];
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+
+  const weekAgo = new Date(todayStart);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const monthAgo = new Date(todayStart);
+  monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+  // Breakdown by type (all interactions)
+  const breakdownByType: Record<string, { count: number; totalPoints: number }> = {
+    consumed: { count: 0, totalPoints: 0 },
+    shared: { count: 0, totalPoints: 0 },
+    sold: { count: 0, totalPoints: 0 },
+    wasted: { count: 0, totalPoints: 0 },
+  };
+
+  let pointsToday = 0;
+  let pointsThisWeek = 0;
+  let pointsThisMonth = 0;
+
+  // Collect unique dates with positive actions for streak computation
+  const activeDateSet = new Set<string>();
+  // Track points per day for bestDayPoints
+  const pointsByDay = new Map<string, number>();
+
+  let firstActivityDate: string | null = null;
+  let lastActiveDate: string | null = null;
+
+  for (const interaction of allInteractions) {
+    const type = interaction.type as keyof typeof POINT_VALUES;
+    const points = POINT_VALUES[type] ?? 0;
+    const interactionDate = new Date(interaction.todayDate);
+    const dateKey = interactionDate.toISOString().split("T")[0];
+
+    // Breakdown
+    if (breakdownByType[type]) {
+      breakdownByType[type].count++;
+      breakdownByType[type].totalPoints += points;
+    }
+
+    // Track first/last activity dates
+    if (!lastActiveDate) lastActiveDate = dateKey;
+    firstActivityDate = dateKey;
+
+    // Points by day
+    pointsByDay.set(dateKey, (pointsByDay.get(dateKey) || 0) + points);
+
+    // Time-windowed points
+    if (interactionDate >= todayStart) {
+      pointsToday += points;
+    }
+    if (interactionDate >= weekAgo) {
+      pointsThisWeek += points;
+    }
+    if (interactionDate >= monthAgo) {
+      pointsThisMonth += points;
+    }
+
+    // Track active days for streak (positive actions only)
+    if (streakActions.includes(type)) {
+      const d = new Date(interaction.todayDate);
+      d.setHours(0, 0, 0, 0);
+      activeDateSet.add(d.toISOString().split("T")[0]);
+    }
+  }
+
+  // Compute longest streak from sorted unique active dates
+  const activeDates = Array.from(activeDateSet)
+    .sort()
+    .map((d) => new Date(d));
+
+  let longestStreak = 0;
+  let currentRun = 0;
+
+  for (let i = 0; i < activeDates.length; i++) {
+    if (i === 0) {
+      currentRun = 1;
+    } else {
+      const prev = activeDates[i - 1];
+      const curr = activeDates[i];
+      const diffMs = curr.getTime() - prev.getTime();
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (diffDays === 1) {
+        currentRun++;
+      } else {
+        currentRun = 1;
+      }
+    }
+    if (currentRun > longestStreak) longestStreak = currentRun;
+  }
+
+  const totalActiveDays = activeDateSet.size;
+  const totalPositivePoints = breakdownByType.consumed.totalPoints +
+    breakdownByType.shared.totalPoints +
+    breakdownByType.sold.totalPoints;
+  const averagePointsPerActiveDay = totalActiveDays > 0
+    ? Math.round(totalPositivePoints / totalActiveDays)
+    : 0;
+
+  const bestDayPoints = pointsByDay.size > 0
+    ? Math.max(...pointsByDay.values())
+    : 0;
+
+  return {
+    longestStreak,
+    totalActiveDays,
+    lastActiveDate,
+    firstActivityDate,
+    pointsToday,
+    pointsThisWeek,
+    pointsThisMonth,
+    bestDayPoints,
+    averagePointsPerActiveDay,
+    breakdownByType,
+  };
+}
+
+/**
  * Get user metrics computed from product_interaction table,
  * @ JASON , TONY , i left this here for your reference, delete if u think not needed, or modify
  * -yh
  */
 export async function getUserMetrics(userId: number) {
-  const interactions = await db.query.ProductSustainabilityMetrics.findMany({
-    where: eq(schema.ProductSustainabilityMetrics.userId, userId),
+  const interactions = await db.query.productSustainabilityMetrics.findMany({
+    where: eq(schema.productSustainabilityMetrics.userId, userId),
   });
 
   const metrics = {

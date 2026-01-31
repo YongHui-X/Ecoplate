@@ -102,7 +102,7 @@ export default function ConversationPage() {
     setMarkingSold(true);
     try {
       const result = await marketplaceService.completeListing(conversation.listingId);
-      addToast(`Listing marked as sold! +${result.pointsAwarded} points`, "success");
+      addToast(`Listing marked as sold! +${result.points.earned} points`, "success");
       await loadConversation();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to mark as sold";
