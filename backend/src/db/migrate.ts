@@ -1,54 +1,74 @@
 import { Database } from "bun:sqlite";
-import { readFileSync, readdirSync } from "fs";
+import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 
-const dbPath = "ecoplate.db";
-const migrationsDir = join(import.meta.dir, "migrations");
+const sqlite = new Database("ecoplate.db");
 
-console.log("Running database migrations...\n");
+async function migrate() {
+  console.log("Running database migrations...");
 
-try {
-  const sqlite = new Database(dbPath);
+  const migrationsDir = join(import.meta.dir, "migrations");
 
-  // Get all SQL migration files sorted by name
-  const migrationFiles = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
+  try {
+    const files = await readdir(migrationsDir);
+    const sqlFiles = files
+        .filter((f) => f.endsWith(".sql"))
+        .sort();
 
-  console.log(`Found ${migrationFiles.length} migration files\n`);
+    console.log(`Found ${sqlFiles.length} migration files`);
 
-  for (const file of migrationFiles) {
-    console.log(`Running migration: ${file}`);
-    const migrationPath = join(migrationsDir, file);
-    const migration = readFileSync(migrationPath, "utf-8");
+    for (const file of sqlFiles) {
+      console.log(`Running migration: ${file}`);
+      const sqlPath = join(migrationsDir, file);
+      const sql = await readFile(sqlPath, "utf-8");
 
-    // Split by statement breakpoint (for drizzle-generated migrations) or semicolon
-    const statements = migration
-      .split(/--> statement-breakpoint|;/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith("--"));
+      // Split by the statement-breakpoint marker
+      const statements = sql
+          .split("--> statement-breakpoint")
+          .map((s) => s.trim())
+          .filter((s) => {
+            // Filter out empty strings
+            if (s.length === 0) return false;
+            // Filter out comment-only blocks
+            if (s.startsWith("--")) return false;
+            // Filter out any TypeScript/JavaScript code (just in case)
+            if (s.startsWith("import ") || s.startsWith("export ")) return false;
+            return true;
+          });
 
-    for (const statement of statements) {
-      try {
-        sqlite.exec(statement + ";");
-      } catch (e: unknown) {
-        const err = e as { message?: string };
-        // Ignore "table already exists" errors when using IF NOT EXISTS
-        if (!err.message?.includes("already exists")) {
-          throw e;
+      for (const statement of statements) {
+        try {
+          // Remove any leading/trailing comments
+          const cleanStatement = statement
+              .split('\n')
+              .filter(line => !line.trim().startsWith('--'))
+              .join('\n')
+              .trim();
+
+          if (cleanStatement.length === 0) continue;
+
+          // Only add semicolon if not already present
+          const finalStatement = cleanStatement.endsWith(';')
+              ? cleanStatement
+              : cleanStatement + ";";
+
+          sqlite.exec(finalStatement);
+        } catch (error: any) {
+          console.error(`Error executing statement: ${statement.substring(0, 100)}...`);
+          throw error;
         }
       }
+
+      console.log(`✓ Completed migration: ${file}`);
     }
-    console.log(`  ✓ ${file} completed`);
+
+    console.log("All migrations completed successfully!");
+  } catch (error) {
+    console.error("Migration failed:", error);
+    throw error;
+  } finally {
+    sqlite.close();
   }
-
-  sqlite.close();
-
-  console.log("\n✓ All migrations completed successfully!");
-  console.log("\nNext steps:");
-  console.log("  1. Run: bun run db:seed");
-  console.log("  2. Start server: bun run dev\n");
-} catch (error) {
-  console.error("Migration failed:", error);
-  process.exit(1);
 }
+
+migrate();
