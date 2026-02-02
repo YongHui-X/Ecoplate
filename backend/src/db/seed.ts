@@ -43,24 +43,47 @@ const demoUsers = [
   },
 ];
 
-// Sample products (MyFridge items)
+// Sample products (MyFridge items) - many products across categories with CO2 data
 const sampleProducts = [
-  {
-    productName: "Fresh Organic Apples",
-    category: "produce",
-    quantity: 5.0,
-    unitPrice: 6.0,
-    description: "Sweet and crispy organic apples from local farm",
-    daysAgo: 2,
-  },
-  {
-    productName: "Whole Wheat Bread",
-    category: "bakery",
-    quantity: 2.0,
-    unitPrice: 2.25,
-    description: "Freshly baked whole wheat bread",
-    daysAgo: 1,
-  },
+  // Alice's products
+  { productName: "Fresh Organic Apples", category: "produce", quantity: 5.0, unitPrice: 6.0, co2Emission: 1.2, description: "Sweet and crispy organic apples", daysAgo: 2, ownerIndex: 0 },
+  { productName: "Whole Wheat Bread", category: "bakery", quantity: 2.0, unitPrice: 2.25, co2Emission: 0.8, description: "Freshly baked whole wheat bread", daysAgo: 1, ownerIndex: 0 },
+  { productName: "Brown Rice 2kg", category: "pantry", quantity: 2.0, unitPrice: 5.5, co2Emission: 2.7, description: "Organic brown rice", daysAgo: 30, ownerIndex: 0 },
+  { productName: "Greek Yogurt", category: "dairy", quantity: 1.0, unitPrice: 4.5, co2Emission: 1.4, description: "Plain Greek yogurt 500g", daysAgo: 5, ownerIndex: 0 },
+  { productName: "Fresh Salmon Fillet", category: "meat", quantity: 0.5, unitPrice: 12.0, co2Emission: 3.2, description: "Norwegian salmon fillet", daysAgo: 3, ownerIndex: 0 },
+  { productName: "Avocados", category: "produce", quantity: 4.0, unitPrice: 8.0, co2Emission: 2.0, description: "Ripe Hass avocados", daysAgo: 60, ownerIndex: 0 },
+  { productName: "Oat Milk", category: "dairy", quantity: 1.0, unitPrice: 4.0, co2Emission: 0.3, description: "Oatly barista edition", daysAgo: 90, ownerIndex: 0 },
+  { productName: "Chicken Thighs", category: "meat", quantity: 1.0, unitPrice: 7.0, co2Emission: 3.5, description: "Free-range chicken thighs", daysAgo: 120, ownerIndex: 0 },
+  { productName: "Pasta 500g", category: "pantry", quantity: 0.5, unitPrice: 3.0, co2Emission: 0.9, description: "Barilla spaghetti", daysAgo: 150, ownerIndex: 0 },
+  { productName: "Fresh Spinach", category: "produce", quantity: 0.3, unitPrice: 3.5, co2Emission: 0.4, description: "Organic baby spinach", daysAgo: 180, ownerIndex: 0 },
+  { productName: "Cheddar Cheese", category: "dairy", quantity: 0.25, unitPrice: 7.0, co2Emission: 3.0, description: "Aged cheddar block", daysAgo: 210, ownerIndex: 0 },
+  { productName: "Bananas", category: "produce", quantity: 6.0, unitPrice: 2.5, co2Emission: 0.5, description: "Fresh Cavendish bananas", daysAgo: 240, ownerIndex: 0 },
+  { productName: "Tofu Pack", category: "produce", quantity: 0.4, unitPrice: 2.0, co2Emission: 0.2, description: "Firm silken tofu", daysAgo: 300, ownerIndex: 0 },
+  { productName: "Eggs 10-pack", category: "dairy", quantity: 10.0, unitPrice: 5.0, co2Emission: 2.5, description: "Free-range eggs", daysAgo: 365, ownerIndex: 0 },
+  { productName: "Orange Juice 1L", category: "beverages", quantity: 1.0, unitPrice: 4.5, co2Emission: 0.7, description: "Fresh squeezed OJ", daysAgo: 400, ownerIndex: 0 },
+  { productName: "Frozen Peas 500g", category: "frozen", quantity: 0.5, unitPrice: 3.0, co2Emission: 0.6, description: "Garden peas", daysAgo: 500, ownerIndex: 0 },
+  // Bob's products
+  { productName: "Organic Milk 2L", category: "dairy", quantity: 2.0, unitPrice: 6.0, co2Emission: 3.0, description: "Fresh organic milk", daysAgo: 3, ownerIndex: 1 },
+  { productName: "Sourdough Bread", category: "bakery", quantity: 1.0, unitPrice: 5.0, co2Emission: 0.9, description: "Artisan sourdough loaf", daysAgo: 7, ownerIndex: 1 },
+  { productName: "Broccoli", category: "produce", quantity: 0.5, unitPrice: 3.0, co2Emission: 0.4, description: "Fresh broccoli crowns", daysAgo: 45, ownerIndex: 1 },
+  { productName: "Minced Beef 500g", category: "meat", quantity: 0.5, unitPrice: 9.0, co2Emission: 13.0, description: "Grass-fed beef mince", daysAgo: 100, ownerIndex: 1 },
+  { productName: "Tomatoes 1kg", category: "produce", quantity: 1.0, unitPrice: 4.0, co2Emission: 0.7, description: "Vine-ripened tomatoes", daysAgo: 200, ownerIndex: 1 },
+  { productName: "Almond Butter", category: "pantry", quantity: 0.3, unitPrice: 8.0, co2Emission: 0.5, description: "Organic almond butter", daysAgo: 350, ownerIndex: 1 },
+  // Charlie's products
+  { productName: "Strawberries 500g", category: "produce", quantity: 0.5, unitPrice: 6.0, co2Emission: 0.3, description: "Korean strawberries", daysAgo: 4, ownerIndex: 2 },
+  { productName: "Pork Belly 1kg", category: "meat", quantity: 1.0, unitPrice: 14.0, co2Emission: 5.5, description: "Fresh pork belly", daysAgo: 50, ownerIndex: 2 },
+  { productName: "Kimchi 500g", category: "pantry", quantity: 0.5, unitPrice: 5.0, co2Emission: 0.3, description: "Homemade kimchi", daysAgo: 130, ownerIndex: 2 },
+  { productName: "Coconut Oil", category: "pantry", quantity: 0.5, unitPrice: 7.0, co2Emission: 1.2, description: "Cold-pressed coconut oil", daysAgo: 250, ownerIndex: 2 },
+  // Diana's products
+  { productName: "Sweet Potatoes", category: "produce", quantity: 1.5, unitPrice: 4.0, co2Emission: 0.3, description: "Japanese sweet potatoes", daysAgo: 10, ownerIndex: 3 },
+  { productName: "Mozzarella", category: "dairy", quantity: 0.25, unitPrice: 5.5, co2Emission: 2.8, description: "Fresh buffalo mozzarella", daysAgo: 75, ownerIndex: 3 },
+  { productName: "Frozen Dumplings", category: "frozen", quantity: 1.0, unitPrice: 8.0, co2Emission: 2.0, description: "Handmade pork dumplings 30pcs", daysAgo: 160, ownerIndex: 3 },
+  { productName: "Honey 500g", category: "pantry", quantity: 0.5, unitPrice: 12.0, co2Emission: 0.2, description: "Raw Manuka honey", daysAgo: 300, ownerIndex: 3 },
+  // Evan's products
+  { productName: "Blueberries 250g", category: "produce", quantity: 0.25, unitPrice: 5.0, co2Emission: 0.4, description: "Chilean blueberries", daysAgo: 6, ownerIndex: 4 },
+  { productName: "Lamb Chops", category: "meat", quantity: 0.6, unitPrice: 18.0, co2Emission: 15.0, description: "NZ lamb rack", daysAgo: 80, ownerIndex: 4 },
+  { productName: "Soy Sauce 500ml", category: "pantry", quantity: 0.5, unitPrice: 4.0, co2Emission: 0.3, description: "Kikkoman soy sauce", daysAgo: 200, ownerIndex: 4 },
+  { productName: "Ice Cream 1L", category: "frozen", quantity: 1.0, unitPrice: 9.0, co2Emission: 1.8, description: "Haagen-Dazs vanilla", daysAgo: 400, ownerIndex: 4 },
 ];
 
 // Sample marketplace listings
@@ -422,8 +445,10 @@ async function seed() {
     console.log("Clearing existing data...");
     sqlite.exec("DELETE FROM messages");
     sqlite.exec("DELETE FROM conversations");
-    sqlite.exec("DELETE FROM listing_images");
+    sqlite.exec("DELETE FROM product_sustainability_metrics");
+    sqlite.exec("DELETE FROM user_points");
     sqlite.exec("DELETE FROM marketplace_listings");
+    sqlite.exec("DELETE FROM listing_images");
     sqlite.exec("DELETE FROM product_sustainability_metrics");
     sqlite.exec("DELETE FROM products");
     sqlite.exec("DELETE FROM user_badges");
@@ -472,11 +497,11 @@ async function seed() {
 
     // Create products (MyFridge items)
     console.log("\nCreating sample products (MyFridge)...");
-    const createdProducts: { id: number; productName: string }[] = [];
+    const createdProducts: { id: number; productName: string; userId: number; co2Emission: number; quantity: number; daysAgo: number }[] = [];
 
     for (let i = 0; i < sampleProducts.length; i++) {
       const product = sampleProducts[i];
-      const owner = createdUsers[i % createdUsers.length];
+      const owner = createdUsers[product.ownerIndex];
 
       const purchaseDate = new Date();
       purchaseDate.setDate(purchaseDate.getDate() - product.daysAgo);
@@ -491,10 +516,18 @@ async function seed() {
           unitPrice: product.unitPrice,
           purchaseDate,
           description: product.description,
+          co2Emission: product.co2Emission,
         })
         .returning();
 
-      createdProducts.push({ id: created.id, productName: created.productName });
+      createdProducts.push({
+        id: created.id,
+        productName: created.productName,
+        userId: owner.id,
+        co2Emission: product.co2Emission,
+        quantity: product.quantity,
+        daysAgo: product.daysAgo,
+      });
       console.log(`  ✓ "${product.productName}" owned by ${owner.name}`);
     }
 
@@ -568,6 +601,140 @@ async function seed() {
     await db.update(schema.conversations)
       .set({ updatedAt: new Date() })
       .where(eq(schema.conversations.id, conversation1.id));
+
+    // ==================== Dashboard Data: Sustainability Metrics ====================
+    console.log("\nCreating sustainability metrics (dashboard data)...");
+
+    // Clear existing metrics
+    sqlite.exec("DELETE FROM product_sustainability_metrics");
+    sqlite.exec("DELETE FROM user_points");
+
+    const actionTypes: ("consumed" | "wasted" | "shared" | "sold")[] = ["consumed", "wasted", "shared", "sold"];
+    // Weights: most interactions are consumed, then shared/sold, least wasted
+    const actionWeights = { consumed: 50, shared: 20, sold: 15, wasted: 15 };
+    let metricsCount = 0;
+
+    // Generate metrics spanning ~2 years for all users, denser in recent months
+    for (const user of createdUsers) {
+      const userProducts = createdProducts.filter(p => p.userId === user.id);
+      if (userProducts.length === 0) continue;
+
+      // Generate data points across 730 days (2 years)
+      // More entries for recent months, fewer for older months
+      for (let daysAgo = 0; daysAgo < 730; daysAgo++) {
+        // Probability of an entry: higher for recent days
+        let entriesForDay: number;
+        if (daysAgo < 30) {
+          entriesForDay = Math.random() < 0.7 ? Math.floor(Math.random() * 3) + 1 : 0;
+        } else if (daysAgo < 90) {
+          entriesForDay = Math.random() < 0.5 ? Math.floor(Math.random() * 2) + 1 : 0;
+        } else if (daysAgo < 365) {
+          entriesForDay = Math.random() < 0.3 ? 1 : 0;
+        } else {
+          entriesForDay = Math.random() < 0.15 ? 1 : 0;
+        }
+
+        for (let e = 0; e < entriesForDay; e++) {
+          // Pick a weighted random action
+          const rand = Math.random() * 100;
+          let action: "consumed" | "wasted" | "shared" | "sold";
+          if (rand < actionWeights.consumed) action = "consumed";
+          else if (rand < actionWeights.consumed + actionWeights.shared) action = "shared";
+          else if (rand < actionWeights.consumed + actionWeights.shared + actionWeights.sold) action = "sold";
+          else action = "wasted";
+
+          const product = userProducts[Math.floor(Math.random() * userProducts.length)];
+          const quantity = Math.round((Math.random() * product.quantity * 0.3 + 0.1) * 100) / 100;
+
+          const date = new Date();
+          date.setDate(date.getDate() - daysAgo);
+          const todayDate = date.toISOString().slice(0, 10); // YYYY-MM-DD
+
+          await db.insert(schema.productSustainabilityMetrics).values({
+            productId: product.id,
+            userId: user.id,
+            todayDate,
+            quantity,
+            type: action,
+          });
+          metricsCount++;
+        }
+      }
+    }
+    console.log(`  ✓ Created ${metricsCount} sustainability metric records`);
+
+    // ==================== Sold Marketplace Listings (for money saved) ====================
+    console.log("\nCreating sold marketplace listings (financial data)...");
+
+    const soldItems = [
+      { title: "Extra Rice Bag", price: 8.0, daysAgo: 5, sellerIndex: 0 },
+      { title: "Leftover Party Snacks", price: 12.0, daysAgo: 15, sellerIndex: 0 },
+      { title: "Excess Cooking Oil", price: 5.0, daysAgo: 30, sellerIndex: 0 },
+      { title: "Bulk Oats Portion", price: 4.0, daysAgo: 60, sellerIndex: 0 },
+      { title: "Homemade Cookies", price: 6.0, daysAgo: 90, sellerIndex: 0 },
+      { title: "Canned Goods Set", price: 15.0, daysAgo: 120, sellerIndex: 0 },
+      { title: "Frozen Berries", price: 7.0, daysAgo: 180, sellerIndex: 0 },
+      { title: "Organic Tea Set", price: 10.0, daysAgo: 240, sellerIndex: 0 },
+      { title: "Dried Pasta Bundle", price: 6.0, daysAgo: 300, sellerIndex: 0 },
+      { title: "Jam Jars 3-pack", price: 9.0, daysAgo: 400, sellerIndex: 0 },
+      { title: "Extra Milk Cartons", price: 5.0, daysAgo: 10, sellerIndex: 1 },
+      { title: "Surplus Vegetables", price: 8.0, daysAgo: 45, sellerIndex: 1 },
+      { title: "Bread Loaves", price: 3.0, daysAgo: 100, sellerIndex: 1 },
+      { title: "Frozen Fish Portions", price: 11.0, daysAgo: 200, sellerIndex: 1 },
+      { title: "Spice Collection", price: 14.0, daysAgo: 350, sellerIndex: 1 },
+      { title: "Kimchi Batch", price: 6.0, daysAgo: 20, sellerIndex: 2 },
+      { title: "Leftover BBQ Meat", price: 10.0, daysAgo: 70, sellerIndex: 2 },
+      { title: "Excess Noodles", price: 4.0, daysAgo: 150, sellerIndex: 2 },
+      { title: "Homemade Sauce Jars", price: 8.0, daysAgo: 280, sellerIndex: 2 },
+      { title: "Dumpling Batch", price: 9.0, daysAgo: 25, sellerIndex: 3 },
+      { title: "Sweet Potato Surplus", price: 5.0, daysAgo: 80, sellerIndex: 3 },
+      { title: "Honey Jar", price: 12.0, daysAgo: 190, sellerIndex: 3 },
+      { title: "Smoothie Fruits", price: 7.0, daysAgo: 12, sellerIndex: 4 },
+      { title: "Lamb Cutlets", price: 15.0, daysAgo: 55, sellerIndex: 4 },
+      { title: "Ice Cream Tubs", price: 8.0, daysAgo: 160, sellerIndex: 4 },
+    ];
+
+    for (const item of soldItems) {
+      const seller = createdUsers[item.sellerIndex];
+      const completedDate = new Date();
+      completedDate.setDate(completedDate.getDate() - item.daysAgo);
+
+      await db.insert(schema.marketplaceListings).values({
+        sellerId: seller.id,
+        title: item.title,
+        description: `Sold item - ${item.title}`,
+        category: "pantry",
+        quantity: 1,
+        unit: "pcs",
+        price: item.price,
+        originalPrice: item.price * 2,
+        status: "sold",
+        completedAt: completedDate,
+        pickupLocation: "Singapore",
+      });
+    }
+    console.log(`  ✓ Created ${soldItems.length} sold listings`);
+
+    // ==================== User Points (Gamification) ====================
+    console.log("\nCreating user points...");
+
+    const userPointsData = [
+      { userIndex: 0, totalPoints: 1250, currentStreak: 12 },
+      { userIndex: 1, totalPoints: 980, currentStreak: 7 },
+      { userIndex: 2, totalPoints: 720, currentStreak: 3 },
+      { userIndex: 3, totalPoints: 540, currentStreak: 5 },
+      { userIndex: 4, totalPoints: 860, currentStreak: 9 },
+    ];
+
+    for (const up of userPointsData) {
+      const user = createdUsers[up.userIndex];
+      await db.insert(schema.userPoints).values({
+        userId: user.id,
+        totalPoints: up.totalPoints,
+        currentStreak: up.currentStreak,
+      });
+      console.log(`  ✓ ${user.name}: ${up.totalPoints} points, ${up.currentStreak}-day streak`);
+    }
 
     console.log("\n========================================");
     console.log("Done! Demo accounts (password: demo123):");

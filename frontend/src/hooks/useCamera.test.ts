@@ -169,7 +169,9 @@ describe("useCamera", () => {
       vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
         const el = originalCreateElement(tag);
         if (tag === "canvas") {
-          (el as HTMLCanvasElement).getContext = vi.fn(() => mockCtx) as unknown as HTMLCanvasElement['getContext'];
+          (el as HTMLCanvasElement).getContext = vi.fn((contextId: string) =>
+            contextId === "2d" ? (mockCtx as unknown as CanvasRenderingContext2D) : null
+          ) as any;
           (el as HTMLCanvasElement).toDataURL = vi.fn(() => "data:image/jpeg;base64,mockdata");
         }
         return el;

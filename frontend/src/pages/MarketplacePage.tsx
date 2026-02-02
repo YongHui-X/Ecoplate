@@ -10,7 +10,7 @@ import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { SkeletonProductCard } from "../components/ui/skeleton";
-import { Plus, Search, MapPin, Clock, List, Map, Package, MessageCircle } from "lucide-react";
+import { Plus, Search, MapPin, Clock, List, Map, Package, MessageCircle, ShoppingBag } from "lucide-react";
 import { getDaysUntilExpiry } from "../lib/utils";
 import MarketplaceMap from "./Marketplace/MarketplaceMap";
 import type { MarketplaceListing, MarketplaceListingWithDistance } from "../types/marketplace";
@@ -131,6 +131,12 @@ export default function MarketplacePage() {
             <Link to="/marketplace/my-listings">
               <Package className="h-4 w-4 mr-2" />
               My Listings
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild className="hidden sm:flex">
+            <Link to="/marketplace/my-purchases">
+              <ShoppingBag className="h-4 w-4 mr-2" />
+              My Purchases
             </Link>
           </Button>
           <Button asChild>

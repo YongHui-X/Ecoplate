@@ -178,7 +178,7 @@ export default function ListingDetailPage() {
 
           {/* Thumbnail Gallery */}
           {imageUrls.length > 1 && (
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
               {imageUrls.map((url, index) => (
                 <button
                   key={index}

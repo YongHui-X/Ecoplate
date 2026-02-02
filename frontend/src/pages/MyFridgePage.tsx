@@ -32,6 +32,7 @@ interface Product {
   productName: string;
   category: string | null;
   quantity: number;
+  unit: string | null;
   unitPrice: number | null;
   purchaseDate: string | null;
   description: string | null;
@@ -48,6 +49,7 @@ interface IdentifiedIngredient {
   unitPrice: number;
   co2Emission: number;
   confidence: "high" | "medium" | "low";
+  interactionId?: number; // Added after confirm-ingredients
 }
 
 
@@ -350,7 +352,7 @@ function ProductCard({
               )}
             </div>
             <div className="flex items-center gap-4 mt-1 text-sm text-gray-600 flex-wrap">
-              <span>Qty: {product.quantity}</span>
+              <span>Qty: {product.quantity}{product.unit ? ` ${product.unit}` : ''}</span>
               {product.unitPrice != null && (
                 <span>${product.unitPrice.toFixed(2)}</span>
               )}
@@ -435,7 +437,7 @@ function AddProductModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             Add Product
@@ -654,6 +656,7 @@ function ScanReceiptModal({
         await api.post("/myfridge/products", {
           productName: item.name,
           quantity: item.quantity,
+          unit: item.unit,
           category: item.category,
           unitPrice: item.unitPrice || undefined,
           co2Emission: item.co2Emission,
@@ -790,7 +793,7 @@ function ScanReceiptModal({
   // --- Main Modal ---
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+      <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[80vh] overflow-y-auto">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             Scan Receipt
@@ -1004,7 +1007,7 @@ function ScanReceiptModal({
   );
 }
 
-type TrackConsumptionStep = "raw-input" | "raw-review" | "waste-input" | "waste-review";
+type TrackConsumptionStep = "raw-input" | "raw-review" | "waste-input" | "waste-review" | "metrics";
 
 function TrackConsumptionModal({
   onClose,
@@ -1036,6 +1039,7 @@ function TrackConsumptionModal({
   const [pendingRecordId, setPendingRecordId] = useState<number | undefined>(pendingRecord?.id);
   const [editableWasteItems, setEditableWasteItems] = useState<Array<{
     id: string;
+    productId?: number;
     productName: string;
     quantity: number;
     category: string;
@@ -1044,8 +1048,10 @@ function TrackConsumptionModal({
 
   const SUPPORTED_FORMATS = ["image/png", "image/jpeg", "image/gif", "image/webp"];
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  const [confirmingIngredients, setConfirmingIngredients] = useState(false);
+  const [confirmingWaste, setConfirmingWaste] = useState(false);
 
-  const stepNumber = step === "raw-input" ? 1 : step === "raw-review" ? 2 : step === "waste-input" ? 3 : 4;
+  const stepNumber = step === "raw-input" ? 1 : step === "raw-review" ? 2 : step === "waste-input" ? 3 : step === "waste-review" ? 4 : 5;
 
   // Guard: waste steps require rawPhoto
   useEffect(() => {
@@ -1127,8 +1133,8 @@ function TrackConsumptionModal({
   );
 
   // --- Waste Photo Processing - calls backend API to analyze waste ---
-  const [_analyzingWaste, setAnalyzingWaste] = useState(false);
-  const [_wasteMetrics, setWasteMetrics] = useState<{
+  const [analyzingWaste, setAnalyzingWaste] = useState(false);
+  const [wasteMetrics, setWasteMetrics] = useState<{
     totalCO2Wasted: number;
     totalCO2Saved: number;
     totalEconomicWaste: number;
@@ -1146,14 +1152,6 @@ function TrackConsumptionModal({
       try {
         console.log("[TrackConsumption] Calling /consumption/analyze-waste...");
         const response = await api.post<{
-          metrics: {
-            totalCO2Wasted: number;
-            totalCO2Saved: number;
-            totalEconomicWaste: number;
-            wastePercentage: number;
-            sustainabilityScore: number;
-            sustainabilityRating: string;
-          };
           wasteAnalysis: {
             wasteItems: Array<{
               productName: string;
@@ -1176,11 +1174,10 @@ function TrackConsumptionModal({
 
         console.log("[TrackConsumption] Waste analysis response:", response);
 
-        setWasteMetrics(response.metrics);
-
-        // Convert waste items to editable format
+        // Convert waste items to editable format with productId
         const wasteItemsWithIds = response.wasteAnalysis.wasteItems.map((item) => ({
           id: Math.random().toString(36).slice(2),
+          productId: item.productId,
           productName: item.productName,
           quantity: item.quantityWasted,
           category: ingredients.find((i) => i.productId === item.productId)?.category || "other",
@@ -1304,10 +1301,10 @@ function TrackConsumptionModal({
     }
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
+    // Pending record is already deleted in confirm-waste endpoint
     addToast("Consumption tracked successfully!", "success");
     onComplete();
-    navigate("/");
   };
 
   // --- Camera View (shared for raw + waste) ---
@@ -1419,7 +1416,7 @@ function TrackConsumptionModal({
   // --- Step Progress Bar ---
   const StepIndicator = () => (
     <div className="flex items-center gap-2 mt-2">
-      {[1, 2, 3, 4].map((s) => (
+      {[1, 2, 3, 4, 5].map((s) => (
         <div
           key={s}
           className={cn(
@@ -1446,7 +1443,7 @@ function TrackConsumptionModal({
     backButton?: React.ReactNode;
   }) => (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+      <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[80vh] overflow-y-auto">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             {title}
@@ -1527,7 +1524,7 @@ function TrackConsumptionModal({
     if (identifyingIngredients) {
       return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md">
             <CardContent className="p-12 text-center">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
               <p className="text-gray-600 font-medium">Identifying ingredients...</p>
@@ -1541,18 +1538,63 @@ function TrackConsumptionModal({
     return (
       <PhotoInputView
         title="Track Consumption"
-        subtitle="Step 1 of 4 — Capture raw ingredients"
+        subtitle="Step 1 of 5 — Capture raw ingredients"
         cameraLabel="Capture your raw ingredients"
         onFileProcess={processRawPhoto}
       />
     );
   }
 
+  // Handle confirming ingredients (step 2 -> step 3)
+  const handleConfirmIngredients = async () => {
+    setConfirmingIngredients(true);
+    try {
+      // Create pending record first (if not exists)
+      let recordId = pendingRecordId;
+      if (!recordId && rawPhoto) {
+        const record = await api.post<{ id: number }>("/myfridge/consumption/pending", {
+          rawPhoto,
+          ingredients,
+          status: "PENDING_WASTE_PHOTO",
+        });
+        recordId = record.id;
+        setPendingRecordId(recordId);
+      }
+
+      // Confirm ingredients - records Consume interactions and deducts from products
+      const response = await api.post<{ interactionIds: number[] }>("/consumption/confirm-ingredients", {
+        ingredients: ingredients.map(ing => ({
+          productId: ing.productId,
+          productName: ing.name,
+          quantityUsed: ing.estimatedQuantity,
+          category: ing.category,
+          unitPrice: ing.unitPrice,
+          co2Emission: ing.co2Emission,
+        })),
+        pendingRecordId: recordId,
+      });
+
+      // Store interaction IDs in ingredients for later use
+      setIngredients(prev => prev.map((ing, i) => ({
+        ...ing,
+        interactionId: response.interactionIds[i]
+      })));
+
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setStep("waste-input");
+    } catch (error) {
+      console.error("Failed to confirm ingredients:", error);
+      addToast("Failed to confirm ingredients", "error");
+    } finally {
+      setConfirmingIngredients(false);
+    }
+  };
+
   // --- PAGE 2: Review Raw Details ---
   if (step === "raw-review") {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+        <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[80vh] overflow-y-auto">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               Review Ingredients
@@ -1560,7 +1602,7 @@ function TrackConsumptionModal({
                 <X className="h-4 w-4" />
               </Button>
             </CardTitle>
-            <p className="text-sm text-gray-500">Step 2 of 4 — Add your ingredients</p>
+            <p className="text-sm text-gray-500">Step 2 of 5 — Confirm your ingredients</p>
             <StepIndicator />
           </CardHeader>
           <CardContent>
@@ -1657,19 +1699,17 @@ function TrackConsumptionModal({
                     setStep("raw-input");
                   }}
                   className="flex-1"
+                  disabled={confirmingIngredients}
                 >
                   Scan Again
                 </Button>
                 <Button
-                  onClick={() => {
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                    setStep("waste-input");
-                  }}
-                  disabled={ingredients.length === 0}
+                  onClick={handleConfirmIngredients}
+                  disabled={ingredients.length === 0 || confirmingIngredients}
                   className="flex-1"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  {confirmingIngredients ? "Confirming..." : "Next"}
+                  {!confirmingIngredients && <ChevronRight className="h-4 w-4 ml-1" />}
                 </Button>
               </div>
             </div>
@@ -1681,11 +1721,26 @@ function TrackConsumptionModal({
 
   // --- PAGE 3: Waste Photo Input (OPTIONAL) ---
   if (step === "waste-input") {
+    // Show loading while analyzing waste
+    if (analyzingWaste) {
+      return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md">
+            <CardContent className="p-12 text-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
+              <p className="text-gray-600 font-medium">Analyzing waste...</p>
+              <p className="text-sm text-gray-400 mt-1">Calculating your sustainability metrics</p>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     // Guard: If no rawPhoto exists, redirect to Page 1
     if (!rawPhoto) {
       return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md">
             <CardContent className="p-6 text-center">
               <AlertCircle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
               <p className="text-gray-600 mb-4">No raw photo found. Please start from the beginning.</p>
@@ -1700,7 +1755,7 @@ function TrackConsumptionModal({
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+        <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[80vh] overflow-y-auto">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               Capture Leftovers
@@ -1708,7 +1763,7 @@ function TrackConsumptionModal({
                 <X className="h-4 w-4" />
               </Button>
             </CardTitle>
-            <p className="text-sm text-gray-500">Step 3 of 4 — Photo your plate after eating</p>
+            <p className="text-sm text-gray-500">Step 3 of 5 — Photo your plate after eating</p>
             <StepIndicator />
           </CardHeader>
           <CardContent>
@@ -1804,11 +1859,53 @@ function TrackConsumptionModal({
     );
   }
 
+  // Handle confirming waste (step 4 -> step 5)
+  const handleConfirmWaste = async () => {
+    setConfirmingWaste(true);
+    try {
+      const response = await api.post<{
+        metrics: {
+          totalCO2Wasted: number;
+          totalCO2Saved: number;
+          totalEconomicWaste: number;
+          wastePercentage: number;
+          sustainabilityScore: number;
+          sustainabilityRating: string;
+        };
+        success: boolean;
+      }>("/consumption/confirm-waste", {
+        ingredients: ingredients.map(ing => ({
+          productId: ing.productId,
+          productName: ing.name,
+          quantityUsed: ing.estimatedQuantity,
+          interactionId: ing.interactionId,
+          category: ing.category,
+          unitPrice: ing.unitPrice,
+          co2Emission: ing.co2Emission,
+        })),
+        wasteItems: editableWasteItems.map(item => ({
+          productId: item.productId || 0,
+          productName: item.productName,
+          quantityWasted: item.quantity,
+        })),
+        pendingRecordId,
+      });
+
+      setWasteMetrics(response.metrics);
+      setStep("metrics");
+    } catch (error) {
+      console.error("Failed to confirm waste:", error);
+      addToast("Failed to confirm waste", "error");
+    } finally {
+      setConfirmingWaste(false);
+    }
+  };
+
   // --- PAGE 4: Review Waste Details ---
   if (step === "waste-review") {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-md max-h-[80vh] overflow-y-auto">
+        <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[80vh] overflow-y-auto">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               Review Waste Details
@@ -1816,7 +1913,7 @@ function TrackConsumptionModal({
                 <X className="h-4 w-4" />
               </Button>
             </CardTitle>
-            <p className="text-sm text-gray-500">Step 4 of 4 — Add waste items</p>
+            <p className="text-sm text-gray-500">Step 4 of 5 — Review and confirm waste</p>
             <StepIndicator />
           </CardHeader>
           <CardContent>
@@ -1831,7 +1928,7 @@ function TrackConsumptionModal({
 
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  {editableWasteItems.length} waste item{editableWasteItems.length !== 1 ? "s" : ""} added
+                  {editableWasteItems.length} waste item{editableWasteItems.length !== 1 ? "s" : ""} detected
                 </p>
                 <Button variant="outline" size="sm" onClick={addWasteItem}>
                   <Plus className="h-4 w-4 mr-1" />
@@ -1860,10 +1957,10 @@ function TrackConsumptionModal({
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-xs text-gray-500">Qty</label>
+                        <label className="text-xs text-gray-500">Qty Wasted</label>
                         <Input
                           type="number"
-                          min="0.1"
+                          min="0"
                           step="0.1"
                           value={item.quantity}
                           onChange={(e) =>
@@ -1905,9 +2002,122 @@ function TrackConsumptionModal({
               </div>
 
               {editableWasteItems.length === 0 && (
-                <p className="text-center text-sm text-gray-400 py-4">
-                  No waste items detected.
+                <div className="text-center py-4">
+                  <p className="text-sm text-green-600 font-medium">No waste detected - great job!</p>
+                  <p className="text-xs text-gray-400 mt-1">You can still add waste items if needed.</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setWastePhoto(null);
+                    setEditableWasteItems([]);
+                    setStep("waste-input");
+                  }}
+                  className="flex-1"
+                  disabled={confirmingWaste}
+                >
+                  Retake
+                </Button>
+                <Button
+                  onClick={handleConfirmWaste}
+                  disabled={confirmingWaste}
+                  className="flex-1"
+                >
+                  {confirmingWaste ? "Confirming..." : "Confirm"}
+                  {!confirmingWaste && <ChevronRight className="h-4 w-4 ml-1" />}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // --- PAGE 5: Sustainability Metrics ---
+  if (step === "metrics") {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[80vh] overflow-y-auto">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              Consumption Tracked!
+              <Button variant="ghost" size="icon" onClick={handleClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+            <p className="text-sm text-gray-500">Step 5 of 5 — Your sustainability results</p>
+            <StepIndicator />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Success Message */}
+              <div className="text-center py-4">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+                  <Check className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">Great job tracking your meal!</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Your consumption and waste have been recorded.
                 </p>
+              </div>
+
+              {/* Waste Metrics Summary Card */}
+              {wasteMetrics && (
+                <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-gray-800">Sustainability Metrics</h3>
+                      <Badge className={cn(
+                        "text-white",
+                        wasteMetrics.sustainabilityRating === "Excellent" && "bg-green-500",
+                        wasteMetrics.sustainabilityRating === "Good" && "bg-blue-500",
+                        wasteMetrics.sustainabilityRating === "Moderate" && "bg-yellow-500",
+                        wasteMetrics.sustainabilityRating === "Poor" && "bg-orange-500",
+                        wasteMetrics.sustainabilityRating === "Critical" && "bg-red-500"
+                      )}>
+                        {wasteMetrics.sustainabilityRating}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Leaf className="h-4 w-4 text-green-600" />
+                        <div>
+                          <p className="text-gray-500">CO2 Saved</p>
+                          <p className="font-medium text-green-600">{wasteMetrics.totalCO2Saved.toFixed(2)} kg</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Leaf className="h-4 w-4 text-red-500" />
+                        <div>
+                          <p className="text-gray-500">CO2 Wasted</p>
+                          <p className="font-medium text-red-500">{wasteMetrics.totalCO2Wasted.toFixed(2)} kg</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-orange-500" />
+                        <div>
+                          <p className="text-gray-500">Economic Waste</p>
+                          <p className="font-medium text-orange-500">${wasteMetrics.totalEconomicWaste.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <UtensilsCrossed className="h-4 w-4 text-blue-500" />
+                        <div>
+                          <p className="text-gray-500">Waste %</p>
+                          <p className="font-medium text-blue-500">{wasteMetrics.wastePercentage.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-green-200 flex justify-between items-center">
+                      <span className="text-gray-600">Sustainability Score</span>
+                      <span className="text-lg font-bold text-green-700">{wasteMetrics.sustainabilityScore}/100</span>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               <Button onClick={handleDone} className="w-full">

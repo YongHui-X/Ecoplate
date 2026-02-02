@@ -1,11 +1,12 @@
 {
   "version": "5",
   "dialect": "sqlite",
-  "id": "e21f80d0-359f-4846-ab11-73b25d68c0fc",
+<<<<<<< HEAD
+  "id": "1a8518f0-0d0d-4d9b-9eff-692361032872",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
-    "badges": {
-      "name": "badges",
+    "product_sustainability_metrics": {
+      "name": "product_sustainability_metrics",
       "columns": {
         "id": {
           "name": "id",
@@ -14,71 +15,165 @@
           "notNull": true,
           "autoincrement": true
         },
-        "code": {
-          "name": "code",
-          "type": "text",
+        "product_id": {
+          "name": "product_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
+        "today_date": {
+          "name": "today_date",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "category": {
-          "name": "category",
-          "type": "text",
+        "quantity": {
+          "name": "quantity",
+          "type": "real",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "points_awarded": {
-          "name": "points_awarded",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "badge_image_url": {
-          "name": "badge_image_url",
+        "type": {
+          "name": "type",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         }
       },
-      "indexes": {
-        "badges_code_unique": {
-          "name": "badges_code_unique",
-          "columns": [
-            "code"
+      "indexes": {},
+      "foreignKeys": {
+        "product_sustainability_metrics_product_id_products_id_fk": {
+          "name": "product_sustainability_metrics_product_id_products_id_fk",
+          "tableFrom": "product_sustainability_metrics",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
           ],
-          "isUnique": true
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "product_sustainability_metrics_user_id_users_id_fk": {
+          "name": "product_sustainability_metrics_user_id_users_id_fk",
+          "tableFrom": "product_sustainability_metrics",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+    "badges": {
+      "name": "badges",
+=======
+<<<<<<< HEAD
+  "id": "609be1bc-9f2b-4bb4-a2a7-031e29c9c222",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+=======
+  "id": "e8c89aa3-36a6-4733-a751-b1d2f26f63eb",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "product_interaction": {
+      "name": "product_interaction",
+>>>>>>> origin/main
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "today_date": {
+          "name": "today_date",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "product_interaction_product_id_products_id_fk": {
+          "name": "product_interaction_product_id_products_id_fk",
+          "tableFrom": "product_interaction",
+          "tableTo": "products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "product_interaction_user_id_users_id_fk": {
+          "name": "product_interaction_user_id_users_id_fk",
+          "tableFrom": "product_interaction",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+>>>>>>> main
     "conversations": {
       "name": "conversations",
       "columns": {
@@ -159,50 +254,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "buyer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
-    "listing_images": {
-      "name": "listing_images",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "listing_id": {
-          "name": "listing_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "image_url": {
-          "name": "image_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "listing_images_listing_id_marketplace_listings_id_fk": {
-          "name": "listing_images_listing_id_marketplace_listings_id_fk",
-          "tableFrom": "listing_images",
-          "tableTo": "marketplace_listings",
-          "columnsFrom": [
-            "listing_id"
           ],
           "columnsTo": [
             "id"
@@ -462,6 +513,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+<<<<<<< HEAD
     "pending_consumption_records": {
       "name": "pending_consumption_records",
       "columns": {
@@ -535,6 +587,8 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+<<<<<<< HEAD
+=======
     "product_sustainability_metrics": {
       "name": "product_sustainability_metrics",
       "columns": {
@@ -549,7 +603,7 @@
           "name": "product_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "user_id": {
@@ -613,6 +667,9 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+=======
+>>>>>>> main
+>>>>>>> origin/main
     "products": {
       "name": "products",
       "columns": {
@@ -706,70 +763,8 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
-    "user_badges": {
-      "name": "user_badges",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "badge_id": {
-          "name": "badge_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "earned_at": {
-          "name": "earned_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "user_badges_user_id_users_id_fk": {
-          "name": "user_badges_user_id_users_id_fk",
-          "tableFrom": "user_badges",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "user_badges_badge_id_badges_id_fk": {
-          "name": "user_badges_badge_id_badges_id_fk",
-          "tableFrom": "user_badges",
-          "tableTo": "badges",
-          "columnsFrom": [
-            "badge_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
-    },
+<<<<<<< HEAD
+=======
     "user_points": {
       "name": "user_points",
       "columns": {
@@ -831,6 +826,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {}
     },
+>>>>>>> main
     "users": {
       "name": "users",
       "columns": {

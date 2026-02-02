@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUnreadCount } from "../contexts/UnreadCountContext";
@@ -45,21 +46,50 @@ function getPageTitle(pathname: string): string {
   return "EcoPlate";
 }
 
+// Avatar mapping helper
+const AVATAR_MAP: Record<string, string> = {
+  'avatar1': '🌱',
+  'avatar2': '🌿',
+  'avatar3': '🍃',
+  'avatar4': '🌾',
+  'avatar5': '🥬',
+  'avatar6': '🥕',
+  'avatar7': '🍎',
+  'avatar8': '🥑',
+};
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const { unreadCount } = useUnreadCount();
   const navigate = useNavigate();
   const location = useLocation();
+  const [, forceUpdate] = useState(0);
+
+  // Listen for profile updates to ensure avatar refreshes
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      forceUpdate((n) => n + 1);
+    };
+    window.addEventListener("auth:profileUpdate", handleProfileUpdate);
+    return () => window.removeEventListener("auth:profileUpdate", handleProfileUpdate);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
 
+  const getAvatarEmoji = useCallback((avatarUrl: string | null | undefined) => {
+    if (avatarUrl && avatarUrl.startsWith('avatar')) {
+      return AVATAR_MAP[avatarUrl] || '🌱';
+    }
+    return null;
+  }, []);
+
   const pageTitle = getPageTitle(location.pathname);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden max-w-full">
       {/* Mobile header - simplified, no hamburger */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b px-4 py-3 safe-area-top">
         <div className="flex items-center justify-center">
@@ -113,22 +143,7 @@ export default function Layout() {
               }
             >
               <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-lg">
-                {user?.avatarUrl && user.avatarUrl.startsWith('avatar')
-                  ? (() => {
-                      const avatarMap: Record<string, string> = {
-                        'avatar1': '🌱',
-                        'avatar2': '🌿',
-                        'avatar3': '🍃',
-                        'avatar4': '🌾',
-                        'avatar5': '🥬',
-                        'avatar6': '🥕',
-                        'avatar7': '🍎',
-                        'avatar8': '🥑',
-                      };
-                      return avatarMap[user.avatarUrl] || user.name.charAt(0).toUpperCase();
-                    })()
-                  : user?.name.charAt(0).toUpperCase()
-                }
+                {getAvatarEmoji(user?.avatarUrl) || user?.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{user?.name}</p>
@@ -146,8 +161,8 @@ export default function Layout() {
         </aside>
 
         {/* Main content - adjusted for mobile header and bottom tabs, with left margin for fixed sidebar */}
-        <main className="flex-1 min-h-screen lg:ml-64">
-          <div className="pt-14 pb-20 lg:pt-8 lg:pb-8 p-4 lg:px-10 lg:py-8">
+        <main className="flex-1 min-h-screen lg:ml-64 overflow-x-hidden">
+          <div className="pt-[calc(env(safe-area-inset-top,0px)+56px)] pb-[calc(env(safe-area-inset-bottom,0px)+72px)] lg:pt-8 lg:pb-8 px-4 lg:px-10">
             <Outlet />
           </div>
         </main>

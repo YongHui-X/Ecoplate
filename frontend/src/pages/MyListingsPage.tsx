@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
 import { uploadService } from "../services/upload";
 import { formatQuantityWithUnit } from "../constants/units";
@@ -11,9 +11,12 @@ import { Plus, Clock, MapPin, Edit, Trash2 } from "lucide-react";
 import { getDaysUntilExpiry, formatDate } from "../lib/utils";
 import type { MarketplaceListing } from "../types/marketplace";
 
+type FilterTab = "all" | "active" | "sold";
+
 export default function MyListingsPage() {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -46,6 +49,21 @@ export default function MyListingsPage() {
     }
   };
 
+  // Filter listings based on active tab
+  const filteredListings = listings.filter((listing) => {
+    if (activeFilter === "all") return true;
+    if (activeFilter === "active") return listing.status === "active";
+    if (activeFilter === "sold") return listing.status === "sold" || listing.status === "completed";
+    return true;
+  });
+
+  // Count for each filter
+  const counts = {
+    all: listings.length,
+    active: listings.filter((l) => l.status === "active").length,
+    sold: listings.filter((l) => l.status === "sold" || l.status === "completed").length,
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -59,7 +77,7 @@ export default function MyListingsPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">My Listings</h1>
-          <p className="text-gray-600">Manage your marketplace listings</p>
+          <p className="text-muted-foreground">Manage your marketplace listings</p>
         </div>
         <Button asChild>
           <Link to="/marketplace/create">
@@ -69,10 +87,37 @@ export default function MyListingsPage() {
         </Button>
       </div>
 
+      {/* Filter Tabs */}
+      {listings.length > 0 && (
+        <div className="flex gap-2">
+          <Button
+            variant={activeFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveFilter("all")}
+          >
+            All ({counts.all})
+          </Button>
+          <Button
+            variant={activeFilter === "active" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveFilter("active")}
+          >
+            Active ({counts.active})
+          </Button>
+          <Button
+            variant={activeFilter === "sold" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveFilter("sold")}
+          >
+            Sold ({counts.sold})
+          </Button>
+        </div>
+      )}
+
       {listings.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-500 mb-4">You haven't created any listings yet</p>
+            <p className="text-muted-foreground mb-4">You haven't created any listings yet</p>
             <Button asChild>
               <Link to="/marketplace/create">
                 <Plus className="h-4 w-4 mr-2" />
@@ -81,9 +126,15 @@ export default function MyListingsPage() {
             </Button>
           </CardContent>
         </Card>
+      ) : filteredListings.length === 0 ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <p className="text-muted-foreground">No {activeFilter} listings</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {listings.map((listing) => (
+          {filteredListings.map((listing) => (
             <ListingCard
               key={listing.id}
               listing={listing}
@@ -102,6 +153,7 @@ interface ListingCardProps {
 }
 
 function ListingCard({ listing, onDelete }: ListingCardProps) {
+  const navigate = useNavigate();
   const daysUntil = getDaysUntilExpiry(listing.expiryDate);
   const discount =
     listing.originalPrice && listing.price
@@ -112,54 +164,59 @@ function ListingCard({ listing, onDelete }: ListingCardProps) {
   const imageUrls = uploadService.getListingImageUrls(listing.images);
   const thumbnailUrl = imageUrls[0];
 
+  const handleCardClick = () => {
+    navigate(`/marketplace/${listing.id}`);
+  };
+
   const handleActionClick = (e: React.MouseEvent) => {
-    e.preventDefault();
     e.stopPropagation();
   };
 
   return (
-    <Link to={`/marketplace/${listing.id}`}>
-      <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
-        {/* Product Image */}
-        <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b overflow-hidden">
-          {thumbnailUrl ? (
-            <img
-              src={thumbnailUrl}
-              alt={listing.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="text-gray-400 text-4xl">📦</div>
-          )}
-          {discount && (
-            <Badge className="absolute top-2 right-2 bg-red-500">
-              -{discount}%
+    <Card
+      className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      onClick={handleCardClick}
+    >
+      {/* Product Image */}
+      <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b overflow-hidden">
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={listing.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="text-gray-400 text-4xl">📦</div>
+        )}
+        {discount && (
+          <Badge className="absolute top-2 right-2 bg-red-500">
+            -{discount}%
+          </Badge>
+        )}
+        <Badge
+          className="absolute top-2 left-2"
+          variant={
+            listing.status === "active"
+              ? "default"
+              : listing.status === "sold" || listing.status === "completed"
+              ? "secondary"
+              : "outline"
+          }
+        >
+          {listing.status === "sold" ? "Completed" : listing.status}
+        </Badge>
+      </div>
+
+      <CardContent className="p-4">
+        {/* Title and Category */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <h3 className="font-semibold line-clamp-1">{listing.title}</h3>
+          {listing.category && (
+            <Badge variant="secondary" className="shrink-0 text-xs">
+              {listing.category}
             </Badge>
           )}
-          <Badge
-            className="absolute top-2 left-2"
-            variant={
-              listing.status === "active"
-                ? "default"
-                : listing.status === "completed"
-                ? "secondary"
-                : "outline"
-            }
-          >
-            {listing.status}
-          </Badge>
         </div>
-
-        <CardContent className="p-4">
-          {/* Title and Category */}
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <h3 className="font-semibold line-clamp-1">{listing.title}</h3>
-            {listing.category && (
-              <Badge variant="secondary" className="shrink-0 text-xs">
-                {listing.category}
-              </Badge>
-            )}
-          </div>
 
         {/* Info */}
         <div className="space-y-1 text-sm text-gray-600 mb-3">
@@ -212,11 +269,14 @@ function ListingCard({ listing, onDelete }: ListingCardProps) {
         {/* Actions */}
         {listing.status === "active" && (
           <div className="flex gap-2" onClick={handleActionClick}>
-            <Button variant="outline" size="sm" asChild className="flex-1">
-              <Link to={`/marketplace/${listing.id}/edit`}>
-                <Edit className="h-3 w-3 mr-1" />
-                Edit
-              </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => navigate(`/marketplace/${listing.id}/edit`)}
+            >
+              <Edit className="h-3 w-3 mr-1" />
+              Edit
             </Button>
             <Button
               variant="outline"
@@ -230,13 +290,12 @@ function ListingCard({ listing, onDelete }: ListingCardProps) {
           </div>
         )}
 
-        {listing.status === "completed" && listing.completedAt && (
-          <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+        {(listing.status === "sold" || listing.status === "completed") && listing.completedAt && (
+          <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
             Completed on {formatDate(listing.completedAt)}
           </div>
         )}
       </CardContent>
     </Card>
-    </Link>
   );
 }

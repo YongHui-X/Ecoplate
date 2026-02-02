@@ -74,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.patch<User>("/auth/profile", data);
     localStorage.setItem("user", JSON.stringify(response));
     setUser(response);
+    // Dispatch event to notify components of profile update
+    window.dispatchEvent(new CustomEvent("auth:profileUpdate", { detail: response }));
   };
 
   const logout = () => {

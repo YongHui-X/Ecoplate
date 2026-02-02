@@ -38,10 +38,17 @@ export const marketplaceService = {
   },
 
   /**
-   * Get user's own marketplace listings
+   * Get user's own marketplace listings (as seller)
    */
   async getMyListings(): Promise<MarketplaceListing[]> {
     return api.get<MarketplaceListing[]>("/marketplace/my-listings");
+  },
+
+  /**
+   * Get user's purchase history (as buyer)
+   */
+  async getMyPurchases(): Promise<MarketplaceListing[]> {
+    return api.get<MarketplaceListing[]>("/marketplace/my-purchases");
   },
 
   /**

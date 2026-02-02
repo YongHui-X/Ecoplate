@@ -66,6 +66,9 @@ export function generateFilename(originalName: string): string {
  * @returns URL path to the saved image
  */
 export async function saveImageLocally(file: File): Promise<string> {
+  // Ensure upload directory exists
+  await mkdir(UPLOAD_DIR, { recursive: true });
+
   const filename = generateFilename(file.name);
   const filepath = join(UPLOAD_DIR, filename);
 

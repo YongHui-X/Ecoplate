@@ -1,9 +1,9 @@
 import { Router, json } from "../utils/router";
 import { db } from "../index";
 import * as schema from "../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { getUser } from "../middleware/auth";
-import { getOrCreateUserPoints, getUserMetrics, getDetailedPointsStats } from "../services/gamification-service";
+import { getOrCreateUserPoints, getUserMetrics, getDetailedPointsStats, awardPoints } from "../services/gamification-service";
 import { POINT_VALUES } from "../services/gamification-service";
 
 export function registerGamificationRoutes(router: Router) {
@@ -178,6 +178,65 @@ export function registerGamificationRoutes(router: Router) {
         wasteReductionRate: metrics.wasteReductionRate,
         co2Saved: metrics.estimatedCo2Saved,
       },
+    });
+  });
+
+  // ================================
+  // POST /api/v1/gamification/sync-sold-points
+  // Backfill points for historical sold products
+  // ================================
+  router.post("/api/v1/gamification/sync-sold-points", async (req) => {
+    const user = getUser(req);
+
+    // Get all sold listings for this user
+    const soldListings = await db.query.marketplaceListings.findMany({
+      where: and(
+        eq(schema.marketplaceListings.sellerId, user.id),
+        eq(schema.marketplaceListings.status, "sold")
+      ),
+    });
+
+    // Get existing "sold" metrics count for this user
+    const existingMetrics = await db.query.productSustainabilityMetrics.findMany({
+      where: and(
+        eq(schema.productSustainabilityMetrics.userId, user.id),
+        eq(schema.productSustainabilityMetrics.type, "sold")
+      ),
+    });
+
+    const soldCount = soldListings.length;
+    const metricCount = existingMetrics.length;
+
+    // Calculate how many sales are missing points
+    const missingSales = soldCount - metricCount;
+
+    if (missingSales <= 0) {
+      const userPoints = await getOrCreateUserPoints(user.id);
+      return json({
+        message: "All sold listings already have points",
+        synced: 0,
+        alreadySynced: soldCount,
+        pointsAwarded: 0,
+        newTotal: userPoints.totalPoints,
+      });
+    }
+
+    // Award points for the missing sales
+    let totalPointsAwarded = 0;
+    for (let i = 0; i < missingSales; i++) {
+      const result = await awardPoints(user.id, "sold");
+      totalPointsAwarded += result.amount;
+    }
+
+    // Get updated total points
+    const userPoints = await getOrCreateUserPoints(user.id);
+
+    return json({
+      message: `Synced ${missingSales} sold listings`,
+      synced: missingSales,
+      alreadySynced: metricCount,
+      pointsAwarded: totalPointsAwarded,
+      newTotal: userPoints.totalPoints,
     });
   });
 }
