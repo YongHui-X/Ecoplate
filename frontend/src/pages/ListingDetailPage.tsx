@@ -12,6 +12,7 @@ import { Badge } from "../components/ui/badge";
 import { ArrowLeft, MapPin, Clock, Edit, Trash2, CheckCircle, ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
 import { formatDate, getDaysUntilExpiry } from "../lib/utils";
 import { SimilarProducts } from "../components/marketplace/SimilarProducts";
+import { showBadgeToasts } from "../utils/badgeNotification";
 import type { MarketplaceListing } from "../types/marketplace";
 
 export default function ListingDetailPage() {
@@ -70,6 +71,7 @@ export default function ListingDetailPage() {
     try {
       const result = await marketplaceService.completeListing(Number(id));
       addToast(`Listing marked as sold! +${result.points.earned} points`, "success");
+      showBadgeToasts(result, addToast);
       loadListing();
     } catch (error: any) {
       addToast(error.message || "Failed to complete listing", "error");

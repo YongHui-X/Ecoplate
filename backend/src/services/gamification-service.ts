@@ -1,6 +1,7 @@
 import { db } from "../index";
 import * as schema from "../db/schema";
 import { eq, and, inArray, desc } from "drizzle-orm";
+import { checkAndAwardBadges } from "./badge-service";
 
 // Point values for different actions
 export const POINT_VALUES = {
@@ -72,7 +73,10 @@ export async function awardPoints(
       .where(eq(schema.userPoints.userId, userId));
   }
 
-  return { action, amount, newTotal };
+  // Check and award any newly earned badges
+  const newBadges = await checkAndAwardBadges(userId);
+
+  return { action, amount, newTotal, newBadges };
 }
 
 /**

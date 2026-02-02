@@ -5,6 +5,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { getUser } from "../middleware/auth";
 import { getOrCreateUserPoints, getUserMetrics, getDetailedPointsStats, awardPoints } from "../services/gamification-service";
 import { POINT_VALUES } from "../services/gamification-service";
+import { getBadgeProgress } from "../services/badge-service";
 
 export function registerGamificationRoutes(router: Router) {
   // ================================
@@ -125,7 +126,10 @@ export function registerGamificationRoutes(router: Router) {
 
     const earnedBadgeIds = new Set(earnedBadges.map((ub) => ub.badgeId));
 
-    // Combine all badges with earned status
+    // Get progress data for all badges
+    const progress = await getBadgeProgress(user.id);
+
+    // Combine all badges with earned status and progress
     const badgesWithStatus = allBadges.map((badge) => ({
       id: badge.id,
       code: badge.code,
@@ -136,6 +140,7 @@ export function registerGamificationRoutes(router: Router) {
       imageUrl: badge.badgeImageUrl,
       earned: earnedBadgeIds.has(badge.id),
       earnedAt: earnedBadges.find((ub) => ub.badgeId === badge.id)?.earnedAt || null,
+      progress: progress[badge.code] || null,
     }));
 
     return json({

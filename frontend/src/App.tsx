@@ -13,7 +13,7 @@ import MyListingsPage from "./pages/MyListingsPage";
 import MyPurchasesPage from "./pages/MyPurchasesPage";
 import MessagesPage from "./pages/MessagesPage";
 import ConversationPage from "./pages/ConversationPage";
-import EcoBoardPage from "./pages/EcoBoardPage";
+import EcoPointsPage from "./pages/EcoPointsPage.tsx";
 import BadgesPage from "./pages/BadgesPage";
 import AccountPage from "./pages/AccountPage";
 
@@ -58,7 +58,7 @@ function App() {
         <Route path="marketplace/:id/edit" element={<EditListingPage />} />
         <Route path="messages" element={<MessagesPage />} />
         <Route path="messages/:conversationId" element={<ConversationPage />} />
-        <Route path="ecopoints" element={<EcoBoardPage />} />
+        <Route path="ecopoints" element={<EcoPointsPage />} />
         <Route path="ecoboard" element={<Navigate to="/ecopoints" replace />} />
         <Route path="badges" element={<BadgesPage />} />
         <Route path="account" element={<AccountPage />} />

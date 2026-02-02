@@ -501,6 +501,7 @@ export function registerMarketplaceRoutes(router: Router) {
         action: pointsResult.action,
         newTotal: pointsResult.newTotal,
       },
+      newBadges: pointsResult.newBadges,
     });
   });
 }

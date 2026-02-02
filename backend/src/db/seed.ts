@@ -371,72 +371,28 @@ const sampleConversationMessages = [
   { text: "That works for me. See you then!", fromBuyer: false },
 ];
 
-// Sample badges
+// Badge definitions (16 badges across 4 categories)
 const sampleBadges = [
-  {
-    code: "first_sale",
-    name: "First Sale",
-    description: "Sold your first item on the marketplace",
-    category: "marketplace",
-    pointsAwarded: 50,
-    sortOrder: 1,
-  },
-  {
-    code: "eco_warrior",
-    name: "Eco Warrior",
-    description: "Saved 10kg of food from going to waste",
-    category: "sustainability",
-    pointsAwarded: 100,
-    sortOrder: 2,
-  },
-  {
-    code: "streak_7",
-    name: "Week Warrior",
-    description: "Maintained a 7-day sustainability streak",
-    category: "streak",
-    pointsAwarded: 75,
-    sortOrder: 3,
-  },
-  {
-    code: "streak_30",
-    name: "Monthly Champion",
-    description: "Maintained a 30-day sustainability streak",
-    category: "streak",
-    pointsAwarded: 200,
-    sortOrder: 4,
-  },
-  {
-    code: "community_helper",
-    name: "Community Helper",
-    description: "Shared food with 5 different people",
-    category: "community",
-    pointsAwarded: 80,
-    sortOrder: 5,
-  },
-  {
-    code: "zero_waste",
-    name: "Zero Waste Hero",
-    description: "Achieved 100% waste reduction rate for a month",
-    category: "sustainability",
-    pointsAwarded: 150,
-    sortOrder: 6,
-  },
-  {
-    code: "marketplace_pro",
-    name: "Marketplace Pro",
-    description: "Successfully sold 10 items",
-    category: "marketplace",
-    pointsAwarded: 120,
-    sortOrder: 7,
-  },
-  {
-    code: "early_adopter",
-    name: "Early Adopter",
-    description: "Joined EcoPlate in its early days",
-    category: "special",
-    pointsAwarded: 50,
-    sortOrder: 8,
-  },
+  // --- Milestones ---
+  { code: "first_action", name: "First Steps", description: "Complete your first sustainability action", category: "milestones", pointsAwarded: 25, sortOrder: 1 },
+  { code: "eco_starter", name: "Eco Starter", description: "Complete 10 sustainability actions", category: "milestones", pointsAwarded: 50, sortOrder: 2 },
+  { code: "eco_enthusiast", name: "Eco Enthusiast", description: "Complete 50 sustainability actions", category: "milestones", pointsAwarded: 100, sortOrder: 3 },
+  { code: "eco_champion", name: "Eco Champion", description: "Earn 1000 total EcoPoints", category: "milestones", pointsAwarded: 150, sortOrder: 4 },
+  // --- Waste Reduction ---
+  { code: "first_consume", name: "Clean Plate", description: "Consume your first item", category: "waste-reduction", pointsAwarded: 25, sortOrder: 5 },
+  { code: "waste_watcher", name: "Waste Watcher", description: "Consume 25 items", category: "waste-reduction", pointsAwarded: 75, sortOrder: 6 },
+  { code: "waste_warrior", name: "Waste Warrior", description: "80%+ waste reduction rate (min 20 items)", category: "waste-reduction", pointsAwarded: 100, sortOrder: 7 },
+  { code: "zero_waste_hero", name: "Zero Waste Hero", description: "95%+ waste reduction rate (min 50 items)", category: "waste-reduction", pointsAwarded: 200, sortOrder: 8 },
+  // --- Sharing ---
+  { code: "first_sale", name: "First Sale", description: "Sell your first marketplace item", category: "sharing", pointsAwarded: 25, sortOrder: 9 },
+  { code: "marketplace_regular", name: "Market Regular", description: "Sell 5 items on the marketplace", category: "sharing", pointsAwarded: 75, sortOrder: 10 },
+  { code: "marketplace_pro", name: "Marketplace Pro", description: "Sell 15 items on the marketplace", category: "sharing", pointsAwarded: 150, sortOrder: 11 },
+  { code: "sharing_champion", name: "Sharing Champion", description: "Share or sell 25 items total", category: "sharing", pointsAwarded: 200, sortOrder: 12 },
+  // --- Streaks ---
+  { code: "streak_3", name: "Getting Started", description: "3-day sustainability streak", category: "streaks", pointsAwarded: 25, sortOrder: 13 },
+  { code: "streak_7", name: "Week Warrior", description: "7-day sustainability streak", category: "streaks", pointsAwarded: 75, sortOrder: 14 },
+  { code: "streak_14", name: "Two-Week Titan", description: "14-day sustainability streak", category: "streaks", pointsAwarded: 125, sortOrder: 15 },
+  { code: "streak_30", name: "Monthly Champion", description: "30-day sustainability streak", category: "streaks", pointsAwarded: 250, sortOrder: 16 },
 ];
 
 async function seed() {

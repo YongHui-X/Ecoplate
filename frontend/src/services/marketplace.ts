@@ -104,8 +104,8 @@ export const marketplaceService = {
   async completeListing(
     id: number,
     buyerId?: number
-  ): Promise<{ message: string; points: { earned: number; action: string; newTotal: number } }> {
-    return api.post<{ message: string; points: { earned: number; action: string; newTotal: number } }>(
+  ): Promise<{ message: string; points: { earned: number; action: string; newTotal: number }; newBadges?: Array<{ code: string; name: string; pointsAwarded: number }> }> {
+    return api.post<{ message: string; points: { earned: number; action: string; newTotal: number }; newBadges?: Array<{ code: string; name: string; pointsAwarded: number }> }>(
       `/marketplace/listings/${id}/sold`,
       { buyerId }
     );
