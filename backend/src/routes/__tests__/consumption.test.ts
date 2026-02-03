@@ -330,10 +330,10 @@ describe("POST /api/v1/consumption/analyze-waste", () => {
     });
 
     expect(interactions.length).toBeGreaterThan(0);
-    // Should have both Consume and Waste interactions (since mock returns waste)
+    // Should have both consumed and wasted interactions (since mock returns waste)
     const types = interactions.map((i) => i.type);
-    expect(types).toContain("Consume");
-    expect(types).toContain("Waste");
+    expect(types).toContain("consumed");
+    expect(types).toContain("wasted");
   });
 
 });

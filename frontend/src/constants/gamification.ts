@@ -1,4 +1,4 @@
-import { Check, Share, DollarSign, X } from "lucide-react";
+import { Check, DollarSign, X } from "lucide-react";
 
 export const ACTION_CONFIG: Record<
   string,
@@ -20,15 +20,6 @@ export const ACTION_CONFIG: Record<
     bgColor: "bg-success/10",
     chartColor: "hsl(var(--success))",
     description: "Eat food before it expires",
-  },
-  shared: {
-    label: "Shared",
-    icon: Share,
-    points: 10,
-    color: "text-primary",
-    bgColor: "bg-primary/10",
-    chartColor: "hsl(var(--primary))",
-    description: "Share excess food with others",
   },
   sold: {
     label: "Sold",

@@ -29,17 +29,18 @@ export function registerGamificationRoutes(router: Router) {
       },
     });
 
-    // Map interactions to transaction like format, filtering out "Add" entries
+    // Map interactions to transaction like format, filtering out "add" entries
     const transactions = recentInteractions
-      .filter((i) => i.type !== "Add")
+      .filter((i) => (i.type || "").toLowerCase() !== "add")
       .map((i) => {
-        const amount = POINT_VALUES[i.type as keyof typeof POINT_VALUES] ?? 0;
+        const normalizedType = (i.type || "").toLowerCase() as keyof typeof POINT_VALUES;
+        const amount = POINT_VALUES[normalizedType] ?? 0;
 
         return {
           id: i.id,
           amount,
           type: amount < 0 ? "penalty" : "earned",
-          action: i.type,
+          action: normalizedType,
           createdAt: i.todayDate,
         };
       });

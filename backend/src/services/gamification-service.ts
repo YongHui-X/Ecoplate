@@ -40,7 +40,8 @@ export async function awardPoints(
   userId: number,
   action: PointAction,
   productId?: number | null,
-  quantity?: number
+  quantity?: number,
+  skipMetricRecording?: boolean
 ) {
   const amount = POINT_VALUES[action];
   const userPoints = await getOrCreateUserPoints(userId);
@@ -52,15 +53,17 @@ export async function awardPoints(
     .set({ totalPoints: newTotal })
     .where(eq(schema.userPoints.userId, userId));
 
-  // Record the sustainability metric
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  await db.insert(schema.productSustainabilityMetrics).values({
-    productId: productId ?? null,
-    userId,
-    todayDate: today,
-    quantity: quantity ?? 1,
-    type: action,
-  });
+  // Record the sustainability metric (skip if caller already recorded it)
+  if (!skipMetricRecording) {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    await db.insert(schema.productSustainabilityMetrics).values({
+      productId: productId ?? null,
+      userId,
+      todayDate: today,
+      quantity: quantity ?? 1,
+      type: action,
+    });
+  }
 
   // Only update streak for positive sustainability actions (not wasted)
   const streakActions = ["consumed", "shared", "sold"];
@@ -211,7 +214,7 @@ export async function getDetailedPointsStats(userId: number) {
   let lastActiveDate: string | null = null;
 
   for (const interaction of allInteractions) {
-    const type = interaction.type as keyof typeof POINT_VALUES;
+    const type = (interaction.type || "").toLowerCase() as keyof typeof POINT_VALUES;
     const points = POINT_VALUES[type] ?? 0;
     const interactionDate = new Date(interaction.todayDate);
     const dateKey = interactionDate.toISOString().split("T")[0];
@@ -330,11 +333,13 @@ export async function getUserMetrics(userId: number) {
   };
 
   for (const interaction of interactions) {
-    switch (interaction.type) {
+    switch ((interaction.type || "").toLowerCase()) {
       case "consumed":
+      case "consume":
         metrics.totalItemsConsumed++;
         break;
       case "wasted":
+      case "waste":
         metrics.totalItemsWasted++;
         break;
       case "shared":

@@ -288,7 +288,7 @@ export async function recordConsumptionInteractions(
         userId,
         todayDate,
         quantity: consumedQty,
-        type: "Consume",
+        type: "consumed",
       });
       count++;
     }
@@ -299,7 +299,7 @@ export async function recordConsumptionInteractions(
         userId,
         todayDate,
         quantity: wastedQty,
-        type: "Waste",
+        type: "wasted",
       });
       count++;
     }
