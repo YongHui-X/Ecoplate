@@ -8,6 +8,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Skeleton } from "../components/ui/skeleton";
 import {
   Plus,
   Camera,
@@ -23,9 +24,11 @@ import {
   Leaf,
   Check,
   DollarSign,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { formatCO2, getCO2ColorClass, calculateTotalCO2 } from "../utils/co2Utils";
+import { PRODUCT_UNITS } from "../constants/units";
 
 interface Product {
   id: number;
@@ -136,29 +139,67 @@ export default function MyFridgePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6">
+        <div className="space-y-4 mb-6">
+          <div>
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-4 w-64 mt-2" />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Skeleton className="h-10 w-full sm:w-auto" />
+            <Skeleton className="h-10 w-full sm:w-auto" />
+            <Skeleton className="h-10 w-full sm:w-auto" />
+          </div>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-card rounded-xl border p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-4 w-60" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-20" />
+                  <Skeleton className="h-9 w-9" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="space-y-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold">MyFridge</h1>
-          <p className="text-gray-600">Manage your food inventory</p>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">MyFridge</h1>
+          <p className="text-sm text-muted-foreground">Manage your food inventory</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowScanModal(true)}>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => setShowScanModal(true)}
+          >
             <Camera className="h-4 w-4 mr-2" />
             Scan Receipt
           </Button>
-          <Button variant="outline" onClick={() => setShowTrackConsumption(true)}>
-            <UtensilsCrossed className="h-4 w-4 mr-2" />
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => setShowTrackConsumption(true)}
+          >
+            <TrendingUp className="h-4 w-4 mr-2" />
             Track Consumption
           </Button>
-          <Button onClick={() => setShowAddForm(true)}>
+          <Button
+            className="w-full sm:w-auto"
+            onClick={() => setShowAddForm(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add Item
           </Button>
@@ -167,24 +208,24 @@ export default function MyFridgePage() {
 
       {/* Pending Consumptions Banner */}
       {pendingConsumptions.length > 0 && (
-        <Card className="border-yellow-200 bg-yellow-50">
+        <Card className="border-warning/20 bg-warning/10">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 shrink-0" />
+              <AlertCircle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
               <div className="flex-1">
-                <h3 className="font-medium text-yellow-800">
+                <h3 className="font-medium text-warning">
                   {pendingConsumptions.length} pending consumption{pendingConsumptions.length > 1 ? "s" : ""}
                 </h3>
-                <p className="text-sm text-yellow-700 mt-1">
+                <p className="text-sm text-warning mt-1">
                   You have meals waiting for waste photo. Add them to complete tracking.
                 </p>
                 <div className="mt-3 space-y-2">
                   {pendingConsumptions.map((record) => (
                     <div
                       key={record.id}
-                      className="flex items-center justify-between bg-white rounded-lg p-2 border border-yellow-200"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-card rounded-lg p-3 border border-warning/20"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1">
                         {record.rawPhoto && (
                           <img
                             src={record.rawPhoto}
@@ -193,10 +234,10 @@ export default function MyFridgePage() {
                           />
                         )}
                         <div>
-                          <p className="text-sm font-medium text-gray-700">
+                          <p className="text-sm font-medium text-foreground">
                             {record.ingredients.length} ingredient{record.ingredients.length !== 1 ? "s" : ""}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted-foreground">
                             {new Date(record.createdAt).toLocaleDateString()}
                           </p>
                         </div>
@@ -204,15 +245,18 @@ export default function MyFridgePage() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
                           onClick={() => handleDeletePendingConsumption(record.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                         <Button
                           size="sm"
+                          variant="outline"
+                          className="flex-1 sm:flex-none"
                           onClick={() => handleResumePendingConsumption(record)}
                         >
+                          <Camera className="mr-1 h-3 w-3" />
                           Add Photo
                         </Button>
                       </div>
@@ -227,7 +271,7 @@ export default function MyFridgePage() {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
         <Input
           placeholder="Search items..."
           value={searchQuery}
@@ -238,27 +282,27 @@ export default function MyFridgePage() {
 
       {/* Total CO2 Footprint Summary */}
       {sortedProducts.length > 0 && (
-        <Card className="bg-green-50 border-green-200">
+        <Card className="bg-primary/10 border-primary/20">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-full">
-                  <Leaf className="h-5 w-5 text-green-600" />
+                <div className="p-2 bg-primary/20 rounded-full">
+                  <Leaf className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-green-900">
+                  <p className="text-sm font-medium text-foreground">
                     Total Carbon Footprint
                   </p>
-                  <p className="text-xs text-green-700">
+                  <p className="text-xs text-muted-foreground">
                     All items in your fridge
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-green-600">
+              <div className="text-left sm:text-right">
+                <p className="text-2xl font-bold text-primary">
                   {calculateTotalCO2(sortedProducts).toFixed(1)} kg
                 </p>
-                <p className="text-xs text-green-700">CO2 emissions</p>
+                <p className="text-xs text-muted-foreground">CO2 emissions</p>
               </div>
             </div>
           </CardContent>
@@ -269,7 +313,7 @@ export default function MyFridgePage() {
       {sortedProducts.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-500 mb-4">No items in your fridge yet</p>
+            <p className="text-muted-foreground mb-4">No items in your fridge yet</p>
             <Button onClick={() => setShowAddForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add your first item
@@ -343,15 +387,15 @@ function ProductCard({
   return (
     <Card className="transition-all">
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold">{product.productName}</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-foreground">{product.productName}</h3>
               {product.category && (
                 <Badge variant="secondary">{product.category}</Badge>
               )}
             </div>
-            <div className="flex items-center gap-4 mt-1 text-sm text-gray-600 flex-wrap">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
               <span>Qty: {product.quantity}{product.unit ? ` ${product.unit}` : ''}</span>
               {product.unitPrice != null && (
                 <span>${product.unitPrice.toFixed(2)}</span>
@@ -369,16 +413,16 @@ function ProductCard({
               )}
             </div>
             {product.description && (
-              <p className="mt-1 text-sm text-gray-500">{product.description}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{product.description}</p>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex gap-2 sm:self-start">
             <Button
               variant="outline"
               size="sm"
               onClick={onSell}
-              className="text-green-600 hover:text-green-700"
+              className="flex-1 sm:flex-none text-primary hover:text-primary/90"
             >
               <DollarSign className="h-4 w-4 mr-1" />
               Sell
@@ -388,7 +432,7 @@ function ProductCard({
               size="icon"
               onClick={() => onDelete(product.id)}
             >
-              <Trash2 className="h-4 w-4 text-gray-400" />
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -407,6 +451,7 @@ function AddProductModal({
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const [unit, setUnit] = useState("");
   const [unitPrice, setUnitPrice] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
   const [description, setDescription] = useState("");
@@ -422,6 +467,7 @@ function AddProductModal({
         productName: name,
         category: category || undefined,
         quantity,
+        unit: unit || undefined,
         unitPrice: unitPrice ? parseFloat(unitPrice) : undefined,
         purchaseDate: purchaseDate || undefined,
         description: description || undefined,
@@ -437,7 +483,7 @@ function AddProductModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md">
+      <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             Add Product
@@ -455,6 +501,7 @@ function AddProductModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Chicken Breast"
+                className="h-11"
                 required
               />
             </div>
@@ -465,7 +512,7 @@ function AddProductModal({
                 id="category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3"
+                className="w-full h-11 rounded-md border border-input bg-background px-3"
               >
                 <option value="">Select...</option>
                 <option value="produce">Produce</option>
@@ -479,9 +526,9 @@ function AddProductModal({
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
+                <Label htmlFor="quantity">Quantity *</Label>
                 <Input
                   id="quantity"
                   type="number"
@@ -489,21 +536,42 @@ function AddProductModal({
                   step="0.1"
                   value={quantity}
                   onChange={(e) => setQuantity(parseFloat(e.target.value))}
+                  className="h-11"
+                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="unitPrice">Unit Price ($)</Label>
-                <Input
-                  id="unitPrice"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={unitPrice}
-                  onChange={(e) => setUnitPrice(e.target.value)}
-                  placeholder="0.00"
-                />
+                <Label htmlFor="unit">Unit *</Label>
+                <select
+                  id="unit"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="w-full h-11 rounded-md border border-input bg-background px-3"
+                  required
+                >
+                  <option value="">Select...</option>
+                  {PRODUCT_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="unitPrice">Unit Price ($)</Label>
+              <Input
+                id="unitPrice"
+                type="number"
+                min="0"
+                step="0.01"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+                placeholder="0.00"
+                className="h-11"
+              />
             </div>
 
             <div className="space-y-2">
@@ -513,6 +581,7 @@ function AddProductModal({
                 type="date"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
+                className="h-11"
               />
             </div>
 
@@ -527,11 +596,11 @@ function AddProductModal({
               />
             </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            <div className="flex flex-col sm:flex-row gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={onClose} className="w-full sm:flex-1">
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} className="flex-1">
+              <Button type="submit" disabled={loading} className="w-full sm:flex-1">
                 {loading ? "Adding..." : "Add Product"}
               </Button>
             </div>
@@ -810,18 +879,18 @@ function ScanReceiptModal({
                 className="w-full h-auto py-4 flex flex-col items-center gap-2"
                 onClick={handleOpenCamera}
               >
-                <Camera className="h-8 w-8 text-gray-500" />
+                <Camera className="h-8 w-8 text-muted-foreground" />
                 <span className="font-medium">Take Photo</span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-muted">
                   Use your camera to capture a receipt
                 </span>
               </Button>
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div className="flex-1 border-t border-gray-200" />
-                <span className="text-xs text-gray-400">or</span>
-                <div className="flex-1 border-t border-gray-200" />
+                <div className="flex-1 border-t border-border" />
+                <span className="text-xs text-muted">or</span>
+                <div className="flex-1 border-t border-border" />
               </div>
 
               {/* Upload File */}
@@ -830,7 +899,7 @@ function ScanReceiptModal({
                   "border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer text-center",
                   isDragging
                     ? "border-primary bg-primary/5"
-                    : "border-gray-300 hover:border-gray-400"
+                    : "border-border hover:border-border/80"
                 )}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -845,11 +914,11 @@ function ScanReceiptModal({
                 }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                <p className="text-gray-600 font-medium text-sm">
+                <Upload className="h-8 w-8 mx-auto text-muted mb-2" />
+                <p className="text-foreground font-medium text-sm">
                   {isDragging ? "Drop your receipt here" : "Upload from files"}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-muted mt-1">
                   Drag and drop, or click to browse
                 </p>
               </div>
@@ -865,41 +934,48 @@ function ScanReceiptModal({
               />
             </div>
           ) : scanning && scannedItems.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
-              <p className="text-gray-600 font-medium">Scanning receipt...</p>
-              <p className="text-sm text-gray-400 mt-1">This may take a few moments</p>
+            <div className="py-8 space-y-4">
+              <Skeleton className="h-20 w-full rounded-lg" />
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-6 w-32" />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Skeleton className="h-11 w-full" />
+                    <Skeleton className="h-11 w-full" />
+                    <Skeleton className="h-11 w-full" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Found {scannedItems.length} items. Review and edit before adding:
               </p>
               <div className="space-y-3 max-h-[400px] overflow-y-auto">
                 {scannedItems.map((item) => (
                   <div
                     key={item.id}
-                    className="p-3 bg-gray-50 rounded-lg space-y-2"
+                    className="p-3 bg-muted/50 rounded-lg space-y-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <Input
                         value={item.name}
                         onChange={(e) => updateItem(item.id, "name", e.target.value)}
-                        className="h-8 text-sm font-medium"
+                        className="h-11 font-medium"
                         placeholder="Product name"
                       />
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
                         onClick={() => removeItem(item.id)}
                       >
-                        <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="text-xs text-gray-500">Qty</label>
+                        <label className="text-xs text-muted-foreground">Qty</label>
                         <Input
                           type="number"
                           min="0.1"
@@ -908,15 +984,15 @@ function ScanReceiptModal({
                           onChange={(e) =>
                             updateItem(item.id, "quantity", parseFloat(e.target.value) || 1)
                           }
-                          className="h-8 text-sm"
+                          className="h-11"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Unit</label>
+                        <label className="text-xs text-muted-foreground">Unit</label>
                         <select
                           value={item.unit}
                           onChange={(e) => updateItem(item.id, "unit", e.target.value)}
-                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                          className="w-full h-11 rounded-md border border-input bg-background px-3"
                         >
                           <option value="pcs">pcs</option>
                           <option value="kg">kg</option>
@@ -931,7 +1007,7 @@ function ScanReceiptModal({
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Price ($)</label>
+                        <label className="text-xs text-muted-foreground">Price ($)</label>
                         <Input
                           type="number"
                           min="0"
@@ -940,18 +1016,18 @@ function ScanReceiptModal({
                           onChange={(e) =>
                             updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)
                           }
-                          className="h-8 text-sm"
+                          className="h-11"
                           placeholder="0.00"
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs text-gray-500">Category</label>
+                        <label className="text-xs text-muted-foreground">Category</label>
                         <select
                           value={item.category}
                           onChange={(e) => updateItem(item.id, "category", e.target.value)}
-                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                          className="w-full h-11 rounded-md border border-input bg-background px-3"
                         >
                           <option value="produce">Produce</option>
                           <option value="dairy">Dairy</option>
@@ -964,13 +1040,13 @@ function ScanReceiptModal({
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">CO2 (kg)</label>
+                        <label className="text-xs text-muted-foreground">CO2 (kg)</label>
                         <Input
                           type="number"
                           value={item.co2Emission}
                           readOnly
                           disabled
-                          className="h-8 text-sm bg-gray-100"
+                          className="h-11 bg-muted"
                         />
                       </div>
                     </div>
@@ -978,7 +1054,7 @@ function ScanReceiptModal({
                 ))}
               </div>
               {scannedItems.length === 0 && (
-                <p className="text-center text-sm text-gray-400 py-4">
+                <p className="text-center text-sm text-muted py-4">
                   All items removed. Scan another receipt or close.
                 </p>
               )}
@@ -1420,7 +1496,7 @@ function TrackConsumptionModal({
           key={s}
           className={cn(
             "h-2 flex-1 rounded-full",
-            stepNumber >= s ? "bg-primary" : "bg-gray-200"
+            stepNumber >= s ? "bg-primary" : "bg-border"
           )}
         />
       ))}
@@ -1450,7 +1526,7 @@ function TrackConsumptionModal({
               <X className="h-4 w-4" />
             </Button>
           </CardTitle>
-          <p className="text-sm text-gray-500">{subtitle}</p>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
           <StepIndicator />
         </CardHeader>
         <CardContent>
@@ -1460,15 +1536,15 @@ function TrackConsumptionModal({
               className="w-full h-auto py-4 flex flex-col items-center gap-2"
               onClick={handleOpenCamera}
             >
-              <Camera className="h-8 w-8 text-gray-500" />
+              <Camera className="h-8 w-8 text-muted-foreground" />
               <span className="font-medium">Take Photo</span>
-              <span className="text-xs text-gray-400">{cameraLabel}</span>
+              <span className="text-xs text-muted">{cameraLabel}</span>
             </Button>
 
             <div className="flex items-center gap-3">
-              <div className="flex-1 border-t border-gray-200" />
-              <span className="text-xs text-gray-400">or</span>
-              <div className="flex-1 border-t border-gray-200" />
+              <div className="flex-1 border-t border-border" />
+              <span className="text-xs text-muted">or</span>
+              <div className="flex-1 border-t border-border" />
             </div>
 
             <div
@@ -1476,7 +1552,7 @@ function TrackConsumptionModal({
                 "border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer text-center",
                 isDragging
                   ? "border-primary bg-primary/5"
-                  : "border-gray-300 hover:border-gray-400"
+                  : "border-border hover:border-border/80"
               )}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -1491,11 +1567,11 @@ function TrackConsumptionModal({
               }}
               onClick={() => fileInputRef.current?.click()}
             >
-              <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-              <p className="text-gray-600 font-medium text-sm">
+              <Upload className="h-8 w-8 mx-auto text-muted mb-2" />
+              <p className="text-foreground font-medium text-sm">
                 {isDragging ? "Drop your photo here" : "Upload from files"}
               </p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-muted mt-1">
                 Drag and drop, or click to browse
               </p>
             </div>
@@ -1524,10 +1600,18 @@ function TrackConsumptionModal({
       return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md">
-            <CardContent className="p-12 text-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
-              <p className="text-gray-600 font-medium">Identifying ingredients...</p>
-              <p className="text-sm text-gray-400 mt-1">Using AI to analyze your photo</p>
+            <CardContent className="p-6 space-y-4">
+              <Skeleton className="h-20 w-full rounded-lg" />
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-6 w-32" />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Skeleton className="h-11 w-full" />
+                    <Skeleton className="h-11 w-full" />
+                    <Skeleton className="h-11 w-full" />
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>
@@ -1601,7 +1685,7 @@ function TrackConsumptionModal({
                 <X className="h-4 w-4" />
               </Button>
             </CardTitle>
-            <p className="text-sm text-gray-500">Step 2 of 5 — Confirm your ingredients</p>
+            <p className="text-sm text-muted-foreground">Step 2 of 5 — Confirm your ingredients</p>
             <StepIndicator />
           </CardHeader>
           <CardContent>
@@ -1615,7 +1699,7 @@ function TrackConsumptionModal({
               )}
 
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   {ingredients.length} ingredient{ingredients.length !== 1 ? "s" : ""} added
                 </p>
                 <Button variant="outline" size="sm" onClick={addIngredient}>
@@ -1626,26 +1710,25 @@ function TrackConsumptionModal({
 
               <div className="space-y-3 max-h-[300px] overflow-y-auto">
                 {ingredients.map((ing) => (
-                  <div key={ing.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
+                  <div key={ing.id} className="p-3 bg-muted/50 rounded-lg space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <Input
                         value={ing.name}
                         onChange={(e) => updateIngredient(ing.id, "name", e.target.value)}
-                        className="h-8 text-sm font-medium"
+                        className="h-11 font-medium"
                         placeholder="Ingredient name"
                       />
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0"
                         onClick={() => removeIngredient(ing.id)}
                       >
-                        <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="text-xs text-gray-500">Qty</label>
+                        <label className="text-xs text-muted-foreground">Qty</label>
                         <Input
                           type="number"
                           min="0.1"
@@ -1654,15 +1737,15 @@ function TrackConsumptionModal({
                           onChange={(e) =>
                             updateIngredient(ing.id, "estimatedQuantity", parseFloat(e.target.value) || 0)
                           }
-                          className="h-8 text-sm"
+                          className="h-11"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Category</label>
+                        <label className="text-xs text-muted-foreground">Category</label>
                         <select
                           value={ing.category}
                           onChange={(e) => updateIngredient(ing.id, "category", e.target.value)}
-                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                          className="w-full h-11 rounded-md border border-input bg-background px-3"
                         >
                           <option value="produce">Produce</option>
                           <option value="dairy">Dairy</option>
@@ -1675,13 +1758,13 @@ function TrackConsumptionModal({
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">CO₂ (kg)</label>
+                        <label className="text-xs text-muted-foreground">CO₂ (kg)</label>
                         <Input
                           type="number"
                           value={ing.co2Emission}
                           readOnly
                           disabled
-                          className="h-8 text-sm bg-gray-100"
+                          className="h-11 bg-muted"
                         />
                       </div>
                     </div>
@@ -1689,7 +1772,7 @@ function TrackConsumptionModal({
                 ))}
               </div>
 
-              <div className="flex gap-2 pt-4">
+              <div className="flex flex-col sm:flex-row gap-2 pt-4">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -1697,7 +1780,7 @@ function TrackConsumptionModal({
                     setIngredients([]);
                     setStep("raw-input");
                   }}
-                  className="flex-1"
+                  className="w-full sm:flex-1"
                   disabled={confirmingIngredients}
                 >
                   Scan Again
@@ -1705,7 +1788,7 @@ function TrackConsumptionModal({
                 <Button
                   onClick={handleConfirmIngredients}
                   disabled={ingredients.length === 0 || confirmingIngredients}
-                  className="flex-1"
+                  className="w-full sm:flex-1"
                 >
                   {confirmingIngredients ? "Confirming..." : "Next"}
                   {!confirmingIngredients && <ChevronRight className="h-4 w-4 ml-1" />}
@@ -1725,10 +1808,18 @@ function TrackConsumptionModal({
       return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md">
-            <CardContent className="p-12 text-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
-              <p className="text-gray-600 font-medium">Analyzing waste...</p>
-              <p className="text-sm text-gray-400 mt-1">Calculating your sustainability metrics</p>
+            <CardContent className="p-6 space-y-4">
+              <Skeleton className="h-20 w-full rounded-lg" />
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-6 w-32" />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Skeleton className="h-11 w-full" />
+                    <Skeleton className="h-11 w-full" />
+                    <Skeleton className="h-11 w-full" />
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>
@@ -1741,8 +1832,8 @@ function TrackConsumptionModal({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md">
             <CardContent className="p-6 text-center">
-              <AlertCircle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
-              <p className="text-gray-600 mb-4">No raw photo found. Please start from the beginning.</p>
+              <AlertCircle className="h-12 w-12 mx-auto text-warning mb-4" />
+              <p className="text-muted-foreground mb-4">No raw photo found. Please start from the beginning.</p>
               <Button onClick={() => setStep("raw-input")} className="w-full">
                 Start Over
               </Button>
@@ -1762,14 +1853,14 @@ function TrackConsumptionModal({
                 <X className="h-4 w-4" />
               </Button>
             </CardTitle>
-            <p className="text-sm text-gray-500">Step 3 of 5 — Photo your plate after eating</p>
+            <p className="text-sm text-muted-foreground">Step 3 of 5 — Photo your plate after eating</p>
             <StepIndicator />
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {/* Info message about optional waste photo */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-700">
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                <p className="text-sm text-primary">
                   You can add the waste photo later after you finish eating.
                   Tap "Do Later" to save your progress and return anytime.
                 </p>
@@ -1780,15 +1871,15 @@ function TrackConsumptionModal({
                 className="w-full h-auto py-4 flex flex-col items-center gap-2"
                 onClick={handleOpenCamera}
               >
-                <Camera className="h-8 w-8 text-gray-500" />
+                <Camera className="h-8 w-8 text-muted-foreground" />
                 <span className="font-medium">Take Photo</span>
-                <span className="text-xs text-gray-400">Capture your plate after eating</span>
+                <span className="text-xs text-muted">Capture your plate after eating</span>
               </Button>
 
               <div className="flex items-center gap-3">
-                <div className="flex-1 border-t border-gray-200" />
-                <span className="text-xs text-gray-400">or</span>
-                <div className="flex-1 border-t border-gray-200" />
+                <div className="flex-1 border-t border-border" />
+                <span className="text-xs text-muted">or</span>
+                <div className="flex-1 border-t border-border" />
               </div>
 
               <div
@@ -1796,7 +1887,7 @@ function TrackConsumptionModal({
                   "border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer text-center",
                   isDragging
                     ? "border-primary bg-primary/5"
-                    : "border-gray-300 hover:border-gray-400"
+                    : "border-border hover:border-border/80"
                 )}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -1811,11 +1902,11 @@ function TrackConsumptionModal({
                 }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                <p className="text-gray-600 font-medium text-sm">
+                <Upload className="h-8 w-8 mx-auto text-muted mb-2" />
+                <p className="text-foreground font-medium text-sm">
                   {isDragging ? "Drop your photo here" : "Upload from files"}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-muted mt-1">
                   Drag and drop, or click to browse
                 </p>
               </div>
@@ -1912,7 +2003,7 @@ function TrackConsumptionModal({
                 <X className="h-4 w-4" />
               </Button>
             </CardTitle>
-            <p className="text-sm text-gray-500">Step 4 of 5 — Review and confirm waste</p>
+            <p className="text-sm text-muted-foreground">Step 4 of 5 — Review and confirm waste</p>
             <StepIndicator />
           </CardHeader>
           <CardContent>
@@ -1926,7 +2017,7 @@ function TrackConsumptionModal({
               )}
 
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   {editableWasteItems.length} waste item{editableWasteItems.length !== 1 ? "s" : ""} detected
                 </p>
                 <Button variant="outline" size="sm" onClick={addWasteItem}>
@@ -1937,12 +2028,12 @@ function TrackConsumptionModal({
 
               <div className="space-y-3 max-h-[300px] overflow-y-auto">
                 {editableWasteItems.map((item) => (
-                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
+                  <div key={item.id} className="p-3 bg-muted/50 rounded-lg space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <Input
                         value={item.productName}
                         onChange={(e) => updateWasteItem(item.id, "productName", e.target.value)}
-                        className="h-8 text-sm font-medium"
+                        className="h-11 font-medium"
                         placeholder="Product name"
                       />
                       <Button
@@ -1951,12 +2042,12 @@ function TrackConsumptionModal({
                         className="h-8 w-8 shrink-0"
                         onClick={() => removeWasteItem(item.id)}
                       >
-                        <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        <Trash2 className="h-4 w-4 text-muted hover:text-red-500" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="text-xs text-gray-500">Qty Wasted</label>
+                        <label className="text-xs text-muted-foreground">Qty Wasted</label>
                         <Input
                           type="number"
                           min="0"
@@ -1965,15 +2056,15 @@ function TrackConsumptionModal({
                           onChange={(e) =>
                             updateWasteItem(item.id, "quantity", parseFloat(e.target.value) || 0)
                           }
-                          className="h-8 text-sm"
+                          className="h-11"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">Category</label>
+                        <label className="text-xs text-muted-foreground">Category</label>
                         <select
                           value={item.category}
                           onChange={(e) => updateWasteItem(item.id, "category", e.target.value)}
-                          className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm"
+                          className="w-full h-11 rounded-md border border-input bg-background px-3"
                         >
                           <option value="produce">Produce</option>
                           <option value="dairy">Dairy</option>
@@ -1986,13 +2077,13 @@ function TrackConsumptionModal({
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500">CO₂ (kg)</label>
+                        <label className="text-xs text-muted-foreground">CO₂ (kg)</label>
                         <Input
                           type="number"
                           value={item.co2Emission}
                           readOnly
                           disabled
-                          className="h-8 text-sm bg-gray-100"
+                          className="h-11 bg-muted"
                         />
                       </div>
                     </div>
@@ -2002,8 +2093,8 @@ function TrackConsumptionModal({
 
               {editableWasteItems.length === 0 && (
                 <div className="text-center py-4">
-                  <p className="text-sm text-green-600 font-medium">No waste detected - great job!</p>
-                  <p className="text-xs text-gray-400 mt-1">You can still add waste items if needed.</p>
+                  <p className="text-sm text-primary font-medium">No waste detected - great job!</p>
+                  <p className="text-xs text-muted mt-1">You can still add waste items if needed.</p>
                 </div>
               )}
 
@@ -2048,7 +2139,7 @@ function TrackConsumptionModal({
                 <X className="h-4 w-4" />
               </Button>
             </CardTitle>
-            <p className="text-sm text-gray-500">Step 5 of 5 — Your sustainability results</p>
+            <p className="text-sm text-muted-foreground">Step 5 of 5 — Your sustainability results</p>
             <StepIndicator />
           </CardHeader>
           <CardContent>
@@ -2058,18 +2149,18 @@ function TrackConsumptionModal({
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
                   <Check className="h-8 w-8 text-green-600" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-800">Great job tracking your meal!</h3>
-                <p className="text-sm text-gray-500 mt-1">
+                <h3 className="text-lg font-semibold text-foreground">Great job tracking your meal!</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   Your consumption and waste have been recorded.
                 </p>
               </div>
 
               {/* Waste Metrics Summary Card */}
               {wasteMetrics && (
-                <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+                <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-gray-800">Sustainability Metrics</h3>
+                      <h3 className="font-semibold text-foreground">Sustainability Metrics</h3>
                       <Badge className={cn(
                         "text-white",
                         wasteMetrics.sustainabilityRating === "Excellent" && "bg-green-500",
@@ -2085,34 +2176,34 @@ function TrackConsumptionModal({
                       <div className="flex items-center gap-2">
                         <Leaf className="h-4 w-4 text-green-600" />
                         <div>
-                          <p className="text-gray-500">CO2 Saved</p>
+                          <p className="text-muted-foreground">CO2 Saved</p>
                           <p className="font-medium text-green-600">{wasteMetrics.totalCO2Saved.toFixed(2)} kg</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Leaf className="h-4 w-4 text-red-500" />
                         <div>
-                          <p className="text-gray-500">CO2 Wasted</p>
+                          <p className="text-muted-foreground">CO2 Wasted</p>
                           <p className="font-medium text-red-500">{wasteMetrics.totalCO2Wasted.toFixed(2)} kg</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4 text-orange-500" />
                         <div>
-                          <p className="text-gray-500">Economic Waste</p>
+                          <p className="text-muted-foreground">Economic Waste</p>
                           <p className="font-medium text-orange-500">${wasteMetrics.totalEconomicWaste.toFixed(2)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <UtensilsCrossed className="h-4 w-4 text-blue-500" />
                         <div>
-                          <p className="text-gray-500">Waste %</p>
+                          <p className="text-muted-foreground">Waste %</p>
                           <p className="font-medium text-blue-500">{wasteMetrics.wastePercentage.toFixed(1)}%</p>
                         </div>
                       </div>
                     </div>
-                    <div className="mt-3 pt-3 border-t border-green-200 flex justify-between items-center">
-                      <span className="text-gray-600">Sustainability Score</span>
+                    <div className="mt-3 pt-3 border-t border-primary/20 flex justify-between items-center">
+                      <span className="text-muted-foreground">Sustainability Score</span>
                       <span className="text-lg font-bold text-green-700">{wasteMetrics.sustainabilityScore}/100</span>
                     </div>
                   </CardContent>
