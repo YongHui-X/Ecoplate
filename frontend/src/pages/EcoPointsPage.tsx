@@ -55,6 +55,9 @@ interface PointsData {
     type: string;
     action: string;
     createdAt: string;
+    productName: string;
+    quantity: number;
+    unit: string;
   }>;
 }
 
@@ -210,7 +213,6 @@ export default function EcoBoardPage() {
                               labelLine={false}
                               outerRadius={80}
                               dataKey="value"
-                              isAnimationActive={false}
                               label={(props: { name?: string; percent?: number }) =>
                                   `${props.name ?? ""} ${((props.percent ?? 0) * 100).toFixed(0)}%`
                               }
@@ -420,10 +422,11 @@ export default function EcoBoardPage() {
                             <Icon className={`h-5 w-5 ${color}`} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm capitalize text-foreground truncate">
-                              {tx.action.replace(/_/g, " ")}
+                            <p className="font-medium text-sm text-foreground truncate">
+                              {tx.productName}
                             </p>
                             <p className="text-xs text-muted-foreground">
+                              {tx.quantity} {tx.unit} &middot;{" "}
                               {new Date(tx.createdAt).toLocaleDateString()}
                             </p>
                           </div>

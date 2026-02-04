@@ -28,7 +28,7 @@ export function registerGamificationRoutes(router: Router) {
         limit: 20,
         with: {
           product: {
-            columns: { productName: true },
+            columns: { productName: true, unit: true },
           },
         },
       });
@@ -47,6 +47,9 @@ export function registerGamificationRoutes(router: Router) {
             type: amount < 0 ? "penalty" : "earned",
             action: normalizedType,
             createdAt: i.todayDate,
+            productName: { sold: "Sold", consumed: "Consumed", wasted: "Wasted", shared: "Shared" }[normalizedType] ?? normalizedType,
+            quantity: i.quantity ?? 1,
+            unit: i.product?.unit ?? "pcs",
           };
         });
 

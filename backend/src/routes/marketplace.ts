@@ -492,7 +492,7 @@ export function registerMarketplaceRoutes(router: Router) {
       .where(eq(marketplaceListings.id, listingId));
 
     // Award points for selling (reduces food waste)
-    const pointsResult = await awardPoints(user.id, "sold");
+    const pointsResult = await awardPoints(user.id, "sold", listing.productId);
 
     return json({
       message: "Listing marked as sold",
