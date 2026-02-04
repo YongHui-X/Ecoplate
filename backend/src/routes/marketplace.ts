@@ -12,6 +12,74 @@ import { awardPoints, POINT_VALUES } from "../services/gamification-service";
 import { calculateCo2Saved } from "../utils/co2-calculator";
 import { generateSecureFilename, validateImageFile } from "../utils/file-utils";
 
+// Fallback price calculation when recommendation engine is unavailable
+function calculateFallbackPrice(
+  originalPrice: number,
+  expiryDate?: string,
+  category?: string
+) {
+  let daysUntilExpiry = 30;
+
+  if (expiryDate) {
+    const expiry = new Date(expiryDate);
+    const now = new Date();
+    daysUntilExpiry = Math.max(0, Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  }
+
+  // Category freshness factors
+  const categoryFactors: Record<string, number> = {
+    produce: 0.85, dairy: 0.80, meat: 0.75, seafood: 0.70,
+    bakery: 0.85, frozen: 0.95, canned: 0.98, beverages: 0.95,
+    snacks: 0.95, condiments: 0.97, pantry: 0.96, other: 0.90
+  };
+
+  const freshnessFactor = categoryFactors[(category || "other").toLowerCase()] || 0.90;
+
+  // Calculate discount based on expiry
+  let discount: number;
+  let urgencyLabel: string;
+
+  if (daysUntilExpiry <= 1) {
+    discount = 0.60;
+    urgencyLabel = "Expiring today/tomorrow";
+  } else if (daysUntilExpiry <= 3) {
+    discount = 0.42;
+    urgencyLabel = "Expiring in 2-3 days";
+  } else if (daysUntilExpiry <= 7) {
+    discount = 0.27;
+    urgencyLabel = "Expiring this week";
+  } else if (daysUntilExpiry <= 14) {
+    discount = 0.15;
+    urgencyLabel = "Expiring in 1-2 weeks";
+  } else if (daysUntilExpiry <= 30) {
+    discount = 0.10;
+    urgencyLabel = "Expiring this month";
+  } else {
+    discount = 0.05;
+    urgencyLabel = "Long shelf life";
+  }
+
+  // Adjust for category perishability
+  discount = Math.min(discount + (1 - freshnessFactor) * 0.15, 0.75);
+
+  const recommendedPrice = Math.max(originalPrice * (1 - discount), originalPrice * 0.25);
+  const minPrice = Math.max(originalPrice * (1 - discount - 0.10), originalPrice * 0.25);
+  const maxPrice = originalPrice * (1 - discount + 0.10);
+
+  return {
+    recommended_price: Math.round(recommendedPrice * 100) / 100,
+    min_price: Math.round(minPrice * 100) / 100,
+    max_price: Math.round(maxPrice * 100) / 100,
+    original_price: originalPrice,
+    discount_percentage: Math.round(discount * 100 * 10) / 10,
+    days_until_expiry: daysUntilExpiry,
+    category: category || "other",
+    urgency_label: urgencyLabel,
+    reasoning: `Based on ${daysUntilExpiry} days until expiry and ${category || "other"} category.`,
+    fallback: true
+  };
+}
+
 // Ensure uploads directory exists - inside public folder for static serving
 const UPLOADS_DIR = join(import.meta.dir, "../../public/uploads/listings");
 if (!existsSync(UPLOADS_DIR)) {
@@ -322,6 +390,46 @@ export function registerMarketplaceRoutes(router: Router) {
       .slice(0, limit - sameCategory.length);
 
     return json({ listings: [...sameCategory, ...others], fallback: true });
+  });
+
+  // Get price recommendation for a listing
+  router.post("/api/v1/marketplace/price-recommendation", async (req) => {
+    const body = await parseBody(req);
+    const { originalPrice, expiryDate, category } = body as {
+      originalPrice: number;
+      expiryDate?: string;
+      category?: string;
+    };
+
+    if (!originalPrice || originalPrice <= 0) {
+      return error("originalPrice is required and must be positive", 400);
+    }
+
+    const recommendationUrl = process.env.RECOMMENDATION_ENGINE_URL || "http://localhost:5000";
+
+    try {
+      const response = await fetch(`${recommendationUrl}/api/v1/recommendations/price`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          original_price: originalPrice,
+          expiry_date: expiryDate,
+          category: category || "other",
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return json(data);
+      }
+
+      // Fallback: simple calculation if recommendation engine is unavailable
+      return json(calculateFallbackPrice(originalPrice, expiryDate, category));
+    } catch (e) {
+      console.error("Recommendation engine error:", e);
+      // Fallback calculation
+      return json(calculateFallbackPrice(originalPrice, expiryDate, category));
+    }
   });
 
   // Create listing

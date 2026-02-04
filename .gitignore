@@ -55,8 +55,12 @@ npm-debug.log*
 
 # Testing
 coverage/
+.coverage
+__pycache__/
+*.pyc
 
 # Misc
+docs/
 *.pem
 .vercel
 .claude.md

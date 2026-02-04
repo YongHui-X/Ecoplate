@@ -1,15 +1,28 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../services/api";
+import { marketplaceService } from "../services/marketplace";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { ArrowLeft, ImagePlus, X, Leaf } from "lucide-react";
+import { ArrowLeft, ImagePlus, X, Leaf, Sparkles, TrendingDown } from "lucide-react";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
 import { calculateCo2Preview } from "../components/common/Co2Badge";
 import { PRODUCT_UNITS } from "../constants/units";
+
+interface PriceRecommendation {
+  recommended_price: number;
+  min_price: number;
+  max_price: number;
+  original_price: number;
+  discount_percentage: number;
+  days_until_expiry: number;
+  category: string;
+  urgency_label: string;
+  reasoning: string;
+}
 
 interface Product {
   id: number;
@@ -43,9 +56,43 @@ export default function CreateListingPage() {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [priceRecommendation, setPriceRecommendation] = useState<PriceRecommendation | null>(null);
+  const [loadingRecommendation, setLoadingRecommendation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { addToast } = useToast();
+
+  // Fetch price recommendation when relevant fields change
+  const fetchPriceRecommendation = useCallback(async () => {
+    const origPrice = parseFloat(originalPrice);
+    if (!origPrice || origPrice <= 0) {
+      setPriceRecommendation(null);
+      return;
+    }
+
+    setLoadingRecommendation(true);
+    try {
+      const recommendation = await marketplaceService.getPriceRecommendation({
+        originalPrice: origPrice,
+        expiryDate: expiryDate || undefined,
+        category: category || undefined,
+      });
+      setPriceRecommendation(recommendation);
+    } catch (error) {
+      console.error("Failed to get price recommendation:", error);
+      setPriceRecommendation(null);
+    } finally {
+      setLoadingRecommendation(false);
+    }
+  }, [originalPrice, expiryDate, category]);
+
+  // Debounce the recommendation fetch
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchPriceRecommendation();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fetchPriceRecommendation]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -327,9 +374,63 @@ export default function CreateListingPage() {
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="Leave empty for free"
                 />
-                <p className="text-xs text-gray-500">Leave empty to list as free</p>
+                <p className="text-xs text-muted-foreground">Leave empty to list as free</p>
               </div>
             </div>
+
+            {/* Price Recommendation */}
+            {loadingRecommendation && (
+              <div className="p-4 rounded-xl bg-muted/50 border animate-pulse">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Getting price recommendation...</span>
+                </div>
+              </div>
+            )}
+
+            {priceRecommendation && !loadingRecommendation && (
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-medium text-foreground">Suggested Price</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                        {priceRecommendation.urgency_label}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-3 mb-2">
+                      <span className="text-2xl font-bold text-primary">
+                        ${priceRecommendation.recommended_price.toFixed(2)}
+                      </span>
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <TrendingDown className="h-3 w-3" />
+                        {priceRecommendation.discount_percentage}% off
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {priceRecommendation.reasoning}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPrice(priceRecommendation.recommended_price.toFixed(2))}
+                        className="text-xs"
+                      >
+                        Use ${priceRecommendation.recommended_price.toFixed(2)}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Range: ${priceRecommendation.min_price.toFixed(2)} - ${priceRecommendation.max_price.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <LocationAutocomplete
               value={pickupLocation}

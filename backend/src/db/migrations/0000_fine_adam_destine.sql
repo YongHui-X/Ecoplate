@@ -74,6 +74,31 @@ CREATE TABLE `messages` (
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
+CREATE TABLE `notification_preferences` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`user_id` integer NOT NULL,
+	`expiring_products` integer DEFAULT true NOT NULL,
+	`badge_unlocked` integer DEFAULT true NOT NULL,
+	`streak_milestone` integer DEFAULT true NOT NULL,
+	`product_stale` integer DEFAULT true NOT NULL,
+	`stale_days_threshold` integer DEFAULT 7 NOT NULL,
+	`expiry_days_threshold` integer DEFAULT 3 NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE TABLE `notifications` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`user_id` integer NOT NULL,
+	`type` text NOT NULL,
+	`title` text NOT NULL,
+	`message` text NOT NULL,
+	`related_id` integer,
+	`is_read` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	`read_at` integer,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `pending_consumption_records` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`user_id` integer NOT NULL,
@@ -129,5 +154,7 @@ CREATE TABLE `users` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `badges_code_unique` ON `badges` (`code`);--> statement-breakpoint
+CREATE UNIQUE INDEX `notification_preferences_user_id_unique` ON `notification_preferences` (`user_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `user_badge_unique_idx` ON `user_badges` (`user_id`,`badge_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `user_points_user_id_unique` ON `user_points` (`user_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);

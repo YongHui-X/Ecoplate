@@ -202,6 +202,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   messages: many(messages),
   points: one(userPoints),
   badges: many(userBadges),
+  notifications: many(notifications),
+  notificationPreferences: one(notificationPreferences),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -317,5 +319,55 @@ export const listingImagesRelations = relations(listingImages, ({ one }) => ({
   listing: one(marketplaceListings, {
     fields: [listingImages.listingId],
     references: [marketplaceListings.id],
+  }),
+}));
+
+// ==================== Notifications ====================
+
+export const notifications = sqliteTable("notifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // "expiring_soon" | "badge_unlocked" | "streak_milestone" | "product_stale"
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  relatedId: integer("related_id"), // productId, badgeId, etc.
+  isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  readAt: integer("read_at", { mode: "timestamp" }),
+});
+
+// ==================== Notification Preferences ====================
+
+export const notificationPreferences = sqliteTable("notification_preferences", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" })
+    .unique(),
+  expiringProducts: integer("expiring_products", { mode: "boolean" }).notNull().default(true),
+  badgeUnlocked: integer("badge_unlocked", { mode: "boolean" }).notNull().default(true),
+  streakMilestone: integer("streak_milestone", { mode: "boolean" }).notNull().default(true),
+  productStale: integer("product_stale", { mode: "boolean" }).notNull().default(true),
+  staleDaysThreshold: integer("stale_days_threshold").notNull().default(7),
+  expiryDaysThreshold: integer("expiry_days_threshold").notNull().default(3),
+});
+
+// ==================== Notification Relations ====================
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+}));
+
+export const notificationPreferencesRelations = relations(notificationPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [notificationPreferences.userId],
+    references: [users.id],
   }),
 }));

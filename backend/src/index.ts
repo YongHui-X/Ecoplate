@@ -10,6 +10,7 @@ import { registerMessageRoutes } from "./routes/messages";
 import { registerDashboardRoutes } from "./routes/dashboard";
 import { registerGamificationRoutes } from "./routes/gamification";
 import { registerUploadRoutes } from "./routes/upload";
+import { registerNotificationRoutes } from "./routes/notifications";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join } from "path";
@@ -35,6 +36,7 @@ registerMessageRoutes(protectedRouter);
 registerDashboardRoutes(protectedRouter);
 registerGamificationRoutes(protectedRouter);
 registerUploadRoutes(protectedRouter);
+registerNotificationRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));
