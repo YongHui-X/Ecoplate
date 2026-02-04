@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent } from "../components/ui/card";
 import { Skeleton, SkeletonCard } from "../components/ui/skeleton";
-import { Leaf, Utensils, DollarSign, Star, Car, TreePine, Zap } from "lucide-react";
+import { Leaf, Utensils, DollarSign, Star, Car, TreePine, Zap, ChevronRight } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -154,6 +155,7 @@ export default function DashboardPage() {
       icon: Star,
       color: "text-yellow-500",
       bg: "bg-yellow-500/10",
+      link: "/ecopoints",
     },
   ];
 
@@ -228,23 +230,37 @@ export default function DashboardPage() {
       {/* Stat Cards */}
       {(activeTab === "summary" || activeTab === "co2" || activeTab === "financial" || activeTab === "food") && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-          {statCards.map((card) => (
-            <Card key={card.label} className="card-hover">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${card.bg}`}>
-                    <card.icon className={`h-5 w-5 ${card.color}`} />
+          {statCards.map((card) => {
+            const content = (
+              <Card key={card.label} className="card-hover">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${card.bg}`}>
+                      <card.icon className={`h-5 w-5 ${card.color}`} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground font-medium">
+                        {card.label}
+                      </p>
+                      <p className="text-xl font-bold">{card.value}</p>
+                    </div>
+                    {card.link && (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">
-                      {card.label}
-                    </p>
-                    <p className="text-xl font-bold">{card.value}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+
+            if (card.link) {
+              return (
+                <Link key={card.label} to={card.link} className="active:scale-[0.98] transition-transform">
+                  {content}
+                </Link>
+              );
+            }
+            return content;
+          })}
         </div>
       )}
 

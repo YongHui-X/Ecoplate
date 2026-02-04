@@ -144,12 +144,12 @@ export default function MyFridgePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="space-y-3">
         <div>
           <h1 className="text-2xl font-bold">MyFridge</h1>
-          <p className="text-gray-600">Manage your food inventory</p>
+          <p className="text-muted-foreground">Manage your food inventory</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setShowScanModal(true)}>
             <Camera className="h-4 w-4 mr-2" />
             Scan Receipt

@@ -26,7 +26,11 @@ import {
   Lightbulb,
   ChevronDown,
   ChevronUp,
+  Award,
+  ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { ACTION_CONFIG, INITIAL_TX_COUNT } from "../constants/gamification";
 
 interface PointsData {
@@ -70,6 +74,7 @@ interface LeaderboardEntry {
 }
 
 export default function EcoBoardPage() {
+  const navigate = useNavigate();
   const [pointsData, setPointsData] = useState<PointsData | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,10 +138,30 @@ export default function EcoBoardPage() {
 
   return (
       <div className="space-y-6">
+        <Button variant="ghost" onClick={() => navigate("/")}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold">EcoPoints</h1>
           <p className="text-muted-foreground">Track your sustainability journey</p>
         </div>
+
+        {/* View Badges Link */}
+        <Link
+          to="/badges"
+          className="flex items-center gap-3 p-4 rounded-xl bg-card border border-border
+                     active:scale-[0.98] transition-transform"
+        >
+          <div className="p-2.5 rounded-xl bg-purple-500/10">
+            <Award className="h-5 w-5 text-purple-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">View Badges</p>
+            <p className="text-xs text-muted-foreground">See your achievements and progress</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        </Link>
 
         {/* 2x2 Dashboard Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

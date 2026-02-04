@@ -49,6 +49,7 @@ async function request<T>(
     if (response.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
     }
     throw new ApiError(response.status, data.error || "Request failed");
   }

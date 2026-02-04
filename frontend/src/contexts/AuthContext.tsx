@@ -45,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      localStorage.removeItem("ecoplate_unread_count");
+    };
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("auth:unauthorized", handleUnauthorized);
+  }, []);
+
   const login = async (email: string, password: string) => {
     const response = await api.post<{
       user: User;
