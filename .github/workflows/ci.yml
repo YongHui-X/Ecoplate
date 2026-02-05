@@ -82,6 +82,124 @@ jobs:
       - run: bun install --ignore-scripts
       - run: cd frontend && bun run build
 
+  # ---------------------------------------------------------------------------
+  # Security Scanning Jobs
+  # ---------------------------------------------------------------------------
+
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: results.sarif
+          retention-days: 30
+
+  python-sast:
+    name: Python SAST (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Bandit
+        run: pip install bandit[toml]
+      - name: Run Bandit (JSON report)
+        run: |
+          bandit -r recommendation-engine/ \
+            -x recommendation-engine/test_app.py \
+            -f json -o bandit-report.json \
+            --severity-level medium || true
+      - name: Run Bandit (console output)
+        if: always()
+        run: |
+          bandit -r recommendation-engine/ \
+            -x recommendation-engine/test_app.py \
+            --severity-level medium || true
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+  python-deps:
+    name: Python Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Run pip-audit (JSON report)
+        run: |
+          pip-audit -r recommendation-engine/requirements.txt \
+            -f json -o pip-audit-report.json || true
+      - name: Run pip-audit (console output)
+        if: always()
+        run: pip-audit -r recommendation-engine/requirements.txt || true
+      - name: Upload pip-audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 30
+
+  js-deps:
+    name: JS Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install osv-scanner
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 \
+            -o /usr/local/bin/osv-scanner
+          chmod +x /usr/local/bin/osv-scanner
+      - name: Scan backend dependencies
+        run: |
+          osv-scanner --lockfile=package-lock.json:backend/package.json \
+            --json > osv-backend-report.json 2>&1 || true
+      - name: Scan frontend dependencies
+        run: |
+          osv-scanner --lockfile=package-lock.json:frontend/package.json \
+            --json > osv-frontend-report.json 2>&1 || true
+      - name: Display results
+        if: always()
+        run: |
+          echo "=== Backend Dependencies ==="
+          osv-scanner --lockfile=package-lock.json:backend/package.json || true
+          echo ""
+          echo "=== Frontend Dependencies ==="
+          osv-scanner --lockfile=package-lock.json:frontend/package.json || true
+      - name: Upload JS audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-audit-reports
+          path: |
+            osv-backend-report.json
+            osv-frontend-report.json
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Deployment Gate
+  # ---------------------------------------------------------------------------
+
   push-to-deployment:
     name: Push to Deployment
     needs:
@@ -91,6 +209,7 @@ jobs:
       - test-frontend
       - test-recommendation
       - build-check
+      - secret-scan
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

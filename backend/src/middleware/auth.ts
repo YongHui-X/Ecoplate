@@ -1,22 +1,15 @@
 import * as jose from "jose";
 import { error } from "../utils/router";
 
-// Validate JWT_SECRET is set in production
+// Validate JWT_SECRET is set
 function getJwtSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET;
-  const isProduction = process.env.NODE_ENV === "production";
-
-  if (!secret && isProduction) {
-    throw new Error("CRITICAL: JWT_SECRET environment variable must be set in production");
-  }
 
   if (!secret) {
-    console.warn("WARNING: Using development JWT secret. Set JWT_SECRET in production.");
+    throw new Error("JWT_SECRET environment variable is required. Set it in your .env file.");
   }
 
-  // Use a default only in development, and make it long enough
-  const secretValue = secret || "ecoplate-dev-secret-do-not-use-in-production-" + Date.now();
-  return new TextEncoder().encode(secretValue);
+  return new TextEncoder().encode(secret);
 }
 
 const JWT_SECRET = getJwtSecret();

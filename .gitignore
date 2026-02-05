@@ -18,6 +18,7 @@ backend/public/uploads/
 
 # Database (each developer maintains their own local database)
 *.db
+*.sqlite
 *.db-journal
 *.db-wal
 *.db-shm
@@ -61,9 +62,19 @@ __pycache__/
 
 # Misc
 docs/
+PRDs/
 *.pem
 .vercel
-.claude.md
+claude.md
+agents/
+design/
+hooks/
+mcp-configs/
+rules/
+scripts/
+skills/
+testimg/
+tests/
 
 # Mobile platforms
 android/

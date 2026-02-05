@@ -56,7 +56,7 @@ export function validateImage(file: File): { valid: boolean; error?: string } {
  */
 export function generateFilename(originalName: string): string {
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
+  const random = crypto.randomUUID();
   const ext = originalName.split(".").pop() || "jpg";
   return `${timestamp}-${random}.${ext}`;
 }

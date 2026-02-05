@@ -652,7 +652,7 @@ function ScanReceiptModal({
         setScannedItems(
           response.items.map((item) => ({
             ...item,
-            id: Math.random().toString(36).slice(2),
+            id: crypto.randomUUID(),
           }))
         );
 
@@ -1187,7 +1187,7 @@ function TrackConsumptionModal({
         // Add unique IDs to each ingredient for React keys
         const ingredientsWithIds = response.ingredients.map((ing) => ({
           ...ing,
-          id: Math.random().toString(36).slice(2),
+          id: crypto.randomUUID(),
         }));
 
         setIngredients(ingredientsWithIds);
@@ -1251,7 +1251,7 @@ function TrackConsumptionModal({
 
         // Convert waste items to editable format with productId
         const wasteItemsWithIds = response.wasteAnalysis.wasteItems.map((item) => ({
-          id: Math.random().toString(36).slice(2),
+          id: crypto.randomUUID(),
           productId: item.productId,
           productName: item.productName,
           quantity: item.quantityWasted,
@@ -1306,7 +1306,7 @@ function TrackConsumptionModal({
     setIngredients((prev) => [
       ...prev,
       {
-        id: Math.random().toString(36).slice(2),
+        id: crypto.randomUUID(),
         productId: 0,
         name: "",
         matchedProductName: "",
@@ -1333,7 +1333,7 @@ function TrackConsumptionModal({
     setEditableWasteItems((prev) => [
       ...prev,
       {
-        id: Math.random().toString(36).slice(2),
+        id: crypto.randomUUID(),
         productName: "",
         quantity: 1,
         category: "other",

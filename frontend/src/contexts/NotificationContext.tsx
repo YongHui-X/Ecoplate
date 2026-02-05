@@ -124,13 +124,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (isLoggedIn()) {
       refreshUnreadCount();
       // Also trigger a notification check on login
-      notificationService.triggerCheck().catch(() => {});
+      notificationService.triggerCheck().catch((err) => console.error("Notification check failed:", err));
     }
 
     // Listen for login event to refresh immediately
     const handleLogin = () => {
       refreshUnreadCount();
-      notificationService.triggerCheck().catch(() => {});
+      notificationService.triggerCheck().catch((err) => console.error("Notification check failed:", err));
     };
     window.addEventListener("auth:login", handleLogin);
 

@@ -57,9 +57,67 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ---------------------------------------------------------------------------
+  # Container Image Security Scanning
+  # ---------------------------------------------------------------------------
+
+  scan-images:
+    name: Container Image Scan (Trivy)
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull app image
+        run: docker pull ${{ env.APP_IMAGE }}:${{ github.sha }}
+
+      - name: Pull recommendation image
+        run: docker pull ${{ env.REC_IMAGE }}:${{ github.sha }}
+
+      - name: Scan app image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.APP_IMAGE }}:${{ github.sha }}
+          format: "table"
+          output: "trivy-app-report.txt"
+          severity: "HIGH,CRITICAL"
+          exit-code: "1"
+
+      - name: Scan recommendation image
+        if: success() || failure()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REC_IMAGE }}:${{ github.sha }}
+          format: "table"
+          output: "trivy-rec-report.txt"
+          severity: "HIGH,CRITICAL"
+          exit-code: "1"
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports
+          path: |
+            trivy-app-report.txt
+            trivy-rec-report.txt
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Deployment
+  # ---------------------------------------------------------------------------
+
   deploy:
     name: Deploy to EC2
-    needs: build-and-push
+    needs: scan-images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,3 +145,47 @@ jobs:
             export APP_IMAGE="${{ env.APP_IMAGE }}"
             export REC_IMAGE="${{ env.REC_IMAGE }}"
             bash deploy/deploy.sh
+
+  # ---------------------------------------------------------------------------
+  # Dynamic Application Security Testing (post-deploy)
+  # ---------------------------------------------------------------------------
+
+  zap-scan:
+    name: OWASP ZAP Baseline Scan
+    needs: deploy
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for deployment to stabilize
+        run: |
+          echo "Waiting 30 seconds for deployment to stabilize..."
+          sleep 30
+          for i in $(seq 1 10); do
+            if curl -sf http://${{ secrets.EC2_HOST }}:3000/api/v1/health > /dev/null 2>&1; then
+              echo "Application is healthy"
+              break
+            fi
+            echo "Attempt $i/10 - waiting..."
+            sleep 10
+          done
+
+      - name: Run ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: "http://${{ secrets.EC2_HOST }}:3000"
+          cmd_options: "-a"
+          allow_issue_writing: false
+        continue-on-error: true
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          retention-days: 30

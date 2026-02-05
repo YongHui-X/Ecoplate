@@ -354,13 +354,21 @@ For each item, determine its eco-focused sub-category (Ruminant meat, Non-rumina
       });
 
       // Parse ingredients JSON for each record
-      const formattedRecords = records.map((record) => ({
-        id: record.id,
-        rawPhoto: record.rawPhoto,
-        ingredients: JSON.parse(record.ingredients),
-        status: record.status,
-        createdAt: record.createdAt?.toISOString() || new Date().toISOString(),
-      }));
+      const formattedRecords = records.map((record) => {
+        let ingredients: unknown[] = [];
+        try {
+          ingredients = JSON.parse(record.ingredients);
+        } catch {
+          ingredients = [];
+        }
+        return {
+          id: record.id,
+          rawPhoto: record.rawPhoto,
+          ingredients,
+          status: record.status,
+          createdAt: record.createdAt?.toISOString() || new Date().toISOString(),
+        };
+      });
 
       return json(formattedRecords);
     } catch (e) {
@@ -407,10 +415,17 @@ For each item, determine its eco-focused sub-category (Ruminant meat, Non-rumina
         })
         .returning();
 
+      let parsedIngredients: unknown[] = [];
+      try {
+        parsedIngredients = JSON.parse(record.ingredients);
+      } catch {
+        parsedIngredients = [];
+      }
+
       return json({
         id: record.id,
         rawPhoto: record.rawPhoto,
-        ingredients: JSON.parse(record.ingredients),
+        ingredients: parsedIngredients,
         status: record.status,
         createdAt: record.createdAt?.toISOString() || new Date().toISOString(),
       });
@@ -467,10 +482,17 @@ For each item, determine its eco-focused sub-category (Ruminant meat, Non-rumina
         .where(eq(pendingConsumptionRecords.id, recordId))
         .returning();
 
+      let updatedIngredients: unknown[] = [];
+      try {
+        updatedIngredients = JSON.parse(updated.ingredients);
+      } catch {
+        updatedIngredients = [];
+      }
+
       return json({
         id: updated.id,
         rawPhoto: updated.rawPhoto,
-        ingredients: JSON.parse(updated.ingredients),
+        ingredients: updatedIngredients,
         status: updated.status,
         createdAt: updated.createdAt?.toISOString() || new Date().toISOString(),
       });

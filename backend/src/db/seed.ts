@@ -13,34 +13,36 @@ const db = drizzle(sqlite, { schema });
 console.log("Seeding database...\n");
 
 // Demo users
+const DEMO_PASSWORD = "demo123"; // NOSONAR — development-only seed data, not used in production
+
 const demoUsers = [
   {
     email: "alice@demo.com",
-    password: "demo123",
+    password: DEMO_PASSWORD,
     name: "Alice Wong",
     userLocation: "Queenstown, Singapore 169648",
   },
   {
     email: "bob@demo.com",
-    password: "demo123",
+    password: DEMO_PASSWORD,
     name: "Bob Tan",
     userLocation: "Clementi, Singapore 129588",
   },
   {
     email: "charlie@demo.com",
-    password: "demo123",
+    password: DEMO_PASSWORD,
     name: "Charlie Lim",
     userLocation: "Tampines, Singapore 529510",
   },
   {
     email: "diana@demo.com",
-    password: "demo123",
+    password: DEMO_PASSWORD,
     name: "Diana Chen",
     userLocation: "Jurong East, Singapore 609731",
   },
   {
     email: "evan@demo.com",
-    password: "demo123",
+    password: DEMO_PASSWORD,
     name: "Evan Ng",
     userLocation: "Bishan, Singapore 570283",
   },
