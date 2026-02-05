@@ -924,13 +924,10 @@ describe("TrackConsumptionModal", () => {
       expect(screen.getByText("2 ingredients added")).toBeInTheDocument();
     });
 
-    // Delete first ingredient
-    const deleteButtons = screen.getAllByRole("button").filter((btn) => {
-      return btn.querySelector("svg") && btn.closest(".bg-gray-50");
-    });
-    if (deleteButtons.length > 0) {
-      fireEvent.click(deleteButtons[0]);
-    }
+    // Delete first ingredient - find the delete button next to the ingredient input
+    const inputs = screen.getAllByPlaceholderText("Ingredient name");
+    const deleteBtn = inputs[0].parentElement?.querySelector("button");
+    if (deleteBtn) fireEvent.click(deleteBtn);
 
     await waitFor(() => {
       expect(screen.getByText("1 ingredient added")).toBeInTheDocument();
@@ -1136,7 +1133,7 @@ describe("TrackConsumptionModal", () => {
     });
   });
 
-  it("should show Back button on waste-input step", async () => {
+  it("should navigate to waste-input step after confirming ingredients", async () => {
     await openTrackModal();
     uploadFile();
 
@@ -1148,13 +1145,8 @@ describe("TrackConsumptionModal", () => {
     fireEvent.click(screen.getByText("Next"));
 
     await waitFor(() => {
-      expect(screen.getByText("Back to ingredients")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText("Back to ingredients"));
-
-    await waitFor(() => {
-      expect(screen.getByText("Review Ingredients")).toBeInTheDocument();
+      expect(screen.getByText("Capture Leftovers")).toBeInTheDocument();
+      expect(screen.getByText("Step 3 of 5 — Photo your plate after eating")).toBeInTheDocument();
     });
   });
 });
