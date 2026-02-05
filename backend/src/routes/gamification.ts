@@ -35,7 +35,10 @@ export function registerGamificationRoutes(router: Router) {
 
       // Map interactions to transaction like format, filtering out "add" entries
       const transactions = recentInteractions
-        .filter((i) => (i.type || "").toLowerCase() !== "add")
+        .filter((i) => {
+          const t = (i.type || "").toLowerCase();
+          return t !== "add" && t !== "shared";
+        })
         .map((i) => {
           const normalizedType = (i.type || "").toLowerCase() as keyof typeof POINT_VALUES;
           const baseAmount = POINT_VALUES[normalizedType] ?? 0;
@@ -48,7 +51,7 @@ export function registerGamificationRoutes(router: Router) {
             type: amount < 0 ? "penalty" : "earned",
             action: normalizedType,
             createdAt: i.todayDate,
-            productName: { sold: "Sold", consumed: "Consumed", wasted: "Wasted", shared: "Shared" }[normalizedType] ?? normalizedType,
+            productName: i.product?.productName || (({ sold: "Sold", consumed: "Consumed", wasted: "Wasted" } as Record<string, string>)[normalizedType] ?? normalizedType),
             quantity: i.quantity ?? 1,
             unit: i.product?.unit ?? "pcs",
           };

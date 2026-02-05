@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
@@ -6,7 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { cn } from "../lib/utils";
-import { User, MapPin, Mail, Bell, Clock, Award, Flame, AlertCircle } from "lucide-react";
+import { User, MapPin, Mail, Bell, Clock, Award, Flame, AlertCircle, Trophy, LogOut, ChevronRight } from "lucide-react";
 import { notificationService, NotificationPreferences } from "../services/notifications";
 
 // Predefined avatar options (same as RegisterPage)
@@ -22,8 +23,9 @@ const AVATAR_OPTIONS = [
 ];
 
 export default function AccountPage() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, logout } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
 
@@ -113,10 +115,21 @@ export default function AccountPage() {
     return avatar?.emoji || AVATAR_OPTIONS[0].emoji;
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  const mobileNavItems = [
+    { to: "/ecopoints", icon: Trophy, label: "EcoPoints", description: "View your eco impact", color: "bg-primary/10 text-primary" },
+    { to: "/badges", icon: Award, label: "Badges", description: "Achievements & milestones", color: "bg-accent/10 text-accent" },
+    { to: "/notifications", icon: Bell, label: "Notifications", description: "Alerts & updates", color: "bg-warning/10 text-warning" },
+  ];
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -124,8 +137,52 @@ export default function AccountPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
-        <p className="text-gray-500 mt-1">Manage your profile and preferences</p>
+        <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Account Settings</h1>
+        <p className="text-muted-foreground mt-1">Manage your profile and preferences</p>
+      </div>
+
+      {/* Mobile navigation hub - only visible on mobile */}
+      <div className="lg:hidden space-y-3">
+        {/* Compact profile card */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                {getAvatarEmoji(selectedAvatar)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-foreground truncate">{user.name}</h3>
+                <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Navigation menu */}
+        <Card>
+          <CardContent className="p-2">
+            {mobileNavItems.map((item, index) => (
+              <button
+                key={item.to}
+                onClick={() => navigate(item.to)}
+                className={cn(
+                  "flex items-center gap-3 w-full p-3 rounded-xl text-left transition-colors hover:bg-muted",
+                  index < mobileNavItems.length - 1 && "mb-1"
+                )}
+              >
+                <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", item.color)}>
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground">{item.label}</p>
+                  <p className="text-xs text-muted-foreground">{item.description}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -140,7 +197,7 @@ export default function AccountPage() {
               {getAvatarEmoji(selectedAvatar)}
             </div>
             <h3 className="font-semibold text-lg">{user.name}</h3>
-            <p className="text-sm text-gray-500">{user.email}</p>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
           </CardContent>
         </Card>
 
@@ -155,7 +212,7 @@ export default function AccountPage() {
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="name"
                     type="text"
@@ -171,22 +228,22 @@ export default function AccountPage() {
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
                     value={user.email}
-                    className="pl-10 bg-gray-50"
+                    className="pl-10 bg-muted"
                     disabled
                   />
                 </div>
-                <p className="text-xs text-gray-500">Email cannot be changed</p>
+                <p className="text-xs text-muted-foreground">Email cannot be changed</p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="userLocation">Location</Label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="userLocation"
                     type="text"
@@ -210,11 +267,11 @@ export default function AccountPage() {
                         "flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:scale-105",
                         selectedAvatar === avatar.id
                           ? "border-primary bg-primary/10"
-                          : "border-gray-200 hover:border-primary/50"
+                          : "border-border hover:border-primary/50"
                       )}
                     >
                       <span className="text-2xl mb-1">{avatar.emoji}</span>
-                      <span className="text-xs text-gray-600">{avatar.label}</span>
+                      <span className="text-xs text-muted-foreground">{avatar.label}</span>
                     </button>
                   ))}
                 </div>
@@ -242,8 +299,8 @@ export default function AccountPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
-                  <Clock className="h-5 w-5 text-orange-500" />
+                <div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-warning" />
                 </div>
                 <div>
                   <p className="font-medium">Expiring Products</p>
@@ -269,8 +326,8 @@ export default function AccountPage() {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                  <Award className="h-5 w-5 text-green-500" />
+                <div className="h-10 w-10 rounded-full bg-success/10 flex items-center justify-center">
+                  <Award className="h-5 w-5 text-success" />
                 </div>
                 <div>
                   <p className="font-medium">Badge Unlocked</p>
@@ -407,6 +464,15 @@ export default function AccountPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Logout button - mobile only, at the very bottom */}
+      <button
+        onClick={handleLogout}
+        className="lg:hidden flex items-center gap-3 w-full p-4 rounded-2xl border border-destructive/20 bg-destructive/5 text-destructive transition-colors hover:bg-destructive/10"
+      >
+        <LogOut className="h-5 w-5" />
+        <span className="font-medium">Log Out</span>
+      </button>
     </div>
   );
 }

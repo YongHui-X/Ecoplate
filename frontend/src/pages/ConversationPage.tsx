@@ -150,7 +150,7 @@ export default function ConversationPage() {
         </Button>
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-gray-500">Conversation not found</p>
+            <p className="text-muted-foreground">Conversation not found</p>
           </CardContent>
         </Card>
       </div>
@@ -170,9 +170,9 @@ export default function ConversationPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header with Product Card */}
-      <Card className={`mb-4 ${newMessageAlert ? "ring-2 ring-primary animate-pulse" : ""}`}>
-        <CardHeader className="py-3 px-4">
-          <div className="flex items-start gap-4">
+      <Card className={`mb-3 ${newMessageAlert ? "ring-2 ring-primary animate-pulse" : ""}`}>
+        <CardHeader className="py-3 px-4 space-y-3">
+          <div className="flex items-center gap-3">
             {/* Back Button */}
             <Button
               variant="ghost"
@@ -184,7 +184,7 @@ export default function ConversationPage() {
             </Button>
 
             {/* Product Image */}
-            <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+            <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-muted shrink-0">
               {thumbnailUrl ? (
                 <img
                   src={thumbnailUrl}
@@ -193,7 +193,7 @@ export default function ConversationPage() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Package className="h-6 w-6 text-gray-400" />
+                  <Package className="h-6 w-6 text-muted-foreground" />
                 </div>
               )}
               {isArchived && (
@@ -220,7 +220,7 @@ export default function ConversationPage() {
                   )}
                 </Badge>
                 {isArchived && (
-                  <Badge variant="outline" className="text-xs bg-gray-100">
+                  <Badge variant="outline" className="text-xs bg-muted">
                     Archived
                   </Badge>
                 )}
@@ -230,13 +230,13 @@ export default function ConversationPage() {
                   </span>
                 )}
               </div>
-              <h2 className="font-semibold truncate mt-1">{conversation.listing.title}</h2>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span>with {otherUser.name}</span>
+              <h2 className="font-semibold text-sm truncate mt-1">{conversation.listing.title}</h2>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <span className="truncate">with {otherUser.name}</span>
                 {conversation.listing.price !== null && (
                   <>
-                    <span>-</span>
-                    <span className="font-medium">
+                    <span className="shrink-0">·</span>
+                    <span className="font-medium shrink-0 text-foreground">
                       {conversation.listing.price === 0
                         ? "Free"
                         : `$${conversation.listing.price.toFixed(2)}`}
@@ -245,26 +245,27 @@ export default function ConversationPage() {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" asChild>
-                <Link to={`/marketplace/${conversation.listingId}`}>
-                  <ExternalLink className="h-4 w-4" />
-                </Link>
+          {/* Action Buttons - separate row to prevent overlap on mobile */}
+          <div className="flex items-center gap-2 justify-end">
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/marketplace/${conversation.listingId}`}>
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                View Listing
+              </Link>
+            </Button>
+            {isSeller && !isArchived && (
+              <Button
+                size="sm"
+                onClick={handleMarkAsSold}
+                disabled={markingSold}
+                className="bg-success text-success-foreground hover:bg-success/90"
+              >
+                <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                Mark Sold
               </Button>
-              {isSeller && !isArchived && (
-                <Button
-                  size="sm"
-                  onClick={handleMarkAsSold}
-                  disabled={markingSold}
-                  className="bg-success text-success-foreground hover:bg-success/90"
-                >
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  Mark Sold
-                </Button>
-              )}
-            </div>
+            )}
           </div>
         </CardHeader>
       </Card>
@@ -273,7 +274,7 @@ export default function ConversationPage() {
       <Card className="flex-1 overflow-hidden flex flex-col">
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
           {sortedMessages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="flex items-center justify-center h-full text-muted-foreground">
               <p>No messages yet. Start the conversation!</p>
             </div>
           ) : (
@@ -299,7 +300,7 @@ export default function ConversationPage() {
                       "text-xs mt-1",
                       msg.userId === user?.id
                         ? "text-primary-foreground/70"
-                        : "text-gray-500"
+                        : "text-muted-foreground"
                     )}
                   >
                     {formatTime(msg.createdAt)}
@@ -313,8 +314,8 @@ export default function ConversationPage() {
 
         {/* Message Input */}
         {isArchived ? (
-          <div className="border-t p-4 bg-gray-50">
-            <p className="text-center text-sm text-gray-500">
+          <div className="border-t p-4 bg-muted">
+            <p className="text-center text-sm text-muted-foreground">
               This conversation is archived because the listing has been sold.
             </p>
           </div>

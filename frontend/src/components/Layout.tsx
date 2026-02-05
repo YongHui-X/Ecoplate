@@ -92,7 +92,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden max-w-full">
       {/* Mobile header - with notification bell */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b px-4 py-3 safe-area-top">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <span className="text-lg font-semibold text-foreground truncate flex-1 min-w-0">{pageTitle}</span>
           <NotificationBell />
@@ -165,7 +165,7 @@ export default function Layout() {
 
         {/* Main content - adjusted for mobile header and bottom tabs, with left margin for fixed sidebar */}
         <main className="flex-1 min-h-screen lg:ml-64 overflow-x-hidden">
-          <div className="pt-[calc(env(safe-area-inset-top,0px)+56px)] pb-[calc(env(safe-area-inset-bottom,0px)+72px)] lg:pt-8 lg:pb-8 px-4 lg:px-10">
+          <div className="pt-[calc(env(safe-area-inset-top,0px)+80px)] pb-[calc(env(safe-area-inset-bottom,0px)+72px)] lg:pt-8 lg:pb-8 px-4 lg:px-10">
             <Outlet />
           </div>
         </main>

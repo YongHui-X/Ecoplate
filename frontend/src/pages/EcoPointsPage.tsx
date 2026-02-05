@@ -282,7 +282,7 @@ export default function EcoBoardPage() {
 
                                 <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-0.5 sm:mb-1 gap-2">
-                                <span className="font-medium text-foreground text-xs sm:text-sm truncate">
+                                <span className="font-medium text-foreground text-xs sm:text-sm">
                                   {entry.name}
                                 </span>
                                     <span className={`font-bold text-xs sm:text-sm flex-shrink-0 ${entry.rawValue >= 0 ?
@@ -449,7 +449,7 @@ export default function EcoBoardPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                               <p className="font-medium text-xs sm:text-sm text-foreground truncate">
-                                  {tx.productName}
+                                  {config?.label || tx.action}
                               </p>
                               <p className="text-[10px] sm:text-xs text-muted-foreground">
                                   {tx.quantity} {tx.unit} &middot;{" "}

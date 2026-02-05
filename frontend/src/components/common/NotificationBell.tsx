@@ -128,7 +128,7 @@ export default function NotificationBell() {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl hover:bg-muted transition-colors flex-shrink-0"
+        className="relative p-2.5 rounded-xl hover:bg-muted transition-colors flex-shrink-0"
         aria-label="Notifications"
       >
         <Bell className="h-5 w-5 text-muted-foreground" />

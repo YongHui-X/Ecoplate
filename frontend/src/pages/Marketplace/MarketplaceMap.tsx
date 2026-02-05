@@ -69,7 +69,6 @@ export default function MarketplaceMap({
   const [radiusKm, setRadiusKm] = useState<number>(5);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [locationAttempted, setLocationAttempted] = useState(false);
 
   // Filter listings by radius only if user location is available
   const displayListings = useMemo(() => {
@@ -196,13 +195,13 @@ export default function MarketplaceMap({
           fillOpacity: 0.1,
         });
       }
-    } else if (locationAttempted) {
+    } else {
       // No location - hide user marker and circle, fit to all listings
       userMarkerRef.current?.setMap(null);
       circleRef.current?.setMap(null);
       fitMapToListings();
     }
-  }, [userLocation, radiusKm, isLoaded, locationAttempted, fitMapToListings]);
+  }, [userLocation, radiusKm, isLoaded, fitMapToListings]);
 
   // Update radius circle when radius changes
   useEffect(() => {
@@ -252,8 +251,10 @@ export default function MarketplaceMap({
   }, [displayListings, navigate]);
 
   useEffect(() => {
-    updateMarkers();
-  }, [updateMarkers]);
+    if (isLoaded) {
+      updateMarkers();
+    }
+  }, [updateMarkers, isLoaded]);
 
   // Request location on mount
   useEffect(() => {
@@ -262,7 +263,6 @@ export default function MarketplaceMap({
       if (hasPermission) {
         await getCurrentPosition();
       }
-      setLocationAttempted(true);
     };
 
     initLocation();
