@@ -131,8 +131,8 @@ wait_for_health() {
 switch_nginx() {
     local env="$1"
     log "Switching Nginx upstream to ${env}..."
-    cp "${DEPLOY_DIR}/nginx-upstream-${env}.conf" "$NGINX_UPSTREAM"
-    nginx -t && nginx -s reload
+    sudo cp "${DEPLOY_DIR}/nginx-upstream-${env}.conf" "$NGINX_UPSTREAM"
+    sudo nginx -t && sudo nginx -s reload
     log "Nginx now pointing to ${env}"
 }
 
