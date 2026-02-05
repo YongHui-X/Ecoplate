@@ -2,6 +2,7 @@ import { db } from "../index";
 import * as schema from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import { getOrCreateUserPoints } from "./gamification-service";
+import { notifyBadgeUnlocked } from "./notification-service";
 
 // ==================== Types ====================
 
@@ -351,6 +352,13 @@ export async function checkAndAwardBadges(
       }
 
       newlyAwarded.push({
+        code: def.code,
+        name: def.name,
+        pointsAwarded: dbBadge.pointsAwarded,
+      });
+
+      // Send notification for badge unlock
+      await notifyBadgeUnlocked(userId, {
         code: def.code,
         name: def.name,
         pointsAwarded: dbBadge.pointsAwarded,

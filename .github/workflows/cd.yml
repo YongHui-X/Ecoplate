@@ -1,0 +1,89 @@
+name: CD
+
+on:
+  push:
+    branches: [deployment]
+
+concurrency:
+  group: cd-deployment
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  APP_IMAGE: ghcr.io/${{ github.repository_owner }}/ecoplate-app
+  REC_IMAGE: ghcr.io/${{ github.repository_owner }}/ecoplate-recommendation
+
+jobs:
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.APP_IMAGE }}:${{ github.sha }}
+            ${{ env.APP_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push recommendation image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./recommendation-engine
+          file: ./recommendation-engine/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REC_IMAGE }}:${{ github.sha }}
+            ${{ env.REC_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy deploy files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy/*"
+          target: /ecoplate/
+          strip_components: 0
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GHCR_DEPLOY_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_DEPLOY_USER }}" --password-stdin
+            cd /ecoplate
+            export IMAGE_TAG="${{ github.sha }}"
+            export APP_IMAGE="${{ env.APP_IMAGE }}"
+            export REC_IMAGE="${{ env.REC_IMAGE }}"
+            bash deploy/deploy.sh

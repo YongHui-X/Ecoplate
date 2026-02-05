@@ -6,7 +6,8 @@ import { hashPassword } from "../middleware/auth";
 import { BADGE_DEFINITIONS } from "../services/badge-service";
 import { calculateCo2Saved } from "../utils/co2-calculator";
 
-const sqlite = new Database("ecoplate.db");
+const dbPath = process.env.DATABASE_PATH || "ecoplate.db";
+const sqlite = new Database(dbPath);
 const db = drizzle(sqlite, { schema });
 
 console.log("Seeding database...\n");
@@ -704,10 +705,23 @@ async function seed() {
       { title: "Ice Cream Tubs", price: 8.0, daysAgo: 160, sellerIndex: 4 },
     ];
 
-    for (const item of soldItems) {
+    // Varying discount multipliers so distribution isn't all 50%
+    const discountMultipliers = [1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 3.0, 3.5, 4.0];
+
+    for (let i = 0; i < soldItems.length; i++) {
+      const item = soldItems[i];
       const seller = createdUsers[item.sellerIndex];
       const completedDate = new Date();
       completedDate.setDate(completedDate.getDate() - item.daysAgo);
+
+      // createdAt must be BEFORE completedAt (listed 1-14 days before sold)
+      const listingDuration = Math.floor(Math.random() * 13) + 1; // 1-14 days
+      const createdDate = new Date(completedDate);
+      createdDate.setDate(createdDate.getDate() - listingDuration);
+
+      // Varying originalPrice for realistic discount distribution
+      const multiplier = discountMultipliers[i % discountMultipliers.length];
+      const originalPrice = Math.round(item.price * multiplier * 100) / 100;
 
       // Calculate CO2 saved for sold items
       const co2Saved = calculateCo2Saved(1, "pcs", "pantry");
@@ -720,8 +734,9 @@ async function seed() {
         quantity: 1,
         unit: "pcs",
         price: item.price,
-        originalPrice: item.price * 2,
+        originalPrice,
         status: "sold",
+        createdAt: createdDate,
         completedAt: completedDate,
         pickupLocation: "Singapore",
         co2Saved,

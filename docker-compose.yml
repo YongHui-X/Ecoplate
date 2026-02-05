@@ -17,7 +17,7 @@ services:
       - PORT=3000
       - JWT_SECRET=${JWT_SECRET}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DATABASE_URL=file:/app/data/ecoplate.db
+      - DATABASE_PATH=/app/data/ecoplate.db
       - RECOMMENDATION_ENGINE_URL=http://recommendation-engine:5000
     volumes:
       - ecoplate-data:/app/data

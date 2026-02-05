@@ -55,8 +55,12 @@ npm-debug.log*
 
 # Testing
 coverage/
+.coverage
+__pycache__/
+*.pyc
 
 # Misc
+docs/
 *.pem
 .vercel
 .claude.md
@@ -70,3 +74,7 @@ design/
 backend/db-full-reset.ts
 backend/db-reset.ts
 backend/test-db.ts
+
+# Deploy secrets and state
+deploy/.env
+deploy/.active-env

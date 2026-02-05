@@ -2,7 +2,8 @@ import { Database } from "bun:sqlite";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 
-const sqlite = new Database("ecoplate.db");
+const dbPath = process.env.DATABASE_PATH || "ecoplate.db";
+const sqlite = new Database(dbPath);
 
 async function migrate() {
   console.log("Running database migrations...");

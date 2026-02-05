@@ -1,0 +1,52 @@
+services:
+  ecoplate-green:
+    image: ${APP_IMAGE}:${IMAGE_TAG:-latest}
+    container_name: ecoplate-green
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DATABASE_PATH=/app/data/ecoplate.db
+      - RECOMMENDATION_ENGINE_URL=http://recommendation-green:5000
+    volumes:
+      - ecoplate-data:/app/data
+    depends_on:
+      recommendation-green:
+        condition: service_healthy
+    networks:
+      - ecoplate-green-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  recommendation-green:
+    image: ${REC_IMAGE}:${IMAGE_TAG:-latest}
+    container_name: recommendation-green
+    restart: unless-stopped
+    ports:
+      - "5002:5000"
+    environment:
+      - PORT=5000
+      - FLASK_ENV=production
+    networks:
+      - ecoplate-green-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  ecoplate-green-net:
+    driver: bridge
+
+volumes:
+  ecoplate-data:
+    external: true

@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-backend:
+    name: Typecheck Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1"
+      - run: bun install --ignore-scripts
+      - run: cd backend && bunx tsc --noEmit
+
+  typecheck-frontend:
+    name: Typecheck Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1"
+      - run: bun install --ignore-scripts
+      - run: cd frontend && bunx tsc --noEmit
+
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1"
+      - run: bun install --ignore-scripts
+      - run: cd backend && bun test
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1"
+      - run: bun install --ignore-scripts
+      - run: cd frontend && bun run test:run
+
+  test-recommendation:
+    name: Test Recommendation Engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          cd recommendation-engine
+          pip install -r requirements.txt
+          pip install pytest
+          pytest test_app.py -v
+
+  build-check:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1"
+      - run: bun install --ignore-scripts
+      - run: cd frontend && bun run build
+
+  push-to-deployment:
+    name: Push to Deployment
+    needs:
+      - typecheck-backend
+      - typecheck-frontend
+      - test-backend
+      - test-frontend
+      - test-recommendation
+      - build-check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push main to deployment branch
+        run: |
+          git push origin HEAD:refs/heads/deployment --force

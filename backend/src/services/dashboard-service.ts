@@ -1,37 +1,73 @@
 import { db } from "../index";
-import { eq, sql, and, gte } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import * as schema from "../db/schema";
 
 type Period = "day" | "month" | "annual";
+
+const CATEGORY_CO2_FACTORS: Record<string, number> = {
+  meat: 27.0,
+  dairy: 3.2,
+  produce: 1.5,
+  vegetables: 2.0,
+  fruits: 1.1,
+  grains: 1.4,
+  pantry: 1.5,
+  seafood: 6.1,
+  bakery: 1.3,
+  beverages: 0.8,
+  other: 2.5,
+};
+
+function normalizeCategory(category: string | null): string {
+  if (!category) return "other";
+  return category.toLowerCase().trim();
+}
+
+function capitalizeCategory(category: string | null): string {
+  const raw = category || "other";
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+}
 
 function getDateRange(period: Period): Date {
   const now = new Date();
   switch (period) {
     case "day":
-      return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30); // last 30 days
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
     case "month":
-      return new Date(now.getFullYear() - 1, now.getMonth(), 1); // last 12 months
+      return new Date(now.getFullYear() - 1, now.getMonth(), 1);
     case "annual":
-      return new Date(now.getFullYear() - 5, 0, 1); // last 5 years
+      return new Date(2000, 0, 1);
   }
 }
 
 function formatDate(date: Date, period: Period): string {
   switch (period) {
     case "day":
-      return date.toISOString().slice(0, 10); // YYYY-MM-DD
+      return date.toISOString().slice(0, 10);
     case "month":
-      return date.toISOString().slice(0, 7); // YYYY-MM
+      return date.toISOString().slice(0, 7);
     case "annual":
       return date.getFullYear().toString();
   }
 }
 
-export async function getDashboardStats(userId: number, period: Period = "month") {
-  const rangeStart = getDateRange(period);
-  const rangeStartStr = rangeStart.toISOString().slice(0, 10); // YYYY-MM-DD format
+function parseMetricDate(todayDate: string): Date {
+  return new Date(todayDate);
+}
 
-  // Get sustainability metrics for this user
+function toDateString(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// ==================== Summary Stats ====================
+
+export async function getDashboardStats(
+  userId: number,
+  period: Period = "month"
+) {
+  const rangeStart = getDateRange(period);
+  const rangeStartStr = toDateString(rangeStart);
+
   const metrics = db
     .select()
     .from(schema.productSustainabilityMetrics)
@@ -43,14 +79,12 @@ export async function getDashboardStats(userId: number, period: Period = "month"
     )
     .all();
 
-  // Get products for co2 data
   const products = db
     .select()
     .from(schema.products)
     .where(eq(schema.products.userId, userId))
     .all();
 
-  // Get sold listings for money saved (filtered by date range)
   const soldListings = db
     .select()
     .from(schema.marketplaceListings)
@@ -63,38 +97,56 @@ export async function getDashboardStats(userId: number, period: Period = "month"
     )
     .all();
 
-  // Calculate summary stats — consumed, sold, shared all count as food saved
   const positiveMetrics = metrics.filter(
-    (m) => m.type === "consumed" || m.type === "sold" || m.type === "shared"
+    (m) => m.type && ["consumed", "sold", "shared"].includes(m.type)
   );
 
-  // CO2 from products linked to positive metrics, proportional to quantity used
   let totalCo2Reduced = 0;
   const productMap = new Map(products.map((p) => [p.id, p]));
   for (const m of positiveMetrics) {
-    if (m.productId == null || m.quantity == null) continue;
+    if (m.productId == null) continue;
     const product = productMap.get(m.productId);
-    if (product?.co2Emission && product.quantity > 0) {
-      totalCo2Reduced += product.co2Emission * (m.quantity / product.quantity);
+    if (!product) continue;
+    const mQuantity = m.quantity ?? 0;
+    let co2: number;
+    if (product.co2Emission && product.quantity > 0) {
+      co2 = product.co2Emission * (mQuantity / product.quantity);
+    } else {
+      const cat = normalizeCategory(product.category);
+      const factor = CATEGORY_CO2_FACTORS[cat] ?? CATEGORY_CO2_FACTORS["other"];
+      co2 = factor * mQuantity;
     }
+    totalCo2Reduced += co2;
   }
 
-  const totalFoodSaved = positiveMetrics.reduce((sum, m) => sum + (m.quantity ?? 0), 0);
-  const totalMoneySaved = soldListings.reduce((sum, l) => sum + (l.price || 0), 0);
-  // const ecoPointsEarned = positiveMetrics.length * 10 + soldListings.length * 25;
+  const totalFoodSaved = positiveMetrics.reduce(
+    (sum, m) => sum + (m.quantity ?? 0),
+    0
+  );
+  const totalMoneySaved = soldListings.reduce(
+    (sum, l) => sum + (l.price || 0),
+    0
+  );
 
-  // Build chart data grouped by period
   const co2Map = new Map<string, number>();
   const foodMap = new Map<string, number>();
 
   for (const m of positiveMetrics) {
-    const dateObj = new Date(m.todayDate);
+    const dateObj = parseMetricDate(m.todayDate);
     const dateKey = formatDate(dateObj, period);
-    const product = m.productId != null ? productMap.get(m.productId) : undefined;
+    const product =
+      m.productId != null ? productMap.get(m.productId) : undefined;
     const mQuantity = m.quantity ?? 0;
-    const co2 = (product?.co2Emission && product.quantity > 0)
-      ? product.co2Emission * (mQuantity / product.quantity)
-      : 0;
+    let co2: number;
+    if (product?.co2Emission && product.quantity > 0) {
+      co2 = product.co2Emission * (mQuantity / product.quantity);
+    } else if (product) {
+      const cat = normalizeCategory(product.category);
+      const factor = CATEGORY_CO2_FACTORS[cat] ?? CATEGORY_CO2_FACTORS["other"];
+      co2 = factor * mQuantity;
+    } else {
+      co2 = CATEGORY_CO2_FACTORS["other"] * mQuantity;
+    }
 
     co2Map.set(dateKey, (co2Map.get(dateKey) || 0) + co2);
     foodMap.set(dateKey, (foodMap.get(dateKey) || 0) + mQuantity);
@@ -108,7 +160,6 @@ export async function getDashboardStats(userId: number, period: Period = "month"
     .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Impact equivalence
   const impactEquivalence = {
     carKmAvoided: Math.round(totalCo2Reduced * 6.0 * 10) / 10,
     treesPlanted: Math.round((totalCo2Reduced / 21.0) * 10) / 10,
@@ -120,10 +171,376 @@ export async function getDashboardStats(userId: number, period: Period = "month"
       totalCo2Reduced: Math.round(totalCo2Reduced * 100) / 100,
       totalFoodSaved: Math.round(totalFoodSaved * 100) / 100,
       totalMoneySaved: Math.round(totalMoneySaved * 100) / 100,
-      // ecoPointsEarned,
     },
     co2ChartData,
     foodChartData,
     impactEquivalence,
+  };
+}
+
+// ==================== CO2 Stats ====================
+
+export async function getCO2Stats(userId: number, period: Period = "month") {
+  const rangeStart = getDateRange(period);
+  const rangeStartStr = toDateString(rangeStart);
+
+  const metrics = db
+    .select()
+    .from(schema.productSustainabilityMetrics)
+    .where(
+      and(
+        eq(schema.productSustainabilityMetrics.userId, userId),
+        gte(schema.productSustainabilityMetrics.todayDate, rangeStartStr)
+      )
+    )
+    .all();
+
+  const products = db
+    .select()
+    .from(schema.products)
+    .where(eq(schema.products.userId, userId))
+    .all();
+
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
+  const positiveMetrics = metrics.filter(
+    (m) => m.type && ["consumed", "sold", "shared"].includes(m.type)
+  );
+
+  const categoryMap = new Map<string, number>();
+  let totalCo2 = 0;
+
+  for (const m of positiveMetrics) {
+    if (m.productId == null) continue;
+    const product = productMap.get(m.productId);
+    if (!product) continue;
+    const mQuantity = m.quantity ?? 0;
+    let co2: number;
+    if (product.co2Emission && product.quantity > 0) {
+      co2 = product.co2Emission * (mQuantity / product.quantity);
+    } else {
+      const cat = normalizeCategory(product.category);
+      const factor = CATEGORY_CO2_FACTORS[cat] ?? CATEGORY_CO2_FACTORS["other"];
+      co2 = factor * mQuantity;
+    }
+    totalCo2 += co2;
+    const catLabel = capitalizeCategory(product.category);
+    categoryMap.set(catLabel, (categoryMap.get(catLabel) || 0) + co2);
+  }
+
+  const trendMap = new Map<string, number>();
+  for (const m of positiveMetrics) {
+    const dateObj = parseMetricDate(m.todayDate);
+    const dateKey = formatDate(dateObj, period);
+    const product =
+      m.productId != null ? productMap.get(m.productId) : undefined;
+    const mQuantity = m.quantity ?? 0;
+    let co2: number;
+    if (product?.co2Emission && product.quantity > 0) {
+      co2 = product.co2Emission * (mQuantity / product.quantity);
+    } else if (product) {
+      const cat = normalizeCategory(product.category);
+      const factor = CATEGORY_CO2_FACTORS[cat] ?? CATEGORY_CO2_FACTORS["other"];
+      co2 = factor * mQuantity;
+    } else {
+      co2 = CATEGORY_CO2_FACTORS["other"] * mQuantity;
+    }
+    trendMap.set(dateKey, (trendMap.get(dateKey) || 0) + co2);
+  }
+
+  const itemCo2 = new Map<string, number>();
+  for (const m of positiveMetrics) {
+    if (m.productId == null) continue;
+    const product = productMap.get(m.productId);
+    if (!product) continue;
+    const mQuantity = m.quantity ?? 0;
+    let co2: number;
+    if (product.co2Emission && product.quantity > 0) {
+      co2 = product.co2Emission * (mQuantity / product.quantity);
+    } else {
+      const cat = normalizeCategory(product.category);
+      co2 =
+        (CATEGORY_CO2_FACTORS[cat] ?? CATEGORY_CO2_FACTORS["other"]) *
+        mQuantity;
+    }
+    const name = product.productName;
+    itemCo2.set(name, (itemCo2.get(name) || 0) + co2);
+  }
+
+  const co2ByCategory = Array.from(categoryMap.entries())
+    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+    .sort((a, b) => b.value - a.value);
+
+  const co2Trend = Array.from(trendMap.entries())
+    .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const topItems = Array.from(itemCo2.entries())
+    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+  const impactEquivalence = {
+    carKmAvoided: Math.round(totalCo2 * 6.0 * 10) / 10,
+    treesPlanted: Math.round((totalCo2 / 21.0) * 10) / 10,
+    electricitySaved: Math.round(totalCo2 * 3.6 * 10) / 10,
+  };
+
+  return {
+    totalCo2Reduced: Math.round(totalCo2 * 100) / 100,
+    co2ByCategory,
+    co2Trend,
+    topItems,
+    impactEquivalence,
+  };
+}
+
+// ==================== Financial Stats ====================
+
+export async function getFinancialStats(
+  userId: number,
+  period: Period = "month"
+) {
+  const rangeStart = getDateRange(period);
+
+  const soldListings = db
+    .select()
+    .from(schema.marketplaceListings)
+    .where(
+      and(
+        eq(schema.marketplaceListings.sellerId, userId),
+        eq(schema.marketplaceListings.status, "sold"),
+        gte(schema.marketplaceListings.completedAt, rangeStart)
+      )
+    )
+    .all();
+
+  const purchasedListings = db
+    .select()
+    .from(schema.marketplaceListings)
+    .where(
+      and(
+        eq(schema.marketplaceListings.buyerId, userId),
+        eq(schema.marketplaceListings.status, "sold"),
+        gte(schema.marketplaceListings.completedAt, rangeStart)
+      )
+    )
+    .all();
+
+  const totalEarned = soldListings.reduce((sum, l) => sum + (l.price || 0), 0);
+  const totalSpent = purchasedListings.reduce(
+    (sum, l) => sum + (l.price || 0),
+    0
+  );
+  const totalSavedByBuying = purchasedListings.reduce((sum, l) => {
+    const orig = l.originalPrice || 0;
+    const actual = l.price || 0;
+    return sum + Math.max(0, orig - actual);
+  }, 0);
+
+  const savingsMap = new Map<string, number>();
+  for (const l of soldListings) {
+    if (!l.completedAt) continue;
+    const dateKey = formatDate(l.completedAt, period);
+    savingsMap.set(dateKey, (savingsMap.get(dateKey) || 0) + (l.price || 0));
+  }
+
+  const savingsOverTime = Array.from(savingsMap.entries())
+    .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const priceComparison = soldListings
+    .filter((l) => l.originalPrice && l.price)
+    .slice(0, 10)
+    .map((l) => ({
+      name: l.title.length > 15 ? l.title.slice(0, 15) + "..." : l.title,
+      originalPrice: Math.round((l.originalPrice || 0) * 100) / 100,
+      sellingPrice: Math.round((l.price || 0) * 100) / 100,
+    }));
+
+  const discountBuckets: Record<string, number> = {
+    "0-20%": 0,
+    "20-40%": 0,
+    "40-60%": 0,
+    "60-80%": 0,
+    "80-100%": 0,
+  };
+  for (const l of soldListings) {
+    if (!l.originalPrice || !l.price || l.originalPrice === 0) continue;
+    const discount = ((l.originalPrice - l.price) / l.originalPrice) * 100;
+    if (discount < 20) discountBuckets["0-20%"]++;
+    else if (discount < 40) discountBuckets["20-40%"]++;
+    else if (discount < 60) discountBuckets["40-60%"]++;
+    else if (discount < 80) discountBuckets["60-80%"]++;
+    else discountBuckets["80-100%"]++;
+  }
+
+  const discountDistribution = Object.entries(discountBuckets).map(
+    ([range, count]) => ({ range, count })
+  );
+
+  const speedBuckets: Record<string, number> = {
+    "< 1 day": 0,
+    "1-3 days": 0,
+    "3-7 days": 0,
+    "1-2 weeks": 0,
+    "2+ weeks": 0,
+  };
+  for (const l of soldListings) {
+    if (!l.completedAt || !l.createdAt) continue;
+    const hoursToSell = Math.max(
+      0,
+      (l.completedAt.getTime() - l.createdAt.getTime()) / (1000 * 60 * 60)
+    );
+    if (hoursToSell < 24) speedBuckets["< 1 day"]++;
+    else if (hoursToSell < 72) speedBuckets["1-3 days"]++;
+    else if (hoursToSell < 168) speedBuckets["3-7 days"]++;
+    else if (hoursToSell < 336) speedBuckets["1-2 weeks"]++;
+    else speedBuckets["2+ weeks"]++;
+  }
+
+  const salesSpeed = Object.entries(speedBuckets).map(([range, count]) => ({
+    range,
+    count,
+  }));
+
+  let avgTimeToSell = 0;
+  const validSoldListings = soldListings.filter(
+    (l) => l.completedAt && l.createdAt && l.completedAt >= l.createdAt
+  );
+  if (validSoldListings.length > 0) {
+    const totalHours = validSoldListings.reduce((sum, l) => {
+      return (
+        sum +
+        (l.completedAt!.getTime() - l.createdAt.getTime()) / (1000 * 60 * 60)
+      );
+    }, 0);
+    avgTimeToSell =
+      Math.round((totalHours / validSoldListings.length) * 10) / 10;
+  }
+
+  return {
+    totalEarned: Math.round(totalEarned * 100) / 100,
+    totalSpent: Math.round(totalSpent * 100) / 100,
+    totalSavedByBuying: Math.round(totalSavedByBuying * 100) / 100,
+    totalListingsSold: soldListings.length,
+    totalPurchases: purchasedListings.length,
+    avgTimeToSell,
+    savingsOverTime,
+    priceComparison,
+    discountDistribution,
+    salesSpeed,
+  };
+}
+
+// ==================== Food Stats ====================
+
+export async function getFoodStats(userId: number, period: Period = "month") {
+  const rangeStart = getDateRange(period);
+  const rangeStartStr = toDateString(rangeStart);
+
+  const metrics = db
+    .select()
+    .from(schema.productSustainabilityMetrics)
+    .where(
+      and(
+        eq(schema.productSustainabilityMetrics.userId, userId),
+        gte(schema.productSustainabilityMetrics.todayDate, rangeStartStr)
+      )
+    )
+    .all();
+
+  const products = db
+    .select()
+    .from(schema.products)
+    .where(eq(schema.products.userId, userId))
+    .all();
+
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
+  const consumed = metrics.filter((m) => m.type === "consumed");
+  const wasted = metrics.filter((m) => m.type === "wasted");
+  const shared = metrics.filter((m) => m.type === "shared");
+  const sold = metrics.filter((m) => m.type === "sold");
+
+  const totalConsumed = consumed.reduce(
+    (sum, m) => sum + (m.quantity ?? 0),
+    0
+  );
+  const totalWasted = wasted.reduce((sum, m) => sum + (m.quantity ?? 0), 0);
+  const totalShared = shared.reduce((sum, m) => sum + (m.quantity ?? 0), 0);
+  const totalSold = sold.reduce((sum, m) => sum + (m.quantity ?? 0), 0);
+  const totalFood = totalConsumed + totalWasted + totalShared + totalSold;
+
+  const wasteRate =
+    totalFood > 0 ? Math.round((totalWasted / totalFood) * 1000) / 10 : 0;
+
+  const categoryMap = new Map<string, number>();
+  for (const m of metrics) {
+    if (m.productId == null) continue;
+    const product = productMap.get(m.productId);
+    const catLabel = capitalizeCategory(product?.category ?? null);
+    categoryMap.set(
+      catLabel,
+      (categoryMap.get(catLabel) || 0) + (m.quantity ?? 0)
+    );
+  }
+
+  const foodByCategory = Array.from(categoryMap.entries())
+    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+    .sort((a, b) => b.value - a.value);
+
+  const savedTrendMap = new Map<string, number>();
+  const wastedTrendMap = new Map<string, number>();
+
+  for (const m of metrics) {
+    const dateObj = parseMetricDate(m.todayDate);
+    const dateKey = formatDate(dateObj, period);
+    const qty = m.quantity ?? 0;
+
+    if (m.type && ["consumed", "sold", "shared"].includes(m.type)) {
+      savedTrendMap.set(dateKey, (savedTrendMap.get(dateKey) || 0) + qty);
+    } else if (m.type === "wasted") {
+      wastedTrendMap.set(dateKey, (wastedTrendMap.get(dateKey) || 0) + qty);
+    }
+  }
+
+  const allDates = new Set([
+    ...savedTrendMap.keys(),
+    ...wastedTrendMap.keys(),
+  ]);
+  const foodTrend = Array.from(allDates)
+    .map((date) => ({
+      date,
+      saved: Math.round((savedTrendMap.get(date) || 0) * 100) / 100,
+      wasted: Math.round((wastedTrendMap.get(date) || 0) * 100) / 100,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const itemMap = new Map<string, number>();
+  for (const m of metrics) {
+    if (m.productId == null) continue;
+    const product = productMap.get(m.productId);
+    if (!product) continue;
+    itemMap.set(
+      product.productName,
+      (itemMap.get(product.productName) || 0) + (m.quantity ?? 0)
+    );
+  }
+
+  const topItems = Array.from(itemMap.entries())
+    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+  return {
+    totalConsumed: Math.round(totalConsumed * 100) / 100,
+    totalWasted: Math.round(totalWasted * 100) / 100,
+    totalShared: Math.round(totalShared * 100) / 100,
+    totalSold: Math.round(totalSold * 100) / 100,
+    wasteRate,
+    foodByCategory,
+    foodTrend,
+    topItems,
   };
 }

@@ -128,16 +128,16 @@ export default function MarketplacePage() {
               <span className="hidden sm:inline">Map</span>
             </button>
           </div>
-          <Button variant="outline" size="sm" asChild className="hidden sm:flex">
+          <Button variant="outline" size="sm" asChild>
             <Link to="/marketplace/my-listings">
-              <Package className="h-4 w-4 mr-2" />
-              My Listings
+              <Package className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">My Listings</span>
             </Link>
           </Button>
-          <Button variant="outline" size="sm" asChild className="hidden sm:flex">
+          <Button variant="outline" size="sm" asChild>
             <Link to="/marketplace/my-purchases">
-              <ShoppingBag className="h-4 w-4 mr-2" />
-              My Purchases
+              <ShoppingBag className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">My Purchases</span>
             </Link>
           </Button>
           <Button asChild>

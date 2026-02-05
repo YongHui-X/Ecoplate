@@ -16,6 +16,7 @@ import ConversationPage from "./pages/ConversationPage";
 import EcoPointsPage from "./pages/EcoPointsPage.tsx";
 import BadgesPage from "./pages/BadgesPage";
 import AccountPage from "./pages/AccountPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -61,6 +62,7 @@ function App() {
         <Route path="ecopoints" element={<EcoPointsPage />} />
         <Route path="ecoboard" element={<Navigate to="/ecopoints" replace />} />
         <Route path="badges" element={<BadgesPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>
     </Routes>

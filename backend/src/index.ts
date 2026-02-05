@@ -12,12 +12,14 @@ import { registerGamificationRoutes } from "./routes/gamification";
 import { registerUploadRoutes } from "./routes/upload";
 import { registerEcoLockerRoutes } from "./routes/ecolocker";
 import { startLockerJobs } from "./jobs/locker-jobs";
+import { registerNotificationRoutes } from "./routes/notifications";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join } from "path";
 
 // Initialize database
-const sqlite = new Database("ecoplate.db");
+const dbPath = process.env.DATABASE_PATH || "ecoplate.db";
+const sqlite = new Database(dbPath);
 sqlite.exec("PRAGMA journal_mode = WAL;");
 export const db = drizzle(sqlite, { schema });
 
@@ -38,6 +40,7 @@ registerDashboardRoutes(protectedRouter);
 registerGamificationRoutes(protectedRouter);
 registerUploadRoutes(protectedRouter);
 registerEcoLockerRoutes(protectedRouter);
+registerNotificationRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));

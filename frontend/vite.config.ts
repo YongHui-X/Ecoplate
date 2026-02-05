@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
       __IS_MOBILE__: isMobile,
     },
     build: {
-      outDir: isMobile ? "dist" : "../backend/public",
+      outDir: "dist",
       emptyOutDir: true,
     },
     server: {

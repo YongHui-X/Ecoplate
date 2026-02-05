@@ -112,7 +112,7 @@ describe('useGeolocation', () => {
         await result.current.getCurrentPosition();
       });
 
-      expect(result.current.error).toBe('Location permission denied');
+      expect(result.current.error).toBe('Location permission denied. Please enable location access in your browser settings.');
       expect(result.current.permission).toBe('denied');
       expect(result.current.coordinates).toBeNull();
     });
@@ -138,7 +138,7 @@ describe('useGeolocation', () => {
         await result.current.getCurrentPosition();
       });
 
-      expect(result.current.error).toBe('Location information unavailable');
+      expect(result.current.error).toBe('Location unavailable. Your device may not have GPS or location services may be disabled.');
     });
 
     it('should handle timeout error', async () => {
@@ -162,7 +162,7 @@ describe('useGeolocation', () => {
         await result.current.getCurrentPosition();
       });
 
-      expect(result.current.error).toBe('Location request timed out');
+      expect(result.current.error).toBe('Location request timed out. Please ensure location services are enabled and try again.');
     });
 
     it('should clear error', () => {
@@ -176,6 +176,13 @@ describe('useGeolocation', () => {
     });
 
     it('should request permission', async () => {
+      // Mock navigator.permissions to return granted
+      const mockQuery = vi.fn().mockResolvedValue({ state: 'granted' });
+      Object.defineProperty(navigator, 'permissions', {
+        value: { query: mockQuery },
+        configurable: true,
+      });
+
       const { result } = renderHook(() => useGeolocation());
 
       await act(async () => {

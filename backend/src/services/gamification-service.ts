@@ -2,6 +2,7 @@ import { db } from "../index";
 import * as schema from "../db/schema";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { checkAndAwardBadges } from "./badge-service";
+import { notifyStreakMilestone } from "./notification-service";
 
 // Point values for different actions
 export const POINT_VALUES = {
@@ -178,6 +179,12 @@ export async function updateStreak(userId: number) {
     .update(schema.userPoints)
     .set({ currentStreak: newStreak })
     .where(eq(schema.userPoints.userId, userId));
+
+  // Check for streak milestones and send notification
+  const milestones = [3, 7, 14, 30, 60, 90, 100, 365];
+  if (milestones.includes(newStreak)) {
+    await notifyStreakMilestone(userId, newStreak);
+  }
 }
 
 /**

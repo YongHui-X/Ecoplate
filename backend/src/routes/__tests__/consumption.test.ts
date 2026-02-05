@@ -70,6 +70,9 @@ mock.module("openai", () => {
   };
 });
 
+// Ensure OPENAI_API_KEY is set for tests (mocked OpenAI is used)
+process.env.OPENAI_API_KEY = "test-key";
+
 // Set up in-memory test database
 let sqlite: Database;
 let testDb: ReturnType<typeof drizzle<typeof schema>>;
