@@ -2,12 +2,6 @@
 # Install: pip install pre-commit && pre-commit install
 
 repos:
-  # Secret Detection - prevent committing secrets
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.18.4
-    hooks:
-      - id: gitleaks
-
   # General code quality
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
@@ -19,6 +13,13 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=1000']
       - id: detect-private-key
+
+  # Secret Detection (free, no license required)
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.63.2
+    hooks:
+      - id: trufflehog
+        entry: trufflehog git file://. --only-verified --fail
 
   # Python security
   - repo: https://github.com/PyCQA/bandit

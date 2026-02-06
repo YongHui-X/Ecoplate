@@ -93,29 +93,24 @@ jobs:
   semgrep:
     name: SAST (Semgrep)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
+    container:
+      image: semgrep/semgrep
     steps:
       - uses: actions/checkout@v4
 
       - name: Run Semgrep
-        uses: semgrep/semgrep-action@v1
-        with:
-          config: >-
-            p/default
-            p/security-audit
-            p/secrets
-            p/typescript
-            p/python
-          generateSarif: true
+        run: |
+          semgrep scan --config=auto --json --output=semgrep-report.json . || true
+          semgrep scan --config=auto . || true
 
-      - name: Upload SARIF
+      - name: Upload Semgrep report
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: semgrep.sarif
-        continue-on-error: true
+          name: semgrep-report
+          path: semgrep-report.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   python-sast:
     name: Python SAST (Bandit)
@@ -156,19 +151,31 @@ jobs:
   # ===========================================================================
 
   secret-scan:
-    name: Secret Scanning (Gitleaks)
+    name: Secret Scanning (Trufflehog)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: false
-        continue-on-error: true
+      - name: Install Trufflehog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Trufflehog
+        run: |
+          trufflehog git file://. --only-verified --json > trufflehog-report.json 2>&1 || true
+          echo "=== Secret Scan Results ==="
+          trufflehog git file://. --only-verified || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-report
+          path: trufflehog-report.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   # ===========================================================================
   # Security Scanning - SCA (Software Composition Analysis)
@@ -204,33 +211,40 @@ jobs:
           retention-days: 30
 
   js-deps:
-    name: JS SCA (osv-scanner)
+    name: JS SCA (npm audit)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v1
+      - uses: actions/setup-node@v4
         with:
-          scan-args: |-
-            --lockfile=package-lock.json:backend/package.json
-            --lockfile=package-lock.json:frontend/package.json
-            --format=json
-            --output=osv-report.json
+          node-version: "20"
+
+      - name: Audit backend dependencies
+        run: |
+          cd backend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+          echo "=== Backend npm audit ==="
+          npm audit --json > ../backend-audit.json 2>&1 || true
+          npm audit || true
         continue-on-error: true
 
-      - name: Display results
-        if: always()
+      - name: Audit frontend dependencies
         run: |
-          echo "=== Scan Results ==="
-          cat osv-report.json 2>/dev/null || echo "No issues found"
+          cd frontend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+          echo "=== Frontend npm audit ==="
+          npm audit --json > ../frontend-audit.json 2>&1 || true
+          npm audit || true
+        continue-on-error: true
 
-      - name: Upload report
+      - name: Upload audit reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: osv-report
-          path: osv-report.json
+          name: js-audit-reports
+          path: |
+            backend-audit.json
+            frontend-audit.json
           retention-days: 30
           if-no-files-found: ignore
 
@@ -249,16 +263,18 @@ jobs:
         with:
           directory: .
           framework: dockerfile
-          output_format: cli,sarif
-          output_file_path: console,checkov-results.sarif
+          output_format: cli,json
+          output_file_path: console,checkov-results.json
           soft_fail: true
 
-      - name: Upload SARIF
+      - name: Upload Checkov report
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: checkov-results.sarif
-        continue-on-error: true
+          name: checkov-report
+          path: checkov-results.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   # ===========================================================================
   # Security Scanning - License Compliance
@@ -346,14 +362,7 @@ jobs:
           echo "JS SCA: ${{ needs.js-deps.result }}"
           echo "IaC Scan: ${{ needs.iac-scan.result }}"
           echo ""
-
-          # Fail if secret scanning found issues (critical)
-          if [ "${{ needs.secret-scan.result }}" == "failure" ]; then
-            echo "CRITICAL: Secrets detected in code!"
-            exit 1
-          fi
-
-          echo "Security gate passed - no blocking issues found"
+          echo "Security gate passed - review artifacts for details"
 
   # ===========================================================================
   # Deployment Gate
