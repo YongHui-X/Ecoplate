@@ -153,7 +153,7 @@ export default function EcoBoardPage() {
         <Link
           to="/badges"
           className="flex items-center gap-3 p-4 rounded-xl bg-card border border-border
-                     active:scale-[0.98] transition-transform"
+                     active:scale-[0.98] transition-transform lg:hidden"
         >
           <div className="p-2.5 rounded-xl bg-purple-500/10">
             <Award className="h-5 w-5 text-purple-500" />
