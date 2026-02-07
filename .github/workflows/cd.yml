@@ -371,7 +371,7 @@ jobs:
   dast-zap-staging:
     name: DAST - ZAP Baseline (Staging)
     needs: deploy-staging
-    if: success()
+    if: ${{ always() && needs.deploy-staging.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -411,7 +411,7 @@ jobs:
   dast-api-staging:
     name: DAST - API Scan (Staging)
     needs: deploy-staging
-    if: success()
+    if: ${{ always() && needs.deploy-staging.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -449,7 +449,7 @@ jobs:
   dast-zap-production:
     name: DAST - ZAP Baseline (Production)
     needs: deploy-production
-    if: success()
+    if: ${{ always() && needs.deploy-production.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -489,7 +489,7 @@ jobs:
   dast-api-production:
     name: DAST - API Scan (Production)
     needs: deploy-production
-    if: success()
+    if: ${{ always() && needs.deploy-production.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
