@@ -40,12 +40,12 @@ export async function getOrCreatePreferences(userId: number): Promise<Notificati
   }
 
   return {
-    expiringProducts: prefs.expiringProducts,
-    badgeUnlocked: prefs.badgeUnlocked,
-    streakMilestone: prefs.streakMilestone,
-    productStale: prefs.productStale,
-    staleDaysThreshold: prefs.staleDaysThreshold,
-    expiryDaysThreshold: prefs.expiryDaysThreshold,
+    expiringProducts: prefs!.expiringProducts,
+    badgeUnlocked: prefs!.badgeUnlocked,
+    streakMilestone: prefs!.streakMilestone,
+    productStale: prefs!.productStale,
+    staleDaysThreshold: prefs!.staleDaysThreshold,
+    expiryDaysThreshold: prefs!.expiryDaysThreshold,
   };
 }
 
