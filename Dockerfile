@@ -40,8 +40,8 @@ RUN bun install --frozen-lockfile
 # Copy ecolocker source
 COPY ecolocker/ .
 
-# Build ecolocker in production mode (outputs to /app/ecolocker/dist)
-RUN bun run build -- --mode production
+# Build ecolocker (vite build defaults to production mode)
+RUN bun run build
 
 # =============================================================================
 # Stage 3: Build Backend

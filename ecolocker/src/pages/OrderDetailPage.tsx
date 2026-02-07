@@ -53,10 +53,6 @@ export function OrderDetailPage() {
   // For seller scheduling
   const [pickupTime, setPickupTime] = useState("");
 
-  // For buyer PIN verification
-  const [pin, setPin] = useState("");
-  const [pinError, setPinError] = useState("");
-
   const justPaid = searchParams.get("paid") === "true";
 
   useEffect(() => {
@@ -107,22 +103,6 @@ export function OrderDetailPage() {
       addToast("Pickup confirmed! Rider is on the way.", "success");
     } catch (err) {
       addToast(getErrorMessage(err), "error");
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleVerifyPin() {
-    if (!order || !pin) return;
-
-    setActionLoading(true);
-    setPinError("");
-
-    try {
-      const result = await orderApi.verifyPin(order.id, pin);
-      setOrder(result.order);
-    } catch (err) {
-      setPinError(err instanceof Error ? err.message : "Invalid PIN");
     } finally {
       setActionLoading(false);
     }
