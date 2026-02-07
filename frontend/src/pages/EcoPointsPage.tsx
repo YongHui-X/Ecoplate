@@ -30,6 +30,7 @@ import {
   Award,
   ChevronRight,
   ArrowLeft,
+  History,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { ACTION_CONFIG, INITIAL_TX_COUNT } from "../constants/gamification";
@@ -427,7 +428,10 @@ export default function EcoBoardPage() {
           {/* Panel 5: Points History */}
           <Card className="overflow-hidden">
             <CardHeader className="p-3 sm:p-6">
-              <CardTitle className="text-sm sm:text-base">Points History</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <History className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                Points History
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
               {transactions.length === 0 ? (
@@ -501,6 +505,9 @@ export default function EcoBoardPage() {
               <Lightbulb className="h-4 w-4 sm:h-5 sm:w-5 text-warning" />
               How to Earn More Points
             </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Points earned or lost scale with quantity.
+            </p>
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">

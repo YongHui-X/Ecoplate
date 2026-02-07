@@ -19,7 +19,7 @@ export const ACTION_CONFIG: Record<
     color: "text-success",
     bgColor: "bg-success/10",
     chartColor: "hsl(var(--success))",
-    description: "Eat food before it expires (scales with quantity)",
+    description: "Eat food before it expires",
   },
   sold: {
     label: "Sold",
@@ -28,7 +28,7 @@ export const ACTION_CONFIG: Record<
     color: "text-secondary",
     bgColor: "bg-secondary/10",
     chartColor: "hsl(var(--secondary))",
-    description: "Sell products on the marketplace (scales with quantity)",
+    description: "Sell products on the marketplace",
   },
   wasted: {
     label: "Wasted",
@@ -37,7 +37,7 @@ export const ACTION_CONFIG: Record<
     color: "text-destructive",
     bgColor: "bg-destructive/10",
     chartColor: "hsl(var(--destructive))",
-    description: "Wasting food costs you points (scales with quantity)",
+    description: "Wasting food costs you points",
   },
 };
 
