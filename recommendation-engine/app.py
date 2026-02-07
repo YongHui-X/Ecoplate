@@ -11,6 +11,9 @@ import logging
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# ML model imports
+from ml import PricePredictor, ProductRecommender
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -18,11 +21,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize ML predictors
+price_predictor = PricePredictor()
+product_recommender = ProductRecommender()
+
 app = Flask(__name__)
 
 # Configure CORS - restrict origins in production
 ALLOWED_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
 CORS(app, origins=ALLOWED_ORIGINS)
+
+
+# ============================================================================
+# Security Headers Middleware
+# ============================================================================
+
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses to address OWASP ZAP findings."""
+    # Prevent MIME type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    # Prevent clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+    # XSS Protection (legacy, but still useful)
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Referrer policy
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Content Security Policy for API
+    response.headers['Content-Security-Policy'] = "default-src 'none'; frame-ancestors 'none'"
+    # Cache control for sensitive endpoints
+    if request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+        response.headers['Pragma'] = 'no-cache'
+    return response
 
 # ============================================================================
 # Constants - extracted magic numbers for maintainability
@@ -389,11 +420,26 @@ def get_price_recommendation() -> tuple:
 
     logger.info(f"Price recommendation request: price={original_price}, category={data.get('category')}")
 
+    # Try ML model first, fallback to rule-based
+    if price_predictor.is_ml_available():
+        recommendation = price_predictor.predict(
+            original_price=original_price,
+            expiry_date=data.get('expiry_date'),
+            category=data.get('category', 'other'),
+            quantity=data.get('quantity', 1.0)
+        )
+        if recommendation.get('source') != 'error':
+            logger.info("Using ML-based price prediction")
+            return jsonify(recommendation), 200
+
+    # Fallback to rule-based
+    logger.info("Using rule-based price recommendation")
     recommendation = PriceRecommender.calculate(
         original_price=original_price,
         expiry_date=data.get('expiry_date'),
         category=data.get('category', 'other')
     )
+    recommendation['source'] = 'rule_based'
 
     return jsonify(recommendation), 200
 
@@ -407,7 +453,8 @@ def get_similar_products() -> tuple:
     {
         "target": { ... },
         "candidates": [ ... ],
-        "limit": 6
+        "limit": 6,
+        "user_id": 123  # Optional: for personalized recommendations
     }
     """
     data = request.get_json()
@@ -428,17 +475,65 @@ def get_similar_products() -> tuple:
 
     logger.info(f"Similar products request: target_id={data['target'].get('id')}, candidates={len(candidates)}")
 
+    limit = data.get('limit', 6)
+    user_id = data.get('user_id')
+
+    # Try ML model first, fallback to rule-based
+    if product_recommender.is_ml_available():
+        result = product_recommender.recommend(
+            target=data['target'],
+            candidates=candidates,
+            user_id=user_id,
+            limit=limit
+        )
+        if result.get('source') != 'error':
+            logger.info(f"Using ML-based recommendations (personalized={result.get('personalized', False)})")
+            result['threshold'] = SIMILARITY_THRESHOLD
+            result['generated_at'] = datetime.now(timezone.utc).isoformat()
+            return jsonify(result), 200
+
+    # Fallback to rule-based
+    logger.info("Using rule-based similar products matching")
     similar = SimilarProductsMatcher.find_similar(
         target=data['target'],
         candidates=candidates,
-        limit=data.get('limit', 6)
+        limit=limit
     )
 
     return jsonify({
         'similar_products': similar,
         'count': len(similar),
         'threshold': SIMILARITY_THRESHOLD,
-        'generated_at': datetime.now(timezone.utc).isoformat()
+        'generated_at': datetime.now(timezone.utc).isoformat(),
+        'source': 'rule_based'
+    }), 200
+
+
+@app.route('/api/v1/models/status', methods=['GET'])
+def get_model_status() -> tuple:
+    """Get status of loaded ML models."""
+    return jsonify({
+        'price_model': {
+            'loaded': price_predictor.is_ml_available(),
+            'type': 'GradientBoostingRegressor'
+        },
+        'recommendation_model': {
+            'loaded': product_recommender.is_ml_available(),
+            'type': 'ContentBased_TF-IDF'
+        }
+    }), 200
+
+
+@app.route('/api/v1/models/reload', methods=['POST'])
+def reload_models() -> tuple:
+    """Reload ML models from disk (after retraining)."""
+    price_reloaded = price_predictor.reload_model()
+    rec_reloaded = product_recommender.reload_model()
+
+    return jsonify({
+        'price_model_reloaded': price_reloaded,
+        'recommendation_model_reloaded': rec_reloaded,
+        'message': 'Models reloaded successfully' if (price_reloaded or rec_reloaded) else 'No models found to reload'
     }), 200
 
 
@@ -451,4 +546,7 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_ENV') == 'development'
 
     logger.info(f"Recommendation Engine starting on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    logger.info(f"Price model available: {price_predictor.is_ml_available()}")
+    logger.info(f"Recommendation model available: {product_recommender.is_ml_available()}")
+    # nosec B104 - binding to 0.0.0.0 is required for Docker container networking
+    app.run(host='0.0.0.0', port=port, debug=debug)  # nosec B104

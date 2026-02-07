@@ -12,12 +12,16 @@ build/
 *.db-wal
 *.db-shm
 
-# Environment files
+# Environment files (prevent secrets from being copied)
 .env
+.env.*
+*.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.ml
+.env.mobile
 
 # IDE
 .idea/

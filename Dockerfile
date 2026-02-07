@@ -6,6 +6,10 @@
 # =============================================================================
 FROM oven/bun:1-alpine AS frontend-builder
 
+# Build args for frontend environment variables
+ARG VITE_GOOGLE_MAPS_API_KEY
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
+
 WORKDIR /app/frontend
 
 # Copy frontend package files

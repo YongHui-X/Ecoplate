@@ -6,3 +6,7 @@ python-dotenv>=1.0.1
 scikit-learn>=1.6.0
 pytest>=8.3.0
 pytest-cov>=6.0.0
+pandas>=2.2.0
+joblib>=1.4.0
+scipy>=1.14.0
+matplotlib>=3.9.0

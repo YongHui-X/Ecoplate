@@ -59,6 +59,13 @@ coverage/
 .coverage
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# ML models and training artifacts (regenerated via training)
+recommendation-engine/models/*.joblib
+recommendation-engine/models/model_metadata.json
+recommendation-engine/reports/*.json
+recommendation-engine/reports/*.log
 
 # Misc
 docs/

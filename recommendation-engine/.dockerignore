@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.eggs/
+*.egg-info/
+*.egg
+
+# Environment files (prevent secrets from being copied)
+.env
+.env.*
+*.env
+
+# Virtual environments
+venv/
+ENV/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+test_*.py
+tests/
+coverage/
+
+# Documentation
+*.md
+docs/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Models and reports (built at runtime)
+models/*.joblib
+reports/*.json
+reports/*.log
+
+# Logs
+*.log
+logs/
+
+# Training data (large files)
+*.db
+*.sqlite
+
+# Misc
+*.pem

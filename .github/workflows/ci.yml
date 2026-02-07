@@ -75,8 +75,8 @@ jobs:
       - run: |
           cd recommendation-engine
           pip install -r requirements.txt
-          pip install pytest
-          pytest test_app.py -v
+          pip install pytest pytest-cov
+          pytest test_app.py test_ml.py -v --cov=. --cov-report=term-missing
 
   build-check:
     name: Build Frontend
