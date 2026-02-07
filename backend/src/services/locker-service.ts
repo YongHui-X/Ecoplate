@@ -472,7 +472,7 @@ export async function verifyPin(
   }
 
   // Award points to seller
-  const pointsResult = await awardPoints(order.sellerId, "sold", null, 1, {
+  const pointsResult = await awardPoints(order.sellerId, "sold", null, 1, undefined, {
     co2Saved: order.listing?.co2Saved || null,
     buyerId: order.buyerId,
   });
