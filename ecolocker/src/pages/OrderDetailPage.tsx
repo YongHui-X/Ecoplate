@@ -397,8 +397,7 @@ export function OrderDetailPage() {
             variant="outline"
             className="w-full"
             onClick={() => {
-              const ecoPlateUrl = import.meta.env.VITE_ECOPLATE_URL || "";
-              window.location.href = `${ecoPlateUrl}/marketplace`;
+              window.location.href = "/marketplace";
             }}
           >
             <ExternalLink className="h-4 w-4 mr-2" />

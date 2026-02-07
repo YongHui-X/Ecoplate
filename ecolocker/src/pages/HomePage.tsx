@@ -174,8 +174,7 @@ export function HomePage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                const ecoPlateUrl = import.meta.env.VITE_ECOPLATE_URL || "/";
-                window.location.href = ecoPlateUrl;
+                window.location.href = "/";
               }}
             >
               <ExternalLink className="h-4 w-4 mr-1" />
