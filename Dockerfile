@@ -60,8 +60,11 @@ COPY --from=backend-builder /app/backend/drizzle.config.ts ./
 # Copy frontend build output to be served by backend
 COPY --from=frontend-builder /app/frontend/dist ./public
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data && chown -R ecoplate:ecoplate /app
+# Copy entrypoint script
+COPY entrypoint.sh ./entrypoint.sh
+
+# Create data directory for SQLite and make entrypoint executable
+RUN mkdir -p /app/data && chmod +x /app/entrypoint.sh && chown -R ecoplate:ecoplate /app
 
 # Switch to non-root user
 USER ecoplate
@@ -70,8 +73,8 @@ USER ecoplate
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=5 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/v1/health || exit 1
 
-# Start the server (serves both API and static frontend)
-CMD ["bun", "run", "src/index.ts"]
+# Start with entrypoint (runs migration + seed if needed, then starts server)
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]

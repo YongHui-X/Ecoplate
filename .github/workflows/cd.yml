@@ -307,7 +307,7 @@ jobs:
           echo "Waiting 30 seconds for deployment to stabilize..."
           sleep 30
           for i in $(seq 1 10); do
-            if curl -sf http://${{ secrets.EC2_HOST }}:3000/api/v1/health > /dev/null 2>&1; then
+            if curl -sf http://${{ secrets.EC2_HOST }}/api/v1/health > /dev/null 2>&1; then
               echo "Application is healthy"
               break
             fi
@@ -318,7 +318,7 @@ jobs:
       - name: Run ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.14.0
         with:
-          target: "http://${{ secrets.EC2_HOST }}:3000"
+          target: "http://${{ secrets.EC2_HOST }}"
           cmd_options: "-a"
           allow_issue_writing: false
         continue-on-error: true
@@ -345,12 +345,12 @@ jobs:
       - name: Wait for deployment
         run: |
           sleep 45
-          curl -sf http://${{ secrets.EC2_HOST }}:3000/api/v1/health || true
+          curl -sf http://${{ secrets.EC2_HOST }}/api/v1/health || true
 
       - name: Run ZAP API Scan
         uses: zaproxy/action-api-scan@v0.9.0
         with:
-          target: "http://${{ secrets.EC2_HOST }}:3000/api/v1/"
+          target: "http://${{ secrets.EC2_HOST }}/api/v1/"
           format: openapi
           cmd_options: "-a"
           allow_issue_writing: false

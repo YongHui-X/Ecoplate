@@ -1,0 +1,605 @@
+name: Security Remediation Report
+
+on:
+  workflow_dispatch:
+    inputs:
+      fix_python:
+        description: 'Fix Python dependencies'
+        type: boolean
+        default: true
+      fix_js:
+        description: 'Fix JavaScript dependencies'
+        type: boolean
+        default: true
+      create_pr:
+        description: 'Create PR with fixes'
+        type: boolean
+        default: true
+
+  schedule:
+    - cron: '0 0 * * 0'  # Every Sunday
+
+jobs:
+  # ===========================================================================
+  # Phase 1: Identify Issues (Pre-Fix Scan)
+  # ===========================================================================
+
+  pre-scan-python:
+    name: "Phase 1: Python Pre-Fix Scan"
+    runs-on: ubuntu-latest
+    outputs:
+      has_vulnerabilities: ${{ steps.scan.outputs.has_vulns }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scanning tools
+        run: pip install pip-audit bandit
+
+      - name: Scan Python dependencies
+        id: scan
+        run: |
+          echo "# Python Dependency Vulnerabilities (Pre-Fix)" > python-pre-scan.md
+          echo "" >> python-pre-scan.md
+          echo "Scan Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> python-pre-scan.md
+          echo "" >> python-pre-scan.md
+
+          echo "## Identified Issues" >> python-pre-scan.md
+          echo "" >> python-pre-scan.md
+          echo '```' >> python-pre-scan.md
+
+          if pip-audit -r recommendation-engine/requirements.txt 2>&1 | tee -a python-pre-scan.md; then
+            echo "has_vulns=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_vulns=true" >> $GITHUB_OUTPUT
+          fi
+
+          echo '```' >> python-pre-scan.md
+
+          # Also generate JSON for later comparison
+          pip-audit -r recommendation-engine/requirements.txt -f json -o python-pre-scan.json 2>/dev/null || true
+
+      - name: Scan Python code (Bandit)
+        run: |
+          echo "" >> python-pre-scan.md
+          echo "## Code Security Issues (Bandit)" >> python-pre-scan.md
+          echo "" >> python-pre-scan.md
+          echo '```' >> python-pre-scan.md
+          bandit -r recommendation-engine/ -x recommendation-engine/test_app.py --severity-level medium 2>&1 | tee -a python-pre-scan.md || true
+          echo '```' >> python-pre-scan.md
+
+      - name: Upload pre-scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-pre-scan
+          path: |
+            python-pre-scan.md
+            python-pre-scan.json
+          retention-days: 30
+
+  pre-scan-js:
+    name: "Phase 1: JavaScript Pre-Fix Scan"
+    runs-on: ubuntu-latest
+    outputs:
+      has_vulnerabilities: ${{ steps.scan.outputs.has_vulns }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Scan JavaScript dependencies
+        id: scan
+        run: |
+          echo "# JavaScript Dependency Vulnerabilities (Pre-Fix)" > js-pre-scan.md
+          echo "" >> js-pre-scan.md
+          echo "Scan Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> js-pre-scan.md
+          echo "" >> js-pre-scan.md
+
+          HAS_VULNS=false
+
+          echo "## Backend Dependencies" >> js-pre-scan.md
+          echo "" >> js-pre-scan.md
+          echo '```' >> js-pre-scan.md
+          cd backend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+          if ! npm audit 2>&1 | tee -a ../js-pre-scan.md; then
+            HAS_VULNS=true
+          fi
+          npm audit --json > ../backend-pre-scan.json 2>/dev/null || true
+          echo '```' >> ../js-pre-scan.md
+          cd ..
+
+          echo "" >> js-pre-scan.md
+          echo "## Frontend Dependencies" >> js-pre-scan.md
+          echo "" >> js-pre-scan.md
+          echo '```' >> js-pre-scan.md
+          cd frontend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+          if ! npm audit 2>&1 | tee -a ../js-pre-scan.md; then
+            HAS_VULNS=true
+          fi
+          npm audit --json > ../frontend-pre-scan.json 2>/dev/null || true
+          echo '```' >> ../js-pre-scan.md
+
+          echo "has_vulns=$HAS_VULNS" >> $GITHUB_OUTPUT
+
+      - name: Upload pre-scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-pre-scan
+          path: |
+            js-pre-scan.md
+            backend-pre-scan.json
+            frontend-pre-scan.json
+          retention-days: 30
+
+  # ===========================================================================
+  # Phase 2: Apply Fixes
+  # ===========================================================================
+
+  apply-fixes:
+    name: "Phase 2: Apply Fixes"
+    needs: [pre-scan-python, pre-scan-js]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install tools
+        run: pip install pip-audit
+
+      - name: Create fixes report
+        run: |
+          echo "# Fixes Applied" > fixes-applied.md
+          echo "" >> fixes-applied.md
+          echo "Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> fixes-applied.md
+          echo "" >> fixes-applied.md
+
+      - name: Fix Python dependencies
+        if: ${{ github.event_name == 'schedule' || inputs.fix_python }}
+        run: |
+          echo "## Python Dependency Fixes" >> fixes-applied.md
+          echo "" >> fixes-applied.md
+
+          echo "### Before Fix (requirements.txt)" >> fixes-applied.md
+          echo '```' >> fixes-applied.md
+          cat recommendation-engine/requirements.txt >> fixes-applied.md
+          echo '```' >> fixes-applied.md
+          echo "" >> fixes-applied.md
+
+          echo "### Applying pip-audit --fix..." >> fixes-applied.md
+          echo '```' >> fixes-applied.md
+          pip-audit -r recommendation-engine/requirements.txt --fix 2>&1 | tee -a fixes-applied.md || true
+          echo '```' >> fixes-applied.md
+          echo "" >> fixes-applied.md
+
+          echo "### After Fix (requirements.txt)" >> fixes-applied.md
+          echo '```' >> fixes-applied.md
+          cat recommendation-engine/requirements.txt >> fixes-applied.md
+          echo '```' >> fixes-applied.md
+          echo "" >> fixes-applied.md
+
+      - name: Fix Backend JavaScript dependencies
+        if: ${{ github.event_name == 'schedule' || inputs.fix_js }}
+        run: |
+          echo "## Backend JavaScript Fixes" >> fixes-applied.md
+          echo "" >> fixes-applied.md
+
+          cd backend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+
+          echo "### Applying npm audit fix..." >> ../fixes-applied.md
+          echo '```' >> ../fixes-applied.md
+          npm audit fix 2>&1 | tee -a ../fixes-applied.md || true
+          echo '```' >> ../fixes-applied.md
+          echo "" >> ../fixes-applied.md
+
+      - name: Fix Frontend JavaScript dependencies
+        if: ${{ github.event_name == 'schedule' || inputs.fix_js }}
+        run: |
+          echo "## Frontend JavaScript Fixes" >> fixes-applied.md
+          echo "" >> fixes-applied.md
+
+          cd frontend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+
+          echo "### Applying npm audit fix..." >> ../fixes-applied.md
+          echo '```' >> ../fixes-applied.md
+          npm audit fix 2>&1 | tee -a ../fixes-applied.md || true
+          echo '```' >> ../fixes-applied.md
+          echo "" >> ../fixes-applied.md
+
+      - name: Upload fixes report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixes-applied
+          path: fixes-applied.md
+          retention-days: 30
+
+      - name: Upload fixed files
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixed-files
+          path: |
+            recommendation-engine/requirements.txt
+            backend/package.json
+            backend/package-lock.json
+            frontend/package.json
+            frontend/package-lock.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ===========================================================================
+  # Phase 3: Re-Scan After Fixes
+  # ===========================================================================
+
+  post-scan-python:
+    name: "Phase 3: Python Post-Fix Scan"
+    needs: apply-fixes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download fixed files
+        uses: actions/download-artifact@v4
+        with:
+          name: fixed-files
+          path: ./
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scanning tools
+        run: pip install pip-audit bandit
+
+      - name: Re-scan Python dependencies
+        run: |
+          echo "# Python Dependency Vulnerabilities (Post-Fix)" > python-post-scan.md
+          echo "" >> python-post-scan.md
+          echo "Scan Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> python-post-scan.md
+          echo "" >> python-post-scan.md
+
+          echo "## Remaining Issues" >> python-post-scan.md
+          echo "" >> python-post-scan.md
+          echo '```' >> python-post-scan.md
+          pip-audit -r recommendation-engine/requirements.txt 2>&1 | tee -a python-post-scan.md || true
+          echo '```' >> python-post-scan.md
+
+          pip-audit -r recommendation-engine/requirements.txt -f json -o python-post-scan.json 2>/dev/null || true
+
+      - name: Re-scan Python code
+        run: |
+          echo "" >> python-post-scan.md
+          echo "## Code Security Issues (Bandit)" >> python-post-scan.md
+          echo "" >> python-post-scan.md
+          echo '```' >> python-post-scan.md
+          bandit -r recommendation-engine/ -x recommendation-engine/test_app.py --severity-level medium 2>&1 | tee -a python-post-scan.md || true
+          echo '```' >> python-post-scan.md
+
+      - name: Upload post-scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-post-scan
+          path: |
+            python-post-scan.md
+            python-post-scan.json
+          retention-days: 30
+
+  post-scan-js:
+    name: "Phase 3: JavaScript Post-Fix Scan"
+    needs: apply-fixes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download fixed files
+        uses: actions/download-artifact@v4
+        with:
+          name: fixed-files
+          path: ./
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Re-scan JavaScript dependencies
+        run: |
+          echo "# JavaScript Dependency Vulnerabilities (Post-Fix)" > js-post-scan.md
+          echo "" >> js-post-scan.md
+          echo "Scan Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> js-post-scan.md
+          echo "" >> js-post-scan.md
+
+          echo "## Backend Dependencies" >> js-post-scan.md
+          echo "" >> js-post-scan.md
+          echo '```' >> js-post-scan.md
+          cd backend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+          npm audit 2>&1 | tee -a ../js-post-scan.md || true
+          npm audit --json > ../backend-post-scan.json 2>/dev/null || true
+          echo '```' >> ../js-post-scan.md
+          cd ..
+
+          echo "" >> js-post-scan.md
+          echo "## Frontend Dependencies" >> js-post-scan.md
+          echo "" >> js-post-scan.md
+          echo '```' >> js-post-scan.md
+          cd frontend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+          npm audit 2>&1 | tee -a ../js-post-scan.md || true
+          npm audit --json > ../frontend-post-scan.json 2>/dev/null || true
+          echo '```' >> ../js-post-scan.md
+
+      - name: Upload post-scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-post-scan
+          path: |
+            js-post-scan.md
+            backend-post-scan.json
+            frontend-post-scan.json
+          retention-days: 30
+
+  # ===========================================================================
+  # Phase 4: Generate Comprehensive Report
+  # ===========================================================================
+
+  generate-report:
+    name: "Phase 4: Generate Remediation Report"
+    needs: [post-scan-python, post-scan-js]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate comprehensive report
+        run: |
+          cat > remediation-report.md << 'EOF'
+          # Security Remediation Report
+
+          **Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          **Repository:** ${{ github.repository }}
+          **Branch:** ${{ github.ref_name }}
+          **Commit:** ${{ github.sha }}
+
+          ---
+
+          ## Executive Summary
+
+          This report documents the security vulnerability remediation process including:
+          1. **Identified Issues** - Vulnerabilities found before fixes
+          2. **Fixes Applied** - Actions taken to remediate vulnerabilities
+          3. **Re-scanning Results** - Verification scan after fixes
+
+          ---
+
+          ## Table of Contents
+
+          1. [Python Security](#python-security)
+             - [Pre-Fix Scan](#python-pre-fix-scan)
+             - [Fixes Applied](#python-fixes-applied)
+             - [Post-Fix Scan](#python-post-fix-scan)
+          2. [JavaScript Security](#javascript-security)
+             - [Pre-Fix Scan](#javascript-pre-fix-scan)
+             - [Fixes Applied](#javascript-fixes-applied)
+             - [Post-Fix Scan](#javascript-post-fix-scan)
+          3. [Summary](#summary)
+
+          ---
+
+          # Python Security
+
+          ## Python Pre-Fix Scan
+
+          EOF
+
+          if [ -f artifacts/python-pre-scan/python-pre-scan.md ]; then
+            cat artifacts/python-pre-scan/python-pre-scan.md >> remediation-report.md
+          else
+            echo "No pre-scan data available." >> remediation-report.md
+          fi
+
+          cat >> remediation-report.md << 'EOF'
+
+          ---
+
+          ## Python Fixes Applied
+
+          EOF
+
+          if [ -f artifacts/fixes-applied/fixes-applied.md ]; then
+            grep -A 1000 "## Python Dependency Fixes" artifacts/fixes-applied/fixes-applied.md | grep -B 1000 -m 1 "## Backend JavaScript Fixes" | head -n -1 >> remediation-report.md || cat artifacts/fixes-applied/fixes-applied.md >> remediation-report.md
+          else
+            echo "No fixes data available." >> remediation-report.md
+          fi
+
+          cat >> remediation-report.md << 'EOF'
+
+          ---
+
+          ## Python Post-Fix Scan
+
+          EOF
+
+          if [ -f artifacts/python-post-scan/python-post-scan.md ]; then
+            cat artifacts/python-post-scan/python-post-scan.md >> remediation-report.md
+          else
+            echo "No post-scan data available." >> remediation-report.md
+          fi
+
+          cat >> remediation-report.md << 'EOF'
+
+          ---
+
+          # JavaScript Security
+
+          ## JavaScript Pre-Fix Scan
+
+          EOF
+
+          if [ -f artifacts/js-pre-scan/js-pre-scan.md ]; then
+            cat artifacts/js-pre-scan/js-pre-scan.md >> remediation-report.md
+          else
+            echo "No pre-scan data available." >> remediation-report.md
+          fi
+
+          cat >> remediation-report.md << 'EOF'
+
+          ---
+
+          ## JavaScript Fixes Applied
+
+          EOF
+
+          if [ -f artifacts/fixes-applied/fixes-applied.md ]; then
+            grep -A 1000 "## Backend JavaScript Fixes" artifacts/fixes-applied/fixes-applied.md >> remediation-report.md || echo "See fixes-applied artifact." >> remediation-report.md
+          else
+            echo "No fixes data available." >> remediation-report.md
+          fi
+
+          cat >> remediation-report.md << 'EOF'
+
+          ---
+
+          ## JavaScript Post-Fix Scan
+
+          EOF
+
+          if [ -f artifacts/js-post-scan/js-post-scan.md ]; then
+            cat artifacts/js-post-scan/js-post-scan.md >> remediation-report.md
+          else
+            echo "No post-scan data available." >> remediation-report.md
+          fi
+
+          cat >> remediation-report.md << 'EOF'
+
+          ---
+
+          # Summary
+
+          ## Remediation Status
+
+          | Category | Pre-Fix Issues | Fixes Applied | Post-Fix Issues | Status |
+          |----------|----------------|---------------|-----------------|--------|
+          | Python Dependencies | See above | Auto-fix | See above | Review |
+          | Python Code (SAST) | See above | Manual | See above | Review |
+          | JS Backend | See above | Auto-fix | See above | Review |
+          | JS Frontend | See above | Auto-fix | See above | Review |
+
+          ## Next Steps
+
+          1. Review remaining vulnerabilities that could not be auto-fixed
+          2. Manually update packages with breaking changes
+          3. Address code-level security issues identified by Bandit
+          4. Re-run this workflow after manual fixes
+
+          ---
+
+          *Report generated by Security Remediation Workflow*
+          EOF
+
+      - name: Upload comprehensive report
+        uses: actions/upload-artifact@v4
+        with:
+          name: remediation-report
+          path: remediation-report.md
+          retention-days: 90
+
+      - name: Post summary to GitHub
+        run: |
+          echo "# Security Remediation Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Artifacts Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Report | Description |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| \`python-pre-scan\` | Python vulnerabilities before fix |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`js-pre-scan\` | JavaScript vulnerabilities before fix |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`fixes-applied\` | Details of fixes applied |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`python-post-scan\` | Python vulnerabilities after fix |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`js-post-scan\` | JavaScript vulnerabilities after fix |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`remediation-report\` | **Complete consolidated report** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the \`remediation-report\` artifact for the full report." >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Phase 5: Create PR with Fixes (Optional)
+  # ===========================================================================
+
+  create-pr:
+    name: "Phase 5: Create Pull Request"
+    needs: [generate-report]
+    if: ${{ github.event_name == 'schedule' || inputs.create_pr }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download fixed files
+        uses: actions/download-artifact@v4
+        with:
+          name: fixed-files
+          path: ./
+        continue-on-error: true
+
+      - name: Download remediation report
+        uses: actions/download-artifact@v4
+        with:
+          name: remediation-report
+          path: ./
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "fix(security): auto-remediate vulnerabilities"
+          title: "Security: Automated Vulnerability Remediation"
+          body: |
+            ## Security Remediation Report
+
+            This PR contains automated security fixes generated by the Security Remediation workflow.
+
+            ### What's Included
+
+            - ✅ Python dependency updates (pip-audit --fix)
+            - ✅ JavaScript dependency updates (npm audit fix)
+
+            ### Reports
+
+            Download the following artifacts from the workflow run:
+            - `python-pre-scan` - Issues before fix
+            - `js-pre-scan` - Issues before fix
+            - `fixes-applied` - What was changed
+            - `python-post-scan` - Remaining issues
+            - `js-post-scan` - Remaining issues
+            - `remediation-report` - **Complete report**
+
+            ### Verification Checklist
+
+            - [ ] Review the remediation report
+            - [ ] CI tests pass
+            - [ ] Application works correctly
+            - [ ] No breaking changes
+
+            ---
+            *Generated by Security Remediation Workflow*
+          branch: security/auto-remediation
+          labels: |
+            security
+            dependencies
+            automated
