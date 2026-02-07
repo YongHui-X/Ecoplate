@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "postinstall": "patch-package && bash scripts/fix-capacitor-proguard.sh",
-    "dev:backend": "lsof -ti :3000 | xargs kill -9 2>/dev/null || true; cd backend && bun --watch src/index.ts",
+    "dev:backend": "cd backend && bun --watch src/index.ts",
     "dev:frontend": "cd frontend && bun run dev",
     "dev:recommendation": "cd recommendation-engine && python app.py",
     "build": "cd frontend && bun run build",

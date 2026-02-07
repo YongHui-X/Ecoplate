@@ -1,4 +1,4 @@
-import { Check, Share, DollarSign, X } from "lucide-react";
+import { Check, DollarSign, X } from "lucide-react";
 
 export const ACTION_CONFIG: Record<
   string,
@@ -19,16 +19,7 @@ export const ACTION_CONFIG: Record<
     color: "text-success",
     bgColor: "bg-success/10",
     chartColor: "hsl(var(--success))",
-    description: "Eat food before it expires",
-  },
-  shared: {
-    label: "Shared",
-    icon: Share,
-    points: 10,
-    color: "text-primary",
-    bgColor: "bg-primary/10",
-    chartColor: "hsl(var(--primary))",
-    description: "Share excess food with others",
+    description: "Eat food before it expires (scales with quantity)",
   },
   sold: {
     label: "Sold",
@@ -37,7 +28,7 @@ export const ACTION_CONFIG: Record<
     color: "text-secondary",
     bgColor: "bg-secondary/10",
     chartColor: "hsl(var(--secondary))",
-    description: "Sell products on the marketplace",
+    description: "Sell products on the marketplace (scales with quantity)",
   },
   wasted: {
     label: "Wasted",
@@ -46,7 +37,7 @@ export const ACTION_CONFIG: Record<
     color: "text-destructive",
     bgColor: "bg-destructive/10",
     chartColor: "hsl(var(--destructive))",
-    description: "Wasting food costs you points",
+    description: "Wasting food costs you points (scales with quantity)",
   },
 };
 

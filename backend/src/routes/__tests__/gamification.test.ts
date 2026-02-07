@@ -57,13 +57,16 @@ function registerTestGamificationRoutes(
     const transactions = recentInteractions
       .filter((i) => i.type !== "Add")
       .map((i) => {
-        const amount = POINT_VALUES[i.type as keyof typeof POINT_VALUES] ?? 0;
+        const baseAmount = POINT_VALUES[i.type as keyof typeof POINT_VALUES] ?? 0;
+        const scaled = Math.round(baseAmount * Math.abs(i.quantity ?? 1));
+        const amount = Math.abs(scaled) >= Math.abs(baseAmount) ? scaled : baseAmount;
         return {
           id: i.id,
           amount,
           type: amount < 0 ? "penalty" : "earned",
           action: i.type,
           createdAt: i.todayDate,
+          quantity: i.quantity ?? 1,
         };
       });
 
@@ -523,6 +526,57 @@ describe("GET /api/v1/gamification/points", () => {
     const data = res.data as { transactions: Array<{ action: string }> };
     expect(data.transactions.length).toBe(1);
     expect(data.transactions[0].action).toBe("consumed");
+  });
+
+  test("transactions with fractional qty show min base values", async () => {
+    await testDb.insert(schema.userPoints).values({
+      userId: testUserId,
+      totalPoints: 50,
+    });
+
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 0.2 },
+      { userId: testUserId, todayDate: "2025-01-15", type: "wasted", quantity: 0.3 },
+    ]);
+
+    const router = createRouter();
+    const res = await makeRequest(router, "GET", "/api/v1/gamification/points");
+
+    const data = res.data as { transactions: Array<{ action: string; amount: number }> };
+    const consumedTx = data.transactions.find((t) => t.action === "consumed");
+    expect(consumedTx?.amount).toBe(5); // min base, not 1
+
+    const wastedTx = data.transactions.find((t) => t.action === "wasted");
+    expect(wastedTx?.amount).toBe(-3); // min base, not -1
+  });
+
+  test("transactions for consume, wasted, sold show correct amounts", async () => {
+    await testDb.insert(schema.userPoints).values({
+      userId: testUserId,
+      totalPoints: 100,
+    });
+
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 3 },
+      { userId: testUserId, todayDate: "2025-01-15", type: "wasted", quantity: 5 },
+      { userId: testUserId, todayDate: "2025-01-15", type: "sold", quantity: 1 },
+    ]);
+
+    const router = createRouter();
+    const res = await makeRequest(router, "GET", "/api/v1/gamification/points");
+
+    const data = res.data as { transactions: Array<{ action: string; amount: number; type: string }> };
+    const consumedTx = data.transactions.find((t) => t.action === "consumed");
+    expect(consumedTx?.amount).toBe(15); // 5 * 3
+    expect(consumedTx?.type).toBe("earned");
+
+    const wastedTx = data.transactions.find((t) => t.action === "wasted");
+    expect(wastedTx?.amount).toBe(-15); // -3 * 5
+    expect(wastedTx?.type).toBe("penalty");
+
+    const soldTx = data.transactions.find((t) => t.action === "sold");
+    expect(soldTx?.amount).toBe(8); // 8 * 1
+    expect(soldTx?.type).toBe("earned");
   });
 });
 

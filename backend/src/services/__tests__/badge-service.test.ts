@@ -1,664 +1,491 @@
-import { describe, expect, test, beforeAll, afterAll, beforeEach } from "bun:test";
+import { describe, expect, test, beforeAll, beforeEach, mock } from "bun:test";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { eq } from "drizzle-orm";
 import * as schema from "../../db/schema";
+import { eq } from "drizzle-orm";
 
-// Set up in-memory test database
-let sqlite: Database;
-let testDb: ReturnType<typeof drizzle<typeof schema>>;
-let testUserId: number;
+// ── In-memory DB setup ──────────────────────────────────────────────
 
-// Simplified badge definitions for testing
-const BADGE_DEFINITIONS = [
-  {
-    code: "first_action",
-    name: "First Steps",
-    description: "Complete your first sustainability action",
-    category: "milestones",
-    pointsAwarded: 25,
-    sortOrder: 1,
-    condition: (m: BadgeMetrics) => m.totalActions >= 1,
-    progress: (m: BadgeMetrics) => ({
-      current: Math.min(m.totalActions, 1),
-      target: 1,
-      percentage: Math.min(100, (m.totalActions / 1) * 100),
-    }),
-  },
-  {
-    code: "eco_starter",
-    name: "Eco Starter",
-    description: "Complete 10 sustainability actions",
-    category: "milestones",
-    pointsAwarded: 50,
-    sortOrder: 2,
-    condition: (m: BadgeMetrics) => m.totalActions >= 10,
-    progress: (m: BadgeMetrics) => ({
-      current: Math.min(m.totalActions, 10),
-      target: 10,
-      percentage: Math.min(100, (m.totalActions / 10) * 100),
-    }),
-  },
-  {
-    code: "first_consume",
-    name: "Clean Plate",
-    description: "Consume your first item",
-    category: "waste-reduction",
-    pointsAwarded: 25,
-    sortOrder: 5,
-    condition: (m: BadgeMetrics) => m.totalConsumed >= 1,
-    progress: (m: BadgeMetrics) => ({
-      current: Math.min(m.totalConsumed, 1),
-      target: 1,
-      percentage: Math.min(100, (m.totalConsumed / 1) * 100),
-    }),
-  },
-  {
-    code: "waste_warrior",
-    name: "Waste Warrior",
-    description: "80%+ waste reduction rate (min 20 items)",
-    category: "waste-reduction",
-    pointsAwarded: 100,
-    sortOrder: 7,
-    condition: (m: BadgeMetrics) => m.wasteReductionRate >= 80 && m.totalItems >= 20,
-    progress: (m: BadgeMetrics) => {
-      if (m.totalItems < 20) {
-        return {
-          current: m.totalItems,
-          target: 20,
-          percentage: Math.min(100, (m.totalItems / 20) * 100),
-        };
-      }
-      return {
-        current: Math.min(Math.round(m.wasteReductionRate), 100),
-        target: 80,
-        percentage: Math.min(100, (m.wasteReductionRate / 80) * 100),
-      };
-    },
-  },
-  {
-    code: "first_sale",
-    name: "First Sale",
-    description: "Sell your first marketplace item",
-    category: "sharing",
-    pointsAwarded: 25,
-    sortOrder: 9,
-    condition: (m: BadgeMetrics) => m.totalSold >= 1,
-    progress: (m: BadgeMetrics) => ({
-      current: Math.min(m.totalSold, 1),
-      target: 1,
-      percentage: Math.min(100, (m.totalSold / 1) * 100),
-    }),
-  },
-];
+const sqlite = new Database(":memory:");
+sqlite.exec("PRAGMA journal_mode = WAL;");
 
-interface BadgeMetrics {
-  totalPoints: number;
-  currentStreak: number;
-  longestStreak: number;
-  totalConsumed: number;
-  totalWasted: number;
-  totalShared: number;
-  totalSold: number;
-  totalActions: number;
-  totalItems: number;
-  wasteReductionRate: number;
-}
+sqlite.exec(`
+  CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    avatar_url TEXT,
+    user_location TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
 
-// Helper function to get user badge metrics
-async function getUserBadgeMetrics(db: typeof testDb, userId: number): Promise<BadgeMetrics> {
-  const userPoints = await db.query.userPoints.findFirst({
-    where: eq(schema.userPoints.userId, userId),
-  });
+  CREATE TABLE products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_name TEXT NOT NULL,
+    category TEXT,
+    quantity REAL NOT NULL,
+    unit TEXT,
+    unit_price REAL,
+    purchase_date INTEGER,
+    description TEXT,
+    co2_emission REAL
+  );
 
-  const interactions = await db.query.productSustainabilityMetrics.findMany({
-    where: eq(schema.productSustainabilityMetrics.userId, userId),
-  });
+  CREATE TABLE user_points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    total_points INTEGER NOT NULL DEFAULT 0,
+    current_streak INTEGER NOT NULL DEFAULT 0,
+    total_co2_saved REAL NOT NULL DEFAULT 0
+  );
 
-  let totalConsumed = 0;
-  let totalWasted = 0;
-  let totalShared = 0;
-  let totalSold = 0;
+  CREATE TABLE product_sustainability_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    today_date TEXT NOT NULL,
+    quantity REAL,
+    type TEXT
+  );
 
-  for (const interaction of interactions) {
-    const type = (interaction.type || "").toLowerCase();
-    if (type === "consumed" || type === "consume") totalConsumed++;
-    else if (type === "wasted" || type === "waste") totalWasted++;
-    else if (type === "shared") totalShared++;
-    else if (type === "sold") totalSold++;
-  }
+  CREATE TABLE badges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    points_awarded INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    badge_image_url TEXT
+  );
 
-  const totalActions = totalConsumed + totalShared + totalSold;
-  const totalItems = totalActions + totalWasted;
-  const wasteReductionRate = totalItems > 0 ? (totalActions / totalItems) * 100 : 0;
+  CREATE TABLE user_badges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    badge_id INTEGER NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
+    earned_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    UNIQUE(user_id, badge_id)
+  );
+`);
 
-  return {
-    totalPoints: userPoints?.totalPoints ?? 0,
-    currentStreak: userPoints?.currentStreak ?? 0,
-    longestStreak: 0,
-    totalConsumed,
-    totalWasted,
-    totalShared,
-    totalSold,
-    totalActions,
-    totalItems,
-    wasteReductionRate,
-  };
-}
+const testDb = drizzle(sqlite, { schema });
 
-// Helper function to check and award badges
-async function checkAndAwardBadges(
-  db: typeof testDb,
-  userId: number
-): Promise<Array<{ code: string; name: string; pointsAwarded: number }>> {
-  const metrics = await getUserBadgeMetrics(db, userId);
+// Mock the db export used by badge-service and gamification-service
+mock.module("../../index", () => ({ db: testDb }));
 
-  const allBadges = await db.query.badges.findMany();
-  const badgeByCode = new Map(allBadges.map((b) => [b.code, b]));
+// Mock notification service to avoid DB calls to notifications table
+mock.module("../notification-service", () => ({
+  notifyStreakMilestone: async () => {},
+  notifyBadgeUnlocked: async () => {},
+}));
 
-  const earnedUserBadges = await db.query.userBadges.findMany({
-    where: eq(schema.userBadges.userId, userId),
-  });
-  const earnedBadgeIds = new Set(earnedUserBadges.map((ub) => ub.badgeId));
+// Import AFTER mocking
+import {
+  BADGE_DEFINITIONS,
+  checkAndAwardBadges,
+  getBadgeProgress,
+  getUserBadgeMetrics,
+} from "../badge-service";
+import { getOrCreateUserPoints } from "../gamification-service";
 
-  const newlyAwarded: Array<{ code: string; name: string; pointsAwarded: number }> = [];
+// ── Seed data ────────────────────────────────────────────────────────
 
+let userId: number;
+let productId: number;
+
+beforeAll(() => {
+  // Seed a test user
+  const userStmt = sqlite.prepare(
+    "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?) RETURNING id"
+  );
+  const userRow = userStmt.get("badge-test@eco.com", "hash456", "Badge Tester") as { id: number };
+  userId = userRow.id;
+
+  // Seed a test product
+  const prodStmt = sqlite.prepare(
+    "INSERT INTO products (user_id, product_name, category, quantity) VALUES (?, ?, ?, ?) RETURNING id"
+  );
+  const prodRow = prodStmt.get(userId, "Apple", "produce", 5) as { id: number };
+  productId = prodRow.id;
+
+  // Seed all badge definitions into the DB
+  const badgeStmt = sqlite.prepare(
+    "INSERT INTO badges (code, name, description, category, points_awarded, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
+  );
   for (const def of BADGE_DEFINITIONS) {
-    const dbBadge = badgeByCode.get(def.code);
-    if (!dbBadge) continue;
-    if (earnedBadgeIds.has(dbBadge.id)) continue;
-    if (!def.condition(metrics)) continue;
+    badgeStmt.run(def.code, def.name, def.description, def.category, def.pointsAwarded, def.sortOrder);
+  }
+});
 
-    try {
-      await db.insert(schema.userBadges).values({
-        userId,
-        badgeId: dbBadge.id,
-      });
+beforeEach(() => {
+  // Clean between tests
+  sqlite.exec("DELETE FROM user_badges");
+  sqlite.exec("DELETE FROM product_sustainability_metrics");
+  sqlite.exec("DELETE FROM user_points");
+});
 
-      if (dbBadge.pointsAwarded > 0) {
-        const userPoints = await db.query.userPoints.findFirst({
-          where: eq(schema.userPoints.userId, userId),
-        });
-        if (userPoints) {
-          await db
-            .update(schema.userPoints)
-            .set({ totalPoints: userPoints.totalPoints + dbBadge.pointsAwarded })
-            .where(eq(schema.userPoints.userId, userId));
-        }
-      }
+// ── BADGE_DEFINITIONS ────────────────────────────────────────────────
 
-      newlyAwarded.push({
-        code: def.code,
-        name: def.name,
-        pointsAwarded: dbBadge.pointsAwarded,
-      });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      if (
-        errorMessage.includes("UNIQUE constraint failed") ||
-        errorMessage.includes("SQLITE_CONSTRAINT")
-      ) {
-        continue;
-      }
-      throw err;
+describe("BADGE_DEFINITIONS", () => {
+  test("all definitions have required fields", () => {
+    for (const def of BADGE_DEFINITIONS) {
+      expect(def.code).toBeDefined();
+      expect(typeof def.code).toBe("string");
+      expect(def.code.length).toBeGreaterThan(0);
+
+      expect(def.name).toBeDefined();
+      expect(typeof def.name).toBe("string");
+
+      expect(typeof def.condition).toBe("function");
+      expect(typeof def.progress).toBe("function");
+
+      expect(typeof def.pointsAwarded).toBe("number");
+      expect(typeof def.sortOrder).toBe("number");
+      expect(def.category).toBeDefined();
+      expect(def.description).toBeDefined();
     }
-  }
+  });
 
-  return newlyAwarded;
-}
-
-// Helper function to get badge progress
-async function getBadgeProgress(
-  db: typeof testDb,
-  userId: number
-): Promise<Record<string, { current: number; target: number; percentage: number }>> {
-  const metrics = await getUserBadgeMetrics(db, userId);
-
-  const progress: Record<string, { current: number; target: number; percentage: number }> = {};
-
-  for (const def of BADGE_DEFINITIONS) {
-    const p = def.progress(metrics);
-    progress[def.code] = {
-      current: p.current,
-      target: p.target,
-      percentage: Math.round(p.percentage),
+  test("condition functions return correct boolean for sample metrics", () => {
+    const zeroMetrics = {
+      totalPoints: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      totalConsumed: 0,
+      totalWasted: 0,
+      totalShared: 0,
+      totalSold: 0,
+      totalActions: 0,
+      totalItems: 0,
+      wasteReductionRate: 0,
     };
-  }
 
-  return progress;
-}
+    const firstActionDef = BADGE_DEFINITIONS.find((d) => d.code === "first_action")!;
+    expect(firstActionDef.condition(zeroMetrics)).toBe(false);
+    expect(firstActionDef.condition({ ...zeroMetrics, totalActions: 1 })).toBe(true);
 
-beforeAll(async () => {
-  sqlite = new Database(":memory:");
-  sqlite.exec("PRAGMA journal_mode = WAL;");
-  sqlite.exec("PRAGMA foreign_keys = ON;");
+    const ecoStarterDef = BADGE_DEFINITIONS.find((d) => d.code === "eco_starter")!;
+    expect(ecoStarterDef.condition({ ...zeroMetrics, totalActions: 9 })).toBe(false);
+    expect(ecoStarterDef.condition({ ...zeroMetrics, totalActions: 10 })).toBe(true);
 
-  sqlite.exec(`
-    CREATE TABLE users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      name TEXT NOT NULL,
-      avatar_url TEXT,
-      user_location TEXT,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-    );
+    const ecoChampionDef = BADGE_DEFINITIONS.find((d) => d.code === "eco_champion")!;
+    expect(ecoChampionDef.condition({ ...zeroMetrics, totalPoints: 999 })).toBe(false);
+    expect(ecoChampionDef.condition({ ...zeroMetrics, totalPoints: 1000 })).toBe(true);
 
-    CREATE TABLE user_points (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-      total_points INTEGER NOT NULL DEFAULT 0,
-      current_streak INTEGER NOT NULL DEFAULT 0,
-      total_co2_saved REAL NOT NULL DEFAULT 0
-    );
+    const firstConsumeDef = BADGE_DEFINITIONS.find((d) => d.code === "first_consume")!;
+    expect(firstConsumeDef.condition(zeroMetrics)).toBe(false);
+    expect(firstConsumeDef.condition({ ...zeroMetrics, totalConsumed: 1 })).toBe(true);
 
-    CREATE TABLE badges (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      code TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      description TEXT,
-      category TEXT,
-      points_awarded INTEGER NOT NULL DEFAULT 0,
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      badge_image_url TEXT
-    );
+    const streak3Def = BADGE_DEFINITIONS.find((d) => d.code === "streak_3")!;
+    expect(streak3Def.condition({ ...zeroMetrics, longestStreak: 2 })).toBe(false);
+    expect(streak3Def.condition({ ...zeroMetrics, longestStreak: 3 })).toBe(true);
 
-    CREATE TABLE user_badges (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      badge_id INTEGER NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
-      earned_at INTEGER NOT NULL DEFAULT (unixepoch()),
-      UNIQUE(user_id, badge_id)
-    );
+    const firstSaleDef = BADGE_DEFINITIONS.find((d) => d.code === "first_sale")!;
+    expect(firstSaleDef.condition(zeroMetrics)).toBe(false);
+    expect(firstSaleDef.condition({ ...zeroMetrics, totalSold: 1 })).toBe(true);
+  });
 
-    CREATE TABLE product_sustainability_metrics (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      product_id INTEGER,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      today_date TEXT NOT NULL,
-      quantity REAL,
-      type TEXT
-    );
-  `);
+  test("progress functions return { current, target, percentage } with percentage 0-100", () => {
+    const zeroMetrics = {
+      totalPoints: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+      totalConsumed: 0,
+      totalWasted: 0,
+      totalShared: 0,
+      totalSold: 0,
+      totalActions: 0,
+      totalItems: 0,
+      wasteReductionRate: 0,
+    };
 
-  testDb = drizzle(sqlite, { schema });
+    for (const def of BADGE_DEFINITIONS) {
+      const p = def.progress(zeroMetrics);
+      expect(p).toHaveProperty("current");
+      expect(p).toHaveProperty("target");
+      expect(p).toHaveProperty("percentage");
+      expect(typeof p.current).toBe("number");
+      expect(typeof p.target).toBe("number");
+      expect(typeof p.percentage).toBe("number");
+      expect(p.percentage).toBeGreaterThanOrEqual(0);
+      expect(p.percentage).toBeLessThanOrEqual(100);
+    }
 
-  // Seed test user
-  const [user] = await testDb
-    .insert(schema.users)
-    .values({
-      email: "test@example.com",
-      passwordHash: "hashed",
-      name: "Test User",
-    })
-    .returning();
-  testUserId = user.id;
-
-  // Seed badges
-  for (const def of BADGE_DEFINITIONS) {
-    await testDb.insert(schema.badges).values({
-      code: def.code,
-      name: def.name,
-      description: def.description,
-      category: def.category,
-      pointsAwarded: def.pointsAwarded,
-      sortOrder: def.sortOrder,
-    });
-  }
-});
-
-afterAll(() => {
-  sqlite.close();
-});
-
-beforeEach(async () => {
-  await testDb.delete(schema.productSustainabilityMetrics);
-  await testDb.delete(schema.userBadges);
-  await testDb.delete(schema.userPoints);
-
-  // Re-create user points
-  await testDb.insert(schema.userPoints).values({
-    userId: testUserId,
-    totalPoints: 0,
-    currentStreak: 0,
+    // Check a fully met condition gives 100%
+    const firstActionDef = BADGE_DEFINITIONS.find((d) => d.code === "first_action")!;
+    const metProgress = firstActionDef.progress({ ...zeroMetrics, totalActions: 5 });
+    expect(metProgress.percentage).toBe(100);
+    expect(metProgress.current).toBe(1); // capped at target
+    expect(metProgress.target).toBe(1);
   });
 });
 
-describe("getUserBadgeMetrics", () => {
-  test("returns zero metrics for user with no activity", async () => {
-    const metrics = await getUserBadgeMetrics(testDb, testUserId);
-
-    expect(metrics.totalConsumed).toBe(0);
-    expect(metrics.totalWasted).toBe(0);
-    expect(metrics.totalShared).toBe(0);
-    expect(metrics.totalSold).toBe(0);
-    expect(metrics.totalActions).toBe(0);
-    expect(metrics.totalItems).toBe(0);
-    expect(metrics.wasteReductionRate).toBe(0);
-  });
-
-  test("counts consumed items", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-    ]);
-
-    const metrics = await getUserBadgeMetrics(testDb, testUserId);
-
-    expect(metrics.totalConsumed).toBe(2);
-    expect(metrics.totalActions).toBe(2);
-  });
-
-  test("handles case-insensitive type values", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "Consume", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "Waste", quantity: 1 },
-    ]);
-
-    const metrics = await getUserBadgeMetrics(testDb, testUserId);
-
-    expect(metrics.totalConsumed).toBe(1);
-    expect(metrics.totalWasted).toBe(1);
-  });
-
-  test("calculates waste reduction rate", async () => {
-    // 3 consumed + 1 wasted = 75% waste reduction
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "wasted", quantity: 1 },
-    ]);
-
-    const metrics = await getUserBadgeMetrics(testDb, testUserId);
-
-    expect(metrics.wasteReductionRate).toBe(75);
-  });
-
-  test("includes shared and sold in totalActions", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "shared", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "sold", quantity: 1 },
-    ]);
-
-    const metrics = await getUserBadgeMetrics(testDb, testUserId);
-
-    expect(metrics.totalActions).toBe(3);
-    expect(metrics.totalConsumed).toBe(1);
-    expect(metrics.totalShared).toBe(1);
-    expect(metrics.totalSold).toBe(1);
-  });
-});
+// ── checkAndAwardBadges ──────────────────────────────────────────────
 
 describe("checkAndAwardBadges", () => {
-  test("awards first_action badge on first action", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-    ]);
-
-    const newBadges = await checkAndAwardBadges(testDb, testUserId);
-
-    expect(newBadges.length).toBeGreaterThan(0);
-    expect(newBadges.some((b) => b.code === "first_action")).toBe(true);
-  });
-
-  test("awards first_consume badge when first item consumed", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-    ]);
-
-    const newBadges = await checkAndAwardBadges(testDb, testUserId);
-
-    expect(newBadges.some((b) => b.code === "first_consume")).toBe(true);
-  });
-
-  test("awards first_sale badge when first item sold", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "sold", quantity: 1 },
-    ]);
-
-    const newBadges = await checkAndAwardBadges(testDb, testUserId);
-
-    expect(newBadges.some((b) => b.code === "first_sale")).toBe(true);
-  });
-
-  test("does not award already earned badge", async () => {
-    // First check: should award badge
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-    ]);
-
-    const firstCheck = await checkAndAwardBadges(testDb, testUserId);
-    expect(firstCheck.some((b) => b.code === "first_action")).toBe(true);
-
-    // Second check: should not award again
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-16", type: "consumed", quantity: 1 },
-    ]);
-
-    const secondCheck = await checkAndAwardBadges(testDb, testUserId);
-    expect(secondCheck.some((b) => b.code === "first_action")).toBe(false);
-  });
-
-  test("awards bonus points when badge earned", async () => {
-    const pointsBefore = (
-      await testDb.query.userPoints.findFirst({
-        where: eq(schema.userPoints.userId, testUserId),
-      })
-    )?.totalPoints;
-
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-    ]);
-
-    await checkAndAwardBadges(testDb, testUserId);
-
-    const pointsAfter = (
-      await testDb.query.userPoints.findFirst({
-        where: eq(schema.userPoints.userId, testUserId),
-      })
-    )?.totalPoints;
-
-    // first_action (25) + first_consume (25) = 50 points
-    expect(pointsAfter).toBe((pointsBefore ?? 0) + 50);
-  });
-
-  test("awards eco_starter badge after 10 actions", async () => {
-    // Add 10 consumed actions
-    for (let i = 0; i < 10; i++) {
-      await testDb.insert(schema.productSustainabilityMetrics).values({
-        userId: testUserId,
-        todayDate: `2025-01-${String(i + 1).padStart(2, "0")}`,
-        type: "consumed",
-        quantity: 1,
-      });
-    }
-
-    const newBadges = await checkAndAwardBadges(testDb, testUserId);
-
-    expect(newBadges.some((b) => b.code === "eco_starter")).toBe(true);
-  });
-
-  test("awards waste_warrior badge at 80% reduction rate with 20+ items", async () => {
-    // Add 18 consumed + 2 wasted = 90% reduction rate with 20 items
-    for (let i = 0; i < 18; i++) {
-      await testDb.insert(schema.productSustainabilityMetrics).values({
-        userId: testUserId,
-        todayDate: `2025-01-${String(i + 1).padStart(2, "0")}`,
-        type: "consumed",
-        quantity: 1,
-      });
-    }
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-19", type: "wasted", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-20", type: "wasted", quantity: 1 },
-    ]);
-
-    const newBadges = await checkAndAwardBadges(testDb, testUserId);
-
-    expect(newBadges.some((b) => b.code === "waste_warrior")).toBe(true);
-  });
-
-  test("does not award waste_warrior with less than 20 items", async () => {
-    // 9 consumed + 1 wasted = 90% but only 10 items
-    for (let i = 0; i < 9; i++) {
-      await testDb.insert(schema.productSustainabilityMetrics).values({
-        userId: testUserId,
-        todayDate: `2025-01-${String(i + 1).padStart(2, "0")}`,
-        type: "consumed",
-        quantity: 1,
-      });
-    }
+  test("awards 'first_action' badge after 1 qualifying action", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    // Create the user_points record
+    await getOrCreateUserPoints(userId);
+    // Record 1 consumed interaction
     await testDb.insert(schema.productSustainabilityMetrics).values({
-      userId: testUserId,
-      todayDate: "2025-01-10",
-      type: "wasted",
-      quantity: 1,
+      userId, productId, todayDate: today, quantity: 1, type: "consumed",
     });
 
-    const newBadges = await checkAndAwardBadges(testDb, testUserId);
+    const awarded = await checkAndAwardBadges(userId);
+    const firstAction = awarded.find((b) => b.code === "first_action");
+    expect(firstAction).toBeDefined();
+    expect(firstAction!.name).toBe("First Steps");
 
-    expect(newBadges.some((b) => b.code === "waste_warrior")).toBe(false);
+    // Also verify first_consume was awarded
+    const firstConsume = awarded.find((b) => b.code === "first_consume");
+    expect(firstConsume).toBeDefined();
+  });
+
+  test("does NOT double-award a badge already earned", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: today, quantity: 1, type: "consumed",
+    });
+
+    // First call awards the badge
+    const first = await checkAndAwardBadges(userId);
+    const firstActionCount = first.filter((b) => b.code === "first_action").length;
+    expect(firstActionCount).toBe(1);
+
+    // Add another interaction so conditions are still met
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: today, quantity: 1, type: "consumed",
+    });
+
+    // Second call should NOT re-award first_action
+    const second = await checkAndAwardBadges(userId);
+    const reAwarded = second.find((b) => b.code === "first_action");
+    expect(reAwarded).toBeUndefined();
+  });
+
+  test("awards bonus points when a badge is earned", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: today, quantity: 1, type: "consumed",
+    });
+
+    await checkAndAwardBadges(userId);
+
+    const up = await getOrCreateUserPoints(userId);
+    // first_action awards 25 points, first_consume awards 25 points → 50 total badge bonus
+    expect(up.totalPoints).toBe(50);
+  });
+
+  test("awards multiple badges if multiple conditions are met simultaneously", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
+    // 1 consumed + 1 sold = satisfies first_action, first_consume, first_sale
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "sold" },
+    ]);
+
+    const awarded = await checkAndAwardBadges(userId);
+    const codes = awarded.map((b) => b.code);
+    expect(codes).toContain("first_action");
+    expect(codes).toContain("first_consume");
+    expect(codes).toContain("first_sale");
+    expect(awarded.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test("badge bonus adds on top of kg-scaled action points", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    // Simulate prior consume of 2kg = 5*2 = 10 action points already in totalPoints
+    await getOrCreateUserPoints(userId);
+    await testDb
+      .update(schema.userPoints)
+      .set({ totalPoints: 10 })
+      .where(eq(schema.userPoints.userId, userId));
+
+    // Record 1 consumed interaction → triggers first_action (25) + first_consume (25)
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: today, quantity: 2, type: "consumed",
+    });
+
+    await checkAndAwardBadges(userId);
+
+    const up = await getOrCreateUserPoints(userId);
+    // 10 (prior action pts) + 25 (first_action) + 25 (first_consume) = 60
+    expect(up.totalPoints).toBe(60);
+  });
+
+  test("multiple kg-based interactions trigger correct badge bonuses", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
+
+    // Insert 10 consumed interactions (each 2.5kg) → triggers first_action (25) + first_consume (25) + eco_starter (50)
+    const rows = Array.from({ length: 10 }, () => ({
+      userId, productId, todayDate: today, quantity: 2.5, type: "consumed" as const,
+    }));
+    await testDb.insert(schema.productSustainabilityMetrics).values(rows);
+
+    const awarded = await checkAndAwardBadges(userId);
+    const codes = awarded.map((b) => b.code);
+    expect(codes).toContain("first_action");
+    expect(codes).toContain("first_consume");
+    expect(codes).toContain("eco_starter");
+
+    const totalBonus = awarded.reduce((sum, b) => sum + b.pointsAwarded, 0);
+    expect(totalBonus).toBe(100); // 25 + 25 + 50
+
+    const up = await getOrCreateUserPoints(userId);
+    expect(up.totalPoints).toBe(100);
+  });
+
+  test("wasted interactions don't count toward badge action totals", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
+
+    // 1 consumed + 5 wasted
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 2, type: "wasted" },
+      { userId, productId, todayDate: today, quantity: 3, type: "wasted" },
+      { userId, productId, todayDate: today, quantity: 1.5, type: "wasted" },
+      { userId, productId, todayDate: today, quantity: 0.5, type: "wasted" },
+      { userId, productId, todayDate: today, quantity: 4, type: "wasted" },
+    ]);
+
+    const metrics = await getUserBadgeMetrics(userId);
+    // totalActions counts only consumed+shared+sold, NOT wasted
+    expect(metrics.totalActions).toBe(1);
+    expect(metrics.totalWasted).toBe(5);
+
+    const awarded = await checkAndAwardBadges(userId);
+    const codes = awarded.map((b) => b.code);
+    // Only first_action + first_consume should be awarded (totalActions=1)
+    expect(codes).toContain("first_action");
+    expect(codes).toContain("first_consume");
+    // eco_starter requires 10 actions — should NOT be awarded
+    expect(codes).not.toContain("eco_starter");
+  });
+
+  test("badge metrics count interactions not kg quantities", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
+
+    // 1 interaction with quantity=50kg
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: today, quantity: 50, type: "consumed",
+    });
+
+    const metrics = await getUserBadgeMetrics(userId);
+    // totalConsumed should be 1 (row count), not 50 (quantity)
+    expect(metrics.totalConsumed).toBe(1);
+    expect(metrics.totalActions).toBe(1);
+
+    const awarded = await checkAndAwardBadges(userId);
+    const codes = awarded.map((b) => b.code);
+    expect(codes).toContain("first_action");
+    expect(codes).toContain("first_consume");
+    // waste_watcher needs 25 consumed interactions — should NOT be awarded with just 1
+    expect(codes).not.toContain("waste_watcher");
   });
 });
+
+// ── getUserBadgeMetrics ──────────────────────────────────────────────
+
+describe("getUserBadgeMetrics", () => {
+  test("metrics count rows not quantity values", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
+
+    // 3 consumed (qty: 10, 5, 0.5), 2 wasted (qty: 3, 1)
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 10, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 5, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 0.5, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 3, type: "wasted" },
+      { userId, productId, todayDate: today, quantity: 1, type: "wasted" },
+    ]);
+
+    const metrics = await getUserBadgeMetrics(userId);
+    expect(metrics.totalConsumed).toBe(3);
+    expect(metrics.totalWasted).toBe(2);
+    expect(metrics.totalActions).toBe(3); // consumed + shared + sold
+    expect(metrics.totalItems).toBe(5);   // totalActions + totalWasted
+    expect(metrics.wasteReductionRate).toBe((3 / 5) * 100); // 60%
+  });
+
+  test("mixed action types with various kg quantities", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
+
+    // 2 consumed, 1 shared, 1 sold, 1 wasted — all with kg-based quantities
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 3.5, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 12, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 0.75, type: "shared" },
+      { userId, productId, todayDate: today, quantity: 8, type: "sold" },
+      { userId, productId, todayDate: today, quantity: 25, type: "wasted" },
+    ]);
+
+    const metrics = await getUserBadgeMetrics(userId);
+    // All counts are per-interaction, not per-kg
+    expect(metrics.totalConsumed).toBe(2);
+    expect(metrics.totalShared).toBe(1);
+    expect(metrics.totalSold).toBe(1);
+    expect(metrics.totalWasted).toBe(1);
+    expect(metrics.totalActions).toBe(4); // 2+1+1
+    expect(metrics.totalItems).toBe(5);   // 4+1
+  });
+});
+
+// ── getBadgeProgress ─────────────────────────────────────────────────
 
 describe("getBadgeProgress", () => {
-  test("returns progress for all badges", async () => {
-    const progress = await getBadgeProgress(testDb, testUserId);
+  test("returns progress for all defined badge codes", async () => {
+    await getOrCreateUserPoints(userId);
+    const progress = await getBadgeProgress(userId);
 
-    expect(progress.first_action).toBeDefined();
-    expect(progress.eco_starter).toBeDefined();
-    expect(progress.first_consume).toBeDefined();
-    expect(progress.first_sale).toBeDefined();
-  });
-
-  test("shows 0 progress with no activity", async () => {
-    const progress = await getBadgeProgress(testDb, testUserId);
-
-    expect(progress.first_action.current).toBe(0);
-    expect(progress.first_action.target).toBe(1);
-    expect(progress.first_action.percentage).toBe(0);
-  });
-
-  test("shows correct progress for first_action", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-    ]);
-
-    const progress = await getBadgeProgress(testDb, testUserId);
-
-    expect(progress.first_action.current).toBe(1);
-    expect(progress.first_action.percentage).toBe(100);
-  });
-
-  test("shows correct progress for eco_starter", async () => {
-    // Add 5 actions (50% progress towards 10)
-    for (let i = 0; i < 5; i++) {
-      await testDb.insert(schema.productSustainabilityMetrics).values({
-        userId: testUserId,
-        todayDate: `2025-01-${String(i + 1).padStart(2, "0")}`,
-        type: "consumed",
-        quantity: 1,
-      });
+    for (const def of BADGE_DEFINITIONS) {
+      expect(progress[def.code]).toBeDefined();
+      expect(progress[def.code]).toHaveProperty("current");
+      expect(progress[def.code]).toHaveProperty("target");
+      expect(progress[def.code]).toHaveProperty("percentage");
     }
-
-    const progress = await getBadgeProgress(testDb, testUserId);
-
-    expect(progress.eco_starter.current).toBe(5);
-    expect(progress.eco_starter.target).toBe(10);
-    expect(progress.eco_starter.percentage).toBe(50);
   });
 
-  test("caps percentage at 100", async () => {
-    // Add 15 actions (150% of target but should cap at 100)
-    for (let i = 0; i < 15; i++) {
-      await testDb.insert(schema.productSustainabilityMetrics).values({
-        userId: testUserId,
-        todayDate: `2025-01-${String(i + 1).padStart(2, "0")}`,
-        type: "consumed",
-        quantity: 1,
-      });
-    }
+  test("percentage is 0 when no progress", async () => {
+    await getOrCreateUserPoints(userId);
+    const progress = await getBadgeProgress(userId);
 
-    const progress = await getBadgeProgress(testDb, testUserId);
+    // first_action needs totalActions >= 1, with 0 interactions it should be 0
+    expect(progress["first_action"].percentage).toBe(0);
+    expect(progress["first_action"].current).toBe(0);
 
-    expect(progress.eco_starter.percentage).toBe(100);
+    // eco_starter needs 10 actions
+    expect(progress["eco_starter"].percentage).toBe(0);
   });
 
-  test("shows item count progress for waste_warrior when below 20 items", async () => {
-    // Add 10 items (should show progress towards 20 items, not towards 80% rate)
-    for (let i = 0; i < 10; i++) {
-      await testDb.insert(schema.productSustainabilityMetrics).values({
-        userId: testUserId,
-        todayDate: `2025-01-${String(i + 1).padStart(2, "0")}`,
-        type: "consumed",
-        quantity: 1,
-      });
-    }
+  test("percentage is 100 when condition is met", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await getOrCreateUserPoints(userId);
 
-    const progress = await getBadgeProgress(testDb, testUserId);
-
-    expect(progress.waste_warrior.current).toBe(10);
-    expect(progress.waste_warrior.target).toBe(20);
-    expect(progress.waste_warrior.percentage).toBe(50);
-  });
-
-  test("shows rate progress for waste_warrior when 20+ items", async () => {
-    // Add 16 consumed + 4 wasted = 80% reduction rate with 20 items
-    for (let i = 0; i < 16; i++) {
-      await testDb.insert(schema.productSustainabilityMetrics).values({
-        userId: testUserId,
-        todayDate: `2025-01-${String(i + 1).padStart(2, "0")}`,
-        type: "consumed",
-        quantity: 1,
-      });
-    }
-    for (let i = 0; i < 4; i++) {
-      await testDb.insert(schema.productSustainabilityMetrics).values({
-        userId: testUserId,
-        todayDate: `2025-01-${String(17 + i).padStart(2, "0")}`,
-        type: "wasted",
-        quantity: 1,
-      });
-    }
-
-    const progress = await getBadgeProgress(testDb, testUserId);
-
-    expect(progress.waste_warrior.current).toBe(80);
-    expect(progress.waste_warrior.target).toBe(80);
-    expect(progress.waste_warrior.percentage).toBe(100);
-  });
-});
-
-describe("race condition handling", () => {
-  test("handles duplicate badge insert gracefully", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-    ]);
-
-    // First award
-    const first = await checkAndAwardBadges(testDb, testUserId);
-    expect(first.some((b) => b.code === "first_action")).toBe(true);
-
-    // Second award (same user, same conditions) should not throw
-    const second = await checkAndAwardBadges(testDb, testUserId);
-    expect(second.some((b) => b.code === "first_action")).toBe(false);
-
-    // Verify only one badge exists
-    const badges = await testDb.query.userBadges.findMany({
-      where: eq(schema.userBadges.userId, testUserId),
+    // Add 1 consumed interaction to satisfy first_action and first_consume
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: today, quantity: 1, type: "consumed",
     });
 
-    const firstActionBadges = badges.filter((b) => {
-      const badge = testDb.query.badges.findFirst({
-        where: eq(schema.badges.id, b.badgeId),
-      });
-      return badge;
-    });
+    const progress = await getBadgeProgress(userId);
 
-    // Should have exactly 2 badges (first_action and first_consume) not duplicates
-    expect(badges.length).toBe(2);
+    expect(progress["first_action"].percentage).toBe(100);
+    expect(progress["first_action"].current).toBe(1);
+    expect(progress["first_action"].target).toBe(1);
+
+    expect(progress["first_consume"].percentage).toBe(100);
+    expect(progress["first_consume"].current).toBe(1);
+    expect(progress["first_consume"].target).toBe(1);
   });
 });

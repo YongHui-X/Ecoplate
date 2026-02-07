@@ -52,9 +52,13 @@ export async function awardPoints(
   action: PointAction,
   productId?: number | null,
   quantity?: number,
+  skipMetricRecording?: boolean,
   listingData?: ListingDataForCo2
 ) {
-  const amount = POINT_VALUES[action];
+  const baseValue = POINT_VALUES[action];
+  const scaled = Math.round(baseValue * (quantity ?? 1));
+  // Enforce minimum of the base value (absolute comparison)
+  const amount = Math.abs(scaled) >= Math.abs(baseValue) ? scaled : baseValue;
   const userPoints = await getOrCreateUserPoints(userId);
 
   const newTotal = Math.max(0, userPoints.totalPoints + amount);
@@ -64,15 +68,17 @@ export async function awardPoints(
     .set({ totalPoints: newTotal })
     .where(eq(schema.userPoints.userId, userId));
 
-  // Record the sustainability metric
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  await db.insert(schema.productSustainabilityMetrics).values({
-    productId: productId ?? null,
-    userId,
-    todayDate: today,
-    quantity: quantity ?? 1,
-    type: action,
-  });
+  // Record the sustainability metric (skip if caller already recorded it)
+  if (!skipMetricRecording) {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    await db.insert(schema.productSustainabilityMetrics).values({
+      productId: productId ?? null,
+      userId,
+      todayDate: today,
+      quantity: quantity ?? 1,
+      type: action,
+    });
+  }
 
   // Only update streak for positive sustainability actions (not wasted)
   const streakActions = ["consumed", "shared", "sold"];
@@ -121,11 +127,12 @@ export async function awardPoints(
 export async function updateStreak(userId: number) {
   const userPoints = await getOrCreateUserPoints(userId);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  // Use UTC date strings to match how todayDate is stored (toISOString().slice(0, 10))
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+  const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
 
   const streakActions = ["consumed", "shared", "sold"];
 
@@ -138,41 +145,28 @@ export async function updateStreak(userId: number) {
     orderBy: [desc(schema.productSustainabilityMetrics.todayDate)],
   });
 
-  // Filter today's interactions in JavaScript (avoids timestamp format issues)
-  const todayInteractions = allInteractions.filter((i) => {
-    const interactionDate = new Date(i.todayDate);
-    interactionDate.setHours(0, 0, 0, 0);
-    return interactionDate.getTime() === today.getTime();
-  });
+  // Filter today's interactions using string comparison (matches storage format)
+  const todayInteractions = allInteractions.filter((i) => i.todayDate === todayStr);
 
   // If more than 1 interaction today, streak already counted for today
   if (todayInteractions.length > 1) {
     return;
   }
 
-  // Find the most recent interaction BEFORE today
-  const previousInteraction = allInteractions.find((i) => {
-    const interactionDate = new Date(i.todayDate);
-    interactionDate.setHours(0, 0, 0, 0);
-    return interactionDate.getTime() < today.getTime();
-  });
+  // Find the most recent interaction BEFORE today using string comparison
+  const previousInteraction = allInteractions.find((i) => i.todayDate < todayStr);
 
   let newStreak: number;
 
   if (!previousInteraction) {
     // First ever qualifying interaction - start streak at 1
     newStreak = 1;
+  } else if (previousInteraction.todayDate === yesterdayStr) {
+    // Last interaction was yesterday - continue streak
+    newStreak = userPoints.currentStreak + 1;
   } else {
-    const lastDate = new Date(previousInteraction.todayDate);
-    lastDate.setHours(0, 0, 0, 0);
-
-    if (lastDate.getTime() === yesterday.getTime()) {
-      // Last interaction was yesterday - continue streak
-      newStreak = userPoints.currentStreak + 1;
-    } else {
-      // Last interaction was more than 1 day ago - reset streak
-      newStreak = 1;
-    }
+    // Last interaction was more than 1 day ago - reset streak
+    newStreak = 1;
   }
 
   await db
@@ -218,14 +212,17 @@ export async function getDetailedPointsStats(userId: number) {
 
   const streakActions = ["consumed", "shared", "sold"];
   const now = new Date();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
 
-  const weekAgo = new Date(todayStart);
-  weekAgo.setDate(weekAgo.getDate() - 7);
+  // Use UTC date strings to match how todayDate is stored
+  const todayStr = now.toISOString().slice(0, 10);
 
-  const monthAgo = new Date(todayStart);
-  monthAgo.setMonth(monthAgo.getMonth() - 1);
+  const weekAgoDate = new Date(now);
+  weekAgoDate.setUTCDate(weekAgoDate.getUTCDate() - 7);
+  const weekAgoStr = weekAgoDate.toISOString().slice(0, 10);
+
+  const monthAgoDate = new Date(now);
+  monthAgoDate.setUTCMonth(monthAgoDate.getUTCMonth() - 1);
+  const monthAgoStr = monthAgoDate.toISOString().slice(0, 10);
 
   // Breakdown by type (all interactions)
   const breakdownByType: Record<string, { count: number; totalPoints: number }> = {
@@ -250,10 +247,12 @@ export async function getDetailedPointsStats(userId: number) {
   let lastActiveDate: string | null = null;
 
   for (const interaction of allInteractions) {
-    const type = interaction.type as keyof typeof POINT_VALUES;
-    const points = POINT_VALUES[type] ?? 0;
-    const interactionDate = new Date(interaction.todayDate);
-    const dateKey = interactionDate.toISOString().split("T")[0];
+    const type = (interaction.type || "").toLowerCase() as keyof typeof POINT_VALUES;
+    const basePoints = POINT_VALUES[type] ?? 0;
+    const scaled = Math.round(basePoints * Math.abs(interaction.quantity ?? 1));
+    const points = Math.abs(scaled) >= Math.abs(basePoints) ? scaled : basePoints;
+    // Use todayDate directly as dateKey — it's already stored as "YYYY-MM-DD"
+    const dateKey = interaction.todayDate;
 
     // Breakdown
     if (breakdownByType[type]) {
@@ -272,29 +271,28 @@ export async function getDetailedPointsStats(userId: number) {
     const monthKey = dateKey.substring(0, 7); // YYYY-MM
     pointsByMonth.set(monthKey, (pointsByMonth.get(monthKey) || 0) + points);
 
-    // Time-windowed points
-    if (interactionDate >= todayStart) {
+    // Time-windowed points using string comparison (YYYY-MM-DD sorts lexicographically)
+    if (dateKey >= todayStr) {
       pointsToday += points;
     }
-    if (interactionDate >= weekAgo) {
+    if (dateKey >= weekAgoStr) {
       pointsThisWeek += points;
     }
-    if (interactionDate >= monthAgo) {
+    if (dateKey >= monthAgoStr) {
       pointsThisMonth += points;
     }
 
     // Track active days for streak (positive actions only)
     if (streakActions.includes(type)) {
-      const d = new Date(interaction.todayDate);
-      d.setHours(0, 0, 0, 0);
-      activeDateSet.add(d.toISOString().split("T")[0]);
+      activeDateSet.add(dateKey);
     }
   }
 
   // Compute longest streak from sorted unique active dates
+  // Parse with explicit UTC suffix to avoid timezone shifts
   const activeDates = Array.from(activeDateSet)
     .sort()
-    .map((d) => new Date(d));
+    .map((d) => new Date(d + "T00:00:00Z"));
 
   let longestStreak = 0;
   let currentRun = 0;
@@ -369,11 +367,13 @@ export async function getUserMetrics(userId: number) {
   };
 
   for (const interaction of interactions) {
-    switch (interaction.type) {
+    switch ((interaction.type || "").toLowerCase()) {
       case "consumed":
+      case "consume":
         metrics.totalItemsConsumed++;
         break;
       case "wasted":
+      case "waste":
         metrics.totalItemsWasted++;
         break;
       case "shared":

@@ -5,6 +5,7 @@ import * as schema from "./schema";
 import { hashPassword } from "../middleware/auth";
 import { BADGE_DEFINITIONS } from "../services/badge-service";
 import { calculateCo2Saved } from "../utils/co2-calculator";
+import 'dotenv/config';
 
 const dbPath = process.env.DATABASE_PATH || "ecoplate.db";
 const sqlite = new Database(dbPath);

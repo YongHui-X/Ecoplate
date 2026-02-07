@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "bun run src/index.ts",
-    "dev": "lsof -ti :3000 | xargs kill -9 2>/dev/null || true; bun --watch src/index.ts",
+    "dev": "bun --watch src/index.ts",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/db/seed.ts",
     "db:reset": "rm -f ecoplate.db && bun run db:migrate && bun run db:seed",

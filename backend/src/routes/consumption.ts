@@ -8,6 +8,7 @@ import {
   calculateWasteMetrics,
   type IngredientInput,
 } from "../services/consumption-service";
+import { awardPoints } from "../services/gamification-service";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import type * as schema from "../db/schema";
 
@@ -364,18 +365,21 @@ Return JSON:
       const todayDate = new Date().toISOString().split("T")[0];
 
       for (const ing of ingredients) {
-        // 1. Record Consume interaction with full quantity
+        // 1. Record consumed interaction with full quantity
         const [interaction] = await db.insert(productSustainabilityMetrics).values({
           productId: ing.productId,
           userId: user.id,
           todayDate,
           quantity: ing.quantityUsed,
-          type: "Consume",
+          type: "consumed",
         }).returning();
 
         interactionIds.push(interaction.id);
 
-        // 2. Deduct from product quantity
+        // 2. Award points (skip metric recording since we already recorded above)
+        await awardPoints(user.id, "consumed", ing.productId, ing.quantityUsed, true);
+
+        // 3. Deduct from product quantity
         const product = await db.query.products.findFirst({
           where: eq(products.id, ing.productId)
         });
@@ -427,24 +431,19 @@ Return JSON:
         // Find waste for this ingredient
         const waste = wasteItems.find(w => w.productId === ing.productId);
         const wastedQty = waste?.quantityWasted || 0;
-        const consumedQty = ing.quantityUsed - wastedQty;
 
-        // 1. Update existing Consume interaction (reduce to actual consumed)
-        if (ing.interactionId) {
-          await db.update(productSustainabilityMetrics)
-            .set({ quantity: consumedQty })
-            .where(eq(productSustainabilityMetrics.id, ing.interactionId));
-        }
-
-        // 2. Create Waste interaction if any waste
+        // 1. Create wasted interaction if any waste
         if (wastedQty > 0) {
           await db.insert(productSustainabilityMetrics).values({
             productId: ing.productId,
             userId: user.id,
             todayDate,
             quantity: wastedQty,
-            type: "Waste",
+            type: "wasted",
           });
+
+          // Penalize points for waste (skip metric recording since we already recorded above)
+          await awardPoints(user.id, "wasted", ing.productId, wastedQty, true);
         }
       }
 

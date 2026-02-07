@@ -5,6 +5,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
 import OpenAI from "openai";
+import { awardPoints, type PointAction } from "../services/gamification-service";
 
 const productSchema = z.object({
   productName: z.string().min(1).max(200),
@@ -18,7 +19,7 @@ const productSchema = z.object({
 });
 
 const interactionSchema = z.object({
-  type: z.enum(["Add", "Consume", "Waste"]),
+  type: z.enum(["add", "consumed", "wasted"]),
   quantity: z.number().positive(),
   todayDate: z.string().optional(),
 });
@@ -38,13 +39,6 @@ const pendingConsumptionSchema = z.object({
   })).default([]),
   status: z.enum(["PENDING_WASTE_PHOTO", "COMPLETED"]).default("PENDING_WASTE_PHOTO"),
 });
-
-// Points awarded for different actions
-const POINTS: Record<string, number> = {
-  Add: 2,
-  Consume: 5,
-  Waste: -2,
-};
 
 export function registerMyFridgeRoutes(router: Router) {
   // Get all products for the authenticated user
@@ -81,18 +75,15 @@ export function registerMyFridgeRoutes(router: Router) {
         })
         .returning();
 
-      // Log "Add" interaction for sustainability tracking
+      // Log "add" interaction for sustainability tracking (no points awarded)
       const todayDate = new Date().toISOString().split("T")[0];
       await db.insert(productSustainabilityMetrics).values({
         productId: product.id,
         userId: user.id,
         todayDate,
         quantity: data.quantity,
-        type: "Add",
+        type: "add",
       });
-
-      // Award points for adding a product
-      await awardPoints(user.id, POINTS.Add);
 
       return json(product);
     } catch (e) {
@@ -195,15 +186,6 @@ export function registerMyFridgeRoutes(router: Router) {
         return error("Product not found", 404);
       }
 
-      // Log the interaction
-      await db.insert(productSustainabilityMetrics).values({
-        productId,
-        userId: user.id,
-        todayDate: data.todayDate || new Date().toISOString().split("T")[0],
-        quantity: data.quantity,
-        type: data.type,
-      });
-
       // Deduct quantity from product
       const newQuantity = Math.max(0, (product.quantity || 0) - data.quantity);
       await db
@@ -211,13 +193,17 @@ export function registerMyFridgeRoutes(router: Router) {
         .set({ quantity: newQuantity })
         .where(eq(products.id, productId));
 
-      // Award/deduct points based on action
-      const pointsChange = POINTS[data.type];
-      await awardPoints(user.id, pointsChange);
+      // Award/deduct points (also records the sustainability metric)
+      const pointsResult = await awardPoints(
+        user.id,
+        data.type as PointAction,
+        productId,
+        data.quantity
+      );
 
       return json({
         message: "Product interaction logged",
-        pointsChange,
+        pointsChange: pointsResult.amount,
         newQuantity,
       });
     } catch (e) {
@@ -535,7 +521,3 @@ For each item, determine its eco-focused sub-category (Ruminant meat, Non-rumina
   });
 }
 
-// TODO: Implement points system once gamification is confirmed
-async function awardPoints(_userId: number, _amount: number) {
-  // No-op until userPoints table is implemented
-}

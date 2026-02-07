@@ -1,520 +1,693 @@
-import { describe, expect, test, beforeAll, afterAll, beforeEach, mock } from "bun:test";
+import { describe, expect, test, beforeAll, beforeEach, mock } from "bun:test";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { eq } from "drizzle-orm";
 import * as schema from "../../db/schema";
+import { eq } from "drizzle-orm";
 
-// Set up in-memory test database
-let sqlite: Database;
-let testDb: ReturnType<typeof drizzle<typeof schema>>;
-let testUserId: number;
-let secondUserId: number;
+// ── In-memory DB setup ──────────────────────────────────────────────
 
-const POINT_VALUES = {
-  consumed: 5,
-  shared: 10,
-  sold: 8,
-  wasted: -3,
-} as const;
+const sqlite = new Database(":memory:");
+sqlite.exec("PRAGMA journal_mode = WAL;");
 
-type PointAction = keyof typeof POINT_VALUES;
+sqlite.exec(`
+  CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    avatar_url TEXT,
+    user_location TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
 
-// Implementation of functions under test (simplified versions that use testDb)
-async function getOrCreateUserPoints(db: typeof testDb, userId: number) {
-  let points = await db.query.userPoints.findFirst({
-    where: eq(schema.userPoints.userId, userId),
-  });
+  CREATE TABLE products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_name TEXT NOT NULL,
+    category TEXT,
+    quantity REAL NOT NULL,
+    unit TEXT,
+    unit_price REAL,
+    purchase_date INTEGER,
+    description TEXT,
+    co2_emission REAL
+  );
 
-  if (!points) {
-    const [created] = await db
-      .insert(schema.userPoints)
-      .values({ userId })
-      .returning();
-    points = created;
-  }
+  CREATE TABLE user_points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    total_points INTEGER NOT NULL DEFAULT 0,
+    current_streak INTEGER NOT NULL DEFAULT 0,
+    total_co2_saved REAL NOT NULL DEFAULT 0
+  );
 
-  return points;
-}
+  CREATE TABLE product_sustainability_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    today_date TEXT NOT NULL,
+    quantity REAL,
+    type TEXT
+  );
 
-async function awardPoints(
-  db: typeof testDb,
-  userId: number,
-  action: PointAction,
-  productId?: number | null,
-  quantity?: number,
-  listingData?: { co2Saved: number | null; buyerId: number | null }
-) {
-  const amount = POINT_VALUES[action];
-  const userPoints = await getOrCreateUserPoints(db, userId);
+  CREATE TABLE badges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT,
+    points_awarded INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    badge_image_url TEXT
+  );
 
-  const newTotal = Math.max(0, userPoints.totalPoints + amount);
+  CREATE TABLE user_badges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    badge_id INTEGER NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
+    earned_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    UNIQUE(user_id, badge_id)
+  );
+`);
 
-  await db
-    .update(schema.userPoints)
-    .set({ totalPoints: newTotal })
-    .where(eq(schema.userPoints.userId, userId));
+const testDb = drizzle(sqlite, { schema });
 
-  // Record the sustainability metric
-  const today = new Date().toISOString().slice(0, 10);
-  await db.insert(schema.productSustainabilityMetrics).values({
-    productId: productId ?? null,
-    userId,
-    todayDate: today,
-    quantity: quantity ?? 1,
-    type: action,
-  });
+// Mock the db export used by gamification-service and badge-service
+mock.module("../../index", () => ({ db: testDb }));
 
-  // Handle CO2 tracking for sold items
-  let co2Saved: number | null = null;
-  if (action === "sold" && listingData?.co2Saved) {
-    co2Saved = listingData.co2Saved;
+// Mock notification service to avoid DB calls to notifications table
+mock.module("../notification-service", () => ({
+  notifyStreakMilestone: async () => {},
+  notifyBadgeUnlocked: async () => {},
+}));
 
-    // Award CO2 to seller
-    await db
-      .update(schema.userPoints)
-      .set({ totalCo2Saved: userPoints.totalCo2Saved + co2Saved })
-      .where(eq(schema.userPoints.userId, userId));
+// Mock badge-service to break circular dependency (badge-service <-> gamification-service)
+mock.module("../badge-service", () => ({
+  checkAndAwardBadges: async () => [],
+  BADGE_DEFINITIONS: [],
+  getUserBadgeMetrics: async () => ({}),
+  getBadgeProgress: async () => ({}),
+}));
 
-    // Award CO2 to buyer if exists
-    if (listingData.buyerId) {
-      const buyerPoints = await getOrCreateUserPoints(db, listingData.buyerId);
-      await db
-        .update(schema.userPoints)
-        .set({ totalCo2Saved: buyerPoints.totalCo2Saved + co2Saved })
-        .where(eq(schema.userPoints.userId, listingData.buyerId));
-    }
-  }
+// Import AFTER mocking so the services pick up our in-memory db
+import {
+  POINT_VALUES,
+  awardPoints,
+  updateStreak,
+  getDetailedPointsStats,
+  getUserMetrics,
+  getOrCreateUserPoints,
+} from "../gamification-service";
 
-  return { action, amount, newTotal, newBadges: [], co2Saved };
-}
+// ── Seed data ────────────────────────────────────────────────────────
 
-async function getUserMetrics(db: typeof testDb, userId: number) {
-  const interactions = await db.query.productSustainabilityMetrics.findMany({
-    where: eq(schema.productSustainabilityMetrics.userId, userId),
-  });
+let userId: number;
+let productId: number;
 
-  const metrics = {
-    totalItemsConsumed: 0,
-    totalItemsWasted: 0,
-    totalItemsShared: 0,
-    totalItemsSold: 0,
-  };
+beforeAll(() => {
+  // Seed a test user
+  const userStmt = sqlite.prepare(
+    "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?) RETURNING id"
+  );
+  const userRow = userStmt.get("test@eco.com", "hash123", "Test User") as { id: number };
+  userId = userRow.id;
 
-  for (const interaction of interactions) {
-    switch (interaction.type) {
-      case "consumed":
-        metrics.totalItemsConsumed++;
-        break;
-      case "wasted":
-        metrics.totalItemsWasted++;
-        break;
-      case "shared":
-        metrics.totalItemsShared++;
-        break;
-      case "sold":
-        metrics.totalItemsSold++;
-        break;
-    }
-  }
+  // Seed a test product
+  const prodStmt = sqlite.prepare(
+    "INSERT INTO products (user_id, product_name, category, quantity) VALUES (?, ?, ?, ?) RETURNING id"
+  );
+  const prodRow = prodStmt.get(userId, "Milk", "dairy", 1) as { id: number };
+  productId = prodRow.id;
 
-  const totalItems =
-    metrics.totalItemsConsumed +
-    metrics.totalItemsWasted +
-    metrics.totalItemsShared +
-    metrics.totalItemsSold;
-
-  const itemsSaved =
-    metrics.totalItemsConsumed + metrics.totalItemsShared + metrics.totalItemsSold;
-
-  const wasteReductionRate = totalItems > 0 ? (itemsSaved / totalItems) * 100 : 100;
-  const estimatedCo2Saved = itemsSaved * 0.5;
-  const estimatedMoneySaved = itemsSaved * 5;
-
-  return {
-    ...metrics,
-    wasteReductionRate,
-    estimatedCo2Saved,
-    estimatedMoneySaved,
-  };
-}
-
-beforeAll(async () => {
-  sqlite = new Database(":memory:");
-  sqlite.exec("PRAGMA journal_mode = WAL;");
-  sqlite.exec("PRAGMA foreign_keys = ON;");
-
-  sqlite.exec(`
-    CREATE TABLE users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      name TEXT NOT NULL,
-      avatar_url TEXT,
-      user_location TEXT,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-    );
-
-    CREATE TABLE user_points (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-      total_points INTEGER NOT NULL DEFAULT 0,
-      current_streak INTEGER NOT NULL DEFAULT 0,
-      total_co2_saved REAL NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE product_sustainability_metrics (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      product_id INTEGER,
-      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      today_date TEXT NOT NULL,
-      quantity REAL,
-      type TEXT
-    );
-  `);
-
-  testDb = drizzle(sqlite, { schema });
-
-  // Seed test users
-  const [user1] = await testDb
-    .insert(schema.users)
-    .values({
-      email: "test@example.com",
-      passwordHash: "hashed",
-      name: "Test User",
-    })
-    .returning();
-  testUserId = user1.id;
-
-  const [user2] = await testDb
-    .insert(schema.users)
-    .values({
-      email: "buyer@example.com",
-      passwordHash: "hashed",
-      name: "Buyer User",
-    })
-    .returning();
-  secondUserId = user2.id;
+  // Seed badge definitions (needed by checkAndAwardBadges which awardPoints calls)
+  const badgeStmt = sqlite.prepare(
+    "INSERT INTO badges (code, name, description, category, points_awarded, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
+  );
+  badgeStmt.run("first_action", "First Steps", "Complete your first sustainability action", "milestones", 25, 1);
+  badgeStmt.run("eco_starter", "Eco Starter", "Complete 10 sustainability actions", "milestones", 50, 2);
+  badgeStmt.run("first_consume", "Clean Plate", "Consume your first item", "waste-reduction", 25, 5);
+  badgeStmt.run("first_sale", "First Sale", "Sell your first marketplace item", "sharing", 25, 9);
 });
 
-afterAll(() => {
-  sqlite.close();
+beforeEach(() => {
+  // Reset points and interactions between tests
+  sqlite.exec("DELETE FROM user_badges");
+  sqlite.exec("DELETE FROM product_sustainability_metrics");
+  sqlite.exec("DELETE FROM user_points");
 });
 
-beforeEach(async () => {
-  await testDb.delete(schema.productSustainabilityMetrics);
-  await testDb.delete(schema.userPoints);
-});
+// ── POINT_VALUES ─────────────────────────────────────────────────────
 
-describe("getOrCreateUserPoints", () => {
-  test("creates user points if not exists", async () => {
-    const points = await getOrCreateUserPoints(testDb, testUserId);
-
-    expect(points).toBeDefined();
-    expect(points.userId).toBe(testUserId);
-    expect(points.totalPoints).toBe(0);
-    expect(points.currentStreak).toBe(0);
+describe("POINT_VALUES", () => {
+  test("consumed awards 5 points", () => {
+    expect(POINT_VALUES.consumed).toBe(5);
   });
 
-  test("returns existing user points", async () => {
-    // Create points first
-    await testDb.insert(schema.userPoints).values({
-      userId: testUserId,
-      totalPoints: 100,
-      currentStreak: 5,
-    });
-
-    const points = await getOrCreateUserPoints(testDb, testUserId);
-
-    expect(points.totalPoints).toBe(100);
-    expect(points.currentStreak).toBe(5);
+  test("shared awards 10 points", () => {
+    expect(POINT_VALUES.shared).toBe(10);
   });
 
-  test("does not create duplicate records", async () => {
-    await getOrCreateUserPoints(testDb, testUserId);
-    await getOrCreateUserPoints(testDb, testUserId);
+  test("sold awards 8 points", () => {
+    expect(POINT_VALUES.sold).toBe(8);
+  });
 
-    const allPoints = await testDb.query.userPoints.findMany({
-      where: eq(schema.userPoints.userId, testUserId),
-    });
-
-    expect(allPoints.length).toBe(1);
+  test("wasted penalizes 3 points", () => {
+    expect(POINT_VALUES.wasted).toBe(-3);
   });
 });
+
+// ── awardPoints ──────────────────────────────────────────────────────
 
 describe("awardPoints", () => {
-  test("awards points for consumed action", async () => {
-    const result = await awardPoints(testDb, testUserId, "consumed");
-
-    expect(result.action).toBe("consumed");
+  test("awards correct positive points for consumed", async () => {
+    const result = await awardPoints(userId, "consumed", productId);
     expect(result.amount).toBe(5);
+    // newTotal is the action-level total (before badge bonuses modify the DB)
     expect(result.newTotal).toBe(5);
+    expect(result.action).toBe("consumed");
   });
 
-  test("awards points for shared action", async () => {
-    const result = await awardPoints(testDb, testUserId, "shared");
-
-    expect(result.action).toBe("shared");
-    expect(result.amount).toBe(10);
-    expect(result.newTotal).toBe(10);
-  });
-
-  test("awards points for sold action", async () => {
-    const result = await awardPoints(testDb, testUserId, "sold");
-
-    expect(result.action).toBe("sold");
+  test("awards correct positive points for sold", async () => {
+    const result = await awardPoints(userId, "sold", productId);
     expect(result.amount).toBe(8);
     expect(result.newTotal).toBe(8);
   });
 
-  test("deducts points for wasted action", async () => {
-    // First give user some points
-    await testDb.insert(schema.userPoints).values({
-      userId: testUserId,
-      totalPoints: 10,
-    });
-
-    const result = await awardPoints(testDb, testUserId, "wasted");
-
-    expect(result.action).toBe("wasted");
-    expect(result.amount).toBe(-3);
-    expect(result.newTotal).toBe(7);
+  test("awards correct positive points for shared", async () => {
+    const result = await awardPoints(userId, "shared", productId);
+    expect(result.amount).toBe(10);
+    expect(result.newTotal).toBe(10);
   });
 
-  test("points cannot go below zero", async () => {
-    // User starts with 0 points
-    const result = await awardPoints(testDb, testUserId, "wasted");
+  test("penalizes points for wasted (negative)", async () => {
+    // Seed user_points directly so no badge bonuses accumulate from awardPoints
+    await getOrCreateUserPoints(userId);
+    await testDb.update(schema.userPoints)
+      .set({ totalPoints: 10 })
+      .where(eq(schema.userPoints.userId, userId));
 
+    const result = await awardPoints(userId, "wasted", productId);
+    expect(result.amount).toBe(-3);
+    expect(result.newTotal).toBe(7); // 10 - 3
+  });
+
+  test("scales points with quantity", async () => {
+    const result = await awardPoints(userId, "consumed", productId, 3);
+    expect(result.amount).toBe(15); // 5 * 3
+    expect(result.newTotal).toBe(15);
+  });
+
+  test("total points floor at 0 (never goes negative)", async () => {
+    const result = await awardPoints(userId, "wasted", productId, 100);
+    // -3 * 100 = -300, but floor at 0
     expect(result.newTotal).toBe(0);
   });
 
-  test("records sustainability metric", async () => {
-    await awardPoints(testDb, testUserId, "consumed", 123, 2);
-
+  test("records a sustainability metric row", async () => {
+    await awardPoints(userId, "consumed", productId);
     const metrics = await testDb.query.productSustainabilityMetrics.findMany({
-      where: eq(schema.productSustainabilityMetrics.userId, testUserId),
+      where: eq(schema.productSustainabilityMetrics.userId, userId),
     });
-
     expect(metrics.length).toBe(1);
     expect(metrics[0].type).toBe("consumed");
-    expect(metrics[0].productId).toBe(123);
-    expect(metrics[0].quantity).toBe(2);
+    expect(metrics[0].productId).toBe(productId);
   });
 
-  test("records metric with null productId", async () => {
-    await awardPoints(testDb, testUserId, "sold", null, 1);
-
+  test("skips metric recording when skipMetricRecording=true", async () => {
+    await awardPoints(userId, "consumed", productId, 1, true);
     const metrics = await testDb.query.productSustainabilityMetrics.findMany({
-      where: eq(schema.productSustainabilityMetrics.userId, testUserId),
+      where: eq(schema.productSustainabilityMetrics.userId, userId),
     });
-
-    expect(metrics[0].productId).toBeNull();
+    expect(metrics.length).toBe(0);
   });
 
-  test("accumulates points over multiple actions", async () => {
-    await awardPoints(testDb, testUserId, "consumed"); // +5
-    await awardPoints(testDb, testUserId, "shared"); // +10
-    await awardPoints(testDb, testUserId, "sold"); // +8
+  test("wasted action resets streak to 0", async () => {
+    // First set a streak via a positive action
+    await awardPoints(userId, "consumed", productId);
+    const pointsBefore = await getOrCreateUserPoints(userId);
+    expect(pointsBefore.currentStreak).toBe(1);
 
-    const points = await testDb.query.userPoints.findFirst({
-      where: eq(schema.userPoints.userId, testUserId),
-    });
-
-    expect(points?.totalPoints).toBe(23);
+    // Then waste should reset streak
+    await awardPoints(userId, "wasted", productId);
+    const pointsAfter = await getOrCreateUserPoints(userId);
+    expect(pointsAfter.currentStreak).toBe(0);
   });
 
-  test("awards CO2 to seller when sold with co2Saved", async () => {
-    const result = await awardPoints(testDb, testUserId, "sold", null, 1, {
-      co2Saved: 2.5,
-      buyerId: null,
-    });
-
-    expect(result.co2Saved).toBe(2.5);
-
-    const points = await testDb.query.userPoints.findFirst({
-      where: eq(schema.userPoints.userId, testUserId),
-    });
-
-    expect(points?.totalCo2Saved).toBe(2.5);
+  test("consume with fractional qty (0.2) awards minimum base of 5", async () => {
+    const result = await awardPoints(userId, "consumed", productId, 0.2);
+    // 5 * 0.2 = 1, but minimum is base value 5
+    expect(result.amount).toBe(5);
   });
 
-  test("awards CO2 to both seller and buyer when sold", async () => {
-    await awardPoints(testDb, testUserId, "sold", null, 1, {
-      co2Saved: 3.0,
-      buyerId: secondUserId,
-    });
+  test("wasted with fractional qty (0.3) awards minimum base of -3", async () => {
+    await getOrCreateUserPoints(userId);
+    await testDb.update(schema.userPoints)
+      .set({ totalPoints: 10 })
+      .where(eq(schema.userPoints.userId, userId));
 
-    const sellerPoints = await testDb.query.userPoints.findFirst({
-      where: eq(schema.userPoints.userId, testUserId),
-    });
-    expect(sellerPoints?.totalCo2Saved).toBe(3.0);
-
-    const buyerPoints = await testDb.query.userPoints.findFirst({
-      where: eq(schema.userPoints.userId, secondUserId),
-    });
-    expect(buyerPoints?.totalCo2Saved).toBe(3.0);
+    const result = await awardPoints(userId, "wasted", productId, 0.3);
+    // -3 * 0.3 = -0.9 → rounds to -1, but minimum is base value -3
+    expect(result.amount).toBe(-3);
   });
 
-  test("does not award CO2 for non-sold actions", async () => {
-    await awardPoints(testDb, testUserId, "consumed");
+  test("sold with qty=1 awards 8 points", async () => {
+    const result = await awardPoints(userId, "sold", productId, 1);
+    expect(result.amount).toBe(8);
+  });
 
-    const points = await testDb.query.userPoints.findFirst({
-      where: eq(schema.userPoints.userId, testUserId),
-    });
+  test("sold with qty=3 awards 24 points", async () => {
+    const result = await awardPoints(userId, "sold", productId, 3);
+    expect(result.amount).toBe(24); // 8 * 3
+  });
 
-    expect(points?.totalCo2Saved).toBe(0);
+  // ── Quantity scaling by unit (kg, L, pcs) ──────────────────────────
+
+  test("consumed 2.5 kg awards 13 pts (5 * 2.5 rounded)", async () => {
+    const result = await awardPoints(userId, "consumed", productId, 2.5);
+    expect(result.amount).toBe(13); // Math.round(5 * 2.5) = 13
+  });
+
+  test("consumed 0.5 kg awards 5 pts (minimum base)", async () => {
+    const result = await awardPoints(userId, "consumed", productId, 0.5);
+    // 5 * 0.5 = 2.5 → rounds to 3, but |3| < |5| so minimum base = 5
+    expect(result.amount).toBe(5);
+  });
+
+  test("consumed 1.0 kg awards exactly base (5 pts)", async () => {
+    const result = await awardPoints(userId, "consumed", productId, 1.0);
+    expect(result.amount).toBe(5);
+  });
+
+  test("consumed 10 pcs awards 50 pts (5 * 10)", async () => {
+    const result = await awardPoints(userId, "consumed", productId, 10);
+    expect(result.amount).toBe(50);
+  });
+
+  test("wasted 2.0 kg penalizes 6 pts (-3 * 2)", async () => {
+    await getOrCreateUserPoints(userId);
+    await testDb.update(schema.userPoints)
+      .set({ totalPoints: 100 })
+      .where(eq(schema.userPoints.userId, userId));
+
+    const result = await awardPoints(userId, "wasted", productId, 2.0);
+    expect(result.amount).toBe(-6); // -3 * 2
+    expect(result.newTotal).toBe(94); // 100 - 6
+  });
+
+  test("wasted 0.5 kg penalizes minimum base (-3 pts)", async () => {
+    await getOrCreateUserPoints(userId);
+    await testDb.update(schema.userPoints)
+      .set({ totalPoints: 50 })
+      .where(eq(schema.userPoints.userId, userId));
+
+    const result = await awardPoints(userId, "wasted", productId, 0.5);
+    // -3 * 0.5 = -1.5 → rounds to -2, but |-2| < |-3| so minimum base = -3
+    expect(result.amount).toBe(-3);
+    expect(result.newTotal).toBe(47);
+  });
+
+  test("wasted 5.0 kg penalizes 15 pts (-3 * 5)", async () => {
+    await getOrCreateUserPoints(userId);
+    await testDb.update(schema.userPoints)
+      .set({ totalPoints: 100 })
+      .where(eq(schema.userPoints.userId, userId));
+
+    const result = await awardPoints(userId, "wasted", productId, 5.0);
+    expect(result.amount).toBe(-15);
+    expect(result.newTotal).toBe(85);
+  });
+
+  test("shared 2.0 L awards 20 pts (10 * 2)", async () => {
+    const result = await awardPoints(userId, "shared", productId, 2.0);
+    expect(result.amount).toBe(20);
+  });
+
+  test("shared 0.3 L awards minimum base (10 pts)", async () => {
+    const result = await awardPoints(userId, "shared", productId, 0.3);
+    // 10 * 0.3 = 3, but |3| < |10| so minimum base = 10
+    expect(result.amount).toBe(10);
+  });
+
+  test("sold 1.5 kg awards 12 pts (8 * 1.5)", async () => {
+    const result = await awardPoints(userId, "sold", productId, 1.5);
+    expect(result.amount).toBe(12);
+  });
+
+  test("cumulative points: consume 2kg + waste 0.5kg", async () => {
+    // Consume 2kg first
+    const r1 = await awardPoints(userId, "consumed", productId, 2.0);
+    expect(r1.amount).toBe(10); // 5 * 2
+    expect(r1.newTotal).toBe(10);
+
+    // Then waste 0.5kg (below base threshold, so uses base -3)
+    const r2 = await awardPoints(userId, "wasted", productId, 0.5);
+    expect(r2.amount).toBe(-3);
+    expect(r2.newTotal).toBe(7); // 10 - 3
+  });
+
+  test("cumulative points: multiple kg-based actions accumulate correctly", async () => {
+    // Consume 3.0 kg → 15 pts
+    const r1 = await awardPoints(userId, "consumed", productId, 3.0);
+    expect(r1.newTotal).toBe(15);
+
+    // Sold 2.0 kg → 16 pts
+    const r2 = await awardPoints(userId, "sold", productId, 2.0);
+    expect(r2.amount).toBe(16); // 8 * 2
+    expect(r2.newTotal).toBe(31); // 15 + 16
+
+    // Wasted 4.0 kg → -12 pts
+    const r3 = await awardPoints(userId, "wasted", productId, 4.0);
+    expect(r3.amount).toBe(-12); // -3 * 4
+    expect(r3.newTotal).toBe(19); // 31 - 12
+  });
+
+  test("consume and sold increment streak only once per day", async () => {
+    // First consume action should set streak to 1
+    await awardPoints(userId, "consumed", productId);
+    const after1 = await getOrCreateUserPoints(userId);
+    expect(after1.currentStreak).toBe(1);
+
+    // Second action on the same day should NOT increment streak
+    await awardPoints(userId, "sold", productId);
+    const after2 = await getOrCreateUserPoints(userId);
+    expect(after2.currentStreak).toBe(1);
   });
 });
 
+// ── updateStreak ─────────────────────────────────────────────────────
+
+describe("updateStreak", () => {
+  test("first qualifying action sets streak to 1", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    // Insert a qualifying metric
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId,
+      productId,
+      todayDate: today,
+      quantity: 1,
+      type: "consumed",
+    });
+    // Create user points record first
+    await getOrCreateUserPoints(userId);
+
+    await updateStreak(userId);
+
+    const up = await getOrCreateUserPoints(userId);
+    expect(up.currentStreak).toBe(1);
+  });
+
+  test("second qualifying action on same day does not double-increment", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    // Insert two metrics for today
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "sold" },
+    ]);
+    await getOrCreateUserPoints(userId);
+
+    await updateStreak(userId);
+
+    const up = await getOrCreateUserPoints(userId);
+    // Should still be 0 because there were already >1 interactions when updateStreak ran
+    // (the check is: if todayInteractions.length > 1, return early)
+    expect(up.currentStreak).toBe(0);
+  });
+
+  test("action on consecutive day increments streak", async () => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const yesterday = new Date(now);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    // Yesterday's action
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: yesterdayStr, quantity: 1, type: "consumed",
+    });
+    // Set current streak to 1 (simulating yesterday's streak update)
+    await getOrCreateUserPoints(userId);
+    await testDb.update(schema.userPoints)
+      .set({ currentStreak: 1 })
+      .where(eq(schema.userPoints.userId, userId));
+
+    // Today's action (exactly 1 for today so the >1 check doesn't trigger)
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: today, quantity: 1, type: "consumed",
+    });
+
+    await updateStreak(userId);
+
+    const up = await getOrCreateUserPoints(userId);
+    expect(up.currentStreak).toBe(2);
+  });
+
+  test("action after a gap day resets streak to 1", async () => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const twoDaysAgo = new Date(now);
+    twoDaysAgo.setUTCDate(twoDaysAgo.getUTCDate() - 2);
+    const twoDaysAgoStr = twoDaysAgo.toISOString().slice(0, 10);
+
+    // Action two days ago
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: twoDaysAgoStr, quantity: 1, type: "consumed",
+    });
+    await getOrCreateUserPoints(userId);
+    await testDb.update(schema.userPoints)
+      .set({ currentStreak: 5 })
+      .where(eq(schema.userPoints.userId, userId));
+
+    // Today's action (gap of 1 day)
+    await testDb.insert(schema.productSustainabilityMetrics).values({
+      userId, productId, todayDate: today, quantity: 1, type: "sold",
+    });
+
+    await updateStreak(userId);
+
+    const up = await getOrCreateUserPoints(userId);
+    expect(up.currentStreak).toBe(1);
+  });
+});
+
+// ── getDetailedPointsStats ───────────────────────────────────────────
+
+describe("getDetailedPointsStats", () => {
+  test("returns correct breakdown counts by type", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "sold" },
+      { userId, productId, todayDate: today, quantity: 1, type: "wasted" },
+    ]);
+
+    const stats = await getDetailedPointsStats(userId);
+
+    expect(stats.breakdownByType.consumed.count).toBe(2);
+    expect(stats.breakdownByType.sold.count).toBe(1);
+    expect(stats.breakdownByType.wasted.count).toBe(1);
+    expect(stats.breakdownByType.shared.count).toBe(0);
+  });
+
+  test("computes longestStreak from interaction history", async () => {
+    const now = new Date();
+    // Create 3 consecutive days of activity
+    for (let i = 2; i >= 0; i--) {
+      const d = new Date(now);
+      d.setUTCDate(d.getUTCDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      await testDb.insert(schema.productSustainabilityMetrics).values({
+        userId, productId, todayDate: dateStr, quantity: 1, type: "consumed",
+      });
+    }
+
+    const stats = await getDetailedPointsStats(userId);
+    expect(stats.longestStreak).toBe(3);
+  });
+
+  test("computes pointsToday correctly", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "sold" },
+    ]);
+
+    const stats = await getDetailedPointsStats(userId);
+    // consumed=5, sold=8 → 13
+    expect(stats.pointsToday).toBe(13);
+  });
+
+  test("computes pointsThisWeek correctly", async () => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const threeDaysAgo = new Date(now);
+    threeDaysAgo.setUTCDate(threeDaysAgo.getUTCDate() - 3);
+    const threeDaysAgoStr = threeDaysAgo.toISOString().slice(0, 10);
+
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: threeDaysAgoStr, quantity: 1, type: "sold" },
+    ]);
+
+    const stats = await getDetailedPointsStats(userId);
+    // Both within the last 7 days
+    expect(stats.pointsThisWeek).toBe(13);
+  });
+
+  test("computes pointsThisMonth correctly", async () => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    // 40 days ago is outside the month window
+    const fortyDaysAgo = new Date(now);
+    fortyDaysAgo.setUTCDate(fortyDaysAgo.getUTCDate() - 40);
+    const fortyDaysAgoStr = fortyDaysAgo.toISOString().slice(0, 10);
+
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: fortyDaysAgoStr, quantity: 1, type: "sold" },
+    ]);
+
+    const stats = await getDetailedPointsStats(userId);
+    // Only today's consumed (5) should be in this month
+    expect(stats.pointsThisMonth).toBe(5);
+  });
+
+  test("points history shows correct amounts for fractional qty", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 0.2, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 0.3, type: "wasted" },
+      { userId, productId, todayDate: today, quantity: 3, type: "sold" },
+    ]);
+
+    const stats = await getDetailedPointsStats(userId);
+
+    // consumed: 5 * 0.2 = 1 → min base = 5
+    expect(stats.breakdownByType.consumed.totalPoints).toBe(5);
+    // wasted: -3 * 0.3 = -0.9 → rounds to -1 → min base = -3
+    expect(stats.breakdownByType.wasted.totalPoints).toBe(-3);
+    // sold: 8 * 3 = 24 (scaled, above base)
+    expect(stats.breakdownByType.sold.totalPoints).toBe(24);
+  });
+
+  test("stats scale correctly with kg-based quantities", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 2.5, type: "consumed" },  // 2.5 kg
+      { userId, productId, todayDate: today, quantity: 1.5, type: "sold" },      // 1.5 kg
+      { userId, productId, todayDate: today, quantity: 0.8, type: "wasted" },    // 0.8 kg
+    ]);
+
+    const stats = await getDetailedPointsStats(userId);
+
+    // consumed: 5 * 2.5 = 12.5 → rounds to 13, |13| >= |5| so 13
+    expect(stats.breakdownByType.consumed.totalPoints).toBe(13);
+    // sold: 8 * 1.5 = 12, |12| >= |8| so 12
+    expect(stats.breakdownByType.sold.totalPoints).toBe(12);
+    // wasted: -3 * 0.8 = -2.4 → rounds to -2, |-2| < |-3| so min base = -3
+    expect(stats.breakdownByType.wasted.totalPoints).toBe(-3);
+
+    // pointsToday = 13 + 12 + (-3) = 22
+    expect(stats.pointsToday).toBe(22);
+  });
+
+  test("stats scale with large kg quantities across multiple entries", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 5.0, type: "consumed" },  // 5 kg rice
+      { userId, productId, todayDate: today, quantity: 2.0, type: "consumed" },  // 2 L milk
+      { userId, productId, todayDate: today, quantity: 3.0, type: "wasted" },    // 3 kg veggies
+    ]);
+
+    const stats = await getDetailedPointsStats(userId);
+
+    // consumed entry 1: 5 * 5.0 = 25
+    // consumed entry 2: 5 * 2.0 = 10
+    // total consumed points: 35
+    expect(stats.breakdownByType.consumed.totalPoints).toBe(35);
+    expect(stats.breakdownByType.consumed.count).toBe(2);
+
+    // wasted: -3 * 3.0 = -9
+    expect(stats.breakdownByType.wasted.totalPoints).toBe(-9);
+
+    // pointsToday = 35 + (-9) = 26
+    expect(stats.pointsToday).toBe(26);
+  });
+
+  test("stats with mixed units: pcs (10), kg (0.5), L (2.0)", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    await testDb.insert(schema.productSustainabilityMetrics).values([
+      { userId, productId, todayDate: today, quantity: 10, type: "consumed" },   // 10 pcs eggs
+      { userId, productId, todayDate: today, quantity: 0.5, type: "consumed" },  // 0.5 kg
+      { userId, productId, todayDate: today, quantity: 2.0, type: "shared" },    // 2 L milk
+    ]);
+
+    const stats = await getDetailedPointsStats(userId);
+
+    // consumed 10 pcs: 5 * 10 = 50
+    // consumed 0.5 kg: 5 * 0.5 = 2.5 → round to 3, |3| < |5| → min 5
+    // total consumed: 55
+    expect(stats.breakdownByType.consumed.totalPoints).toBe(55);
+
+    // shared 2.0 L: 10 * 2.0 = 20
+    expect(stats.breakdownByType.shared.totalPoints).toBe(20);
+
+    // pointsToday = 55 + 20 = 75
+    expect(stats.pointsToday).toBe(75);
+  });
+});
+
+// ── getUserMetrics ───────────────────────────────────────────────────
+
 describe("getUserMetrics", () => {
-  test("returns zero metrics for user with no activity", async () => {
-    const metrics = await getUserMetrics(testDb, testUserId);
-
-    expect(metrics.totalItemsConsumed).toBe(0);
-    expect(metrics.totalItemsWasted).toBe(0);
-    expect(metrics.totalItemsShared).toBe(0);
-    expect(metrics.totalItemsSold).toBe(0);
-    expect(metrics.wasteReductionRate).toBe(100);
-  });
-
-  test("counts consumed items correctly", async () => {
+  test("counts each type correctly", async () => {
+    const today = new Date().toISOString().slice(0, 10);
     await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "wasted" },
+      { userId, productId, todayDate: today, quantity: 1, type: "sold" },
+      { userId, productId, todayDate: today, quantity: 1, type: "shared" },
     ]);
 
-    const metrics = await getUserMetrics(testDb, testUserId);
-
-    expect(metrics.totalItemsConsumed).toBe(3);
-  });
-
-  test("counts wasted items correctly", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "wasted", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "wasted", quantity: 1 },
-    ]);
-
-    const metrics = await getUserMetrics(testDb, testUserId);
-
-    expect(metrics.totalItemsWasted).toBe(2);
-  });
-
-  test("counts shared items correctly", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "shared", quantity: 1 },
-    ]);
-
-    const metrics = await getUserMetrics(testDb, testUserId);
-
+    const metrics = await getUserMetrics(userId);
+    expect(metrics.totalItemsConsumed).toBe(2);
+    expect(metrics.totalItemsWasted).toBe(1);
+    expect(metrics.totalItemsSold).toBe(1);
     expect(metrics.totalItemsShared).toBe(1);
   });
 
-  test("counts sold items correctly", async () => {
+  test("handles case variants ('consume' vs 'consumed')", async () => {
+    const today = new Date().toISOString().slice(0, 10);
     await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "sold", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "sold", quantity: 1 },
+      { userId, productId, todayDate: today, quantity: 1, type: "Consume" },
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "Waste" },
+      { userId, productId, todayDate: today, quantity: 1, type: "wasted" },
     ]);
 
-    const metrics = await getUserMetrics(testDb, testUserId);
-
-    expect(metrics.totalItemsSold).toBe(2);
+    const metrics = await getUserMetrics(userId);
+    expect(metrics.totalItemsConsumed).toBe(2);
+    expect(metrics.totalItemsWasted).toBe(2);
   });
 
-  test("calculates waste reduction rate correctly", async () => {
-    // 3 consumed, 1 wasted = 75% saved
+  test("computes wasteReductionRate correctly", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    // 3 consumed, 1 wasted → saved=3, total=4, rate=75%
     await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "wasted", quantity: 1 },
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "consumed" },
+      { userId, productId, todayDate: today, quantity: 1, type: "wasted" },
     ]);
 
-    const metrics = await getUserMetrics(testDb, testUserId);
-
-    expect(metrics.wasteReductionRate).toBe(75);
+    const metrics = await getUserMetrics(userId);
+    expect(metrics.wasteReductionRate).toBeCloseTo(75, 1);
   });
 
-  test("handles 100% waste scenario", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "wasted", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "wasted", quantity: 1 },
-    ]);
-
-    const metrics = await getUserMetrics(testDb, testUserId);
-
-    expect(metrics.wasteReductionRate).toBe(0);
-  });
-
-  test("handles 0% waste scenario (all saved)", async () => {
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "shared", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "sold", quantity: 1 },
-    ]);
-
-    const metrics = await getUserMetrics(testDb, testUserId);
-
+  test("wasteReductionRate is 100 when no interactions", async () => {
+    const metrics = await getUserMetrics(userId);
     expect(metrics.wasteReductionRate).toBe(100);
-  });
-
-  test("calculates estimated CO2 saved", async () => {
-    // 4 items saved * 0.5 kg CO2 each = 2.0 kg
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "shared", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "sold", quantity: 1 },
-    ]);
-
-    const metrics = await getUserMetrics(testDb, testUserId);
-
-    expect(metrics.estimatedCo2Saved).toBe(2.0);
-  });
-
-  test("calculates estimated money saved", async () => {
-    // 3 items saved * $5 each = $15
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "shared", quantity: 1 },
-      { userId: testUserId, todayDate: "2025-01-15", type: "sold", quantity: 1 },
-    ]);
-
-    const metrics = await getUserMetrics(testDb, testUserId);
-
-    expect(metrics.estimatedMoneySaved).toBe(15);
-  });
-
-  test("only counts metrics for the specified user", async () => {
-    // Add metrics for both users
-    await testDb.insert(schema.productSustainabilityMetrics).values([
-      { userId: testUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: secondUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-      { userId: secondUserId, todayDate: "2025-01-15", type: "consumed", quantity: 1 },
-    ]);
-
-    const metricsUser1 = await getUserMetrics(testDb, testUserId);
-    const metricsUser2 = await getUserMetrics(testDb, secondUserId);
-
-    expect(metricsUser1.totalItemsConsumed).toBe(1);
-    expect(metricsUser2.totalItemsConsumed).toBe(2);
-  });
-});
-
-describe("POINT_VALUES", () => {
-  test("consumed action gives 5 points", () => {
-    expect(POINT_VALUES.consumed).toBe(5);
-  });
-
-  test("shared action gives 10 points", () => {
-    expect(POINT_VALUES.shared).toBe(10);
-  });
-
-  test("sold action gives 8 points", () => {
-    expect(POINT_VALUES.sold).toBe(8);
-  });
-
-  test("wasted action deducts 3 points", () => {
-    expect(POINT_VALUES.wasted).toBe(-3);
   });
 });
