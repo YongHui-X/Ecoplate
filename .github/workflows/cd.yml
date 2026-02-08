@@ -434,6 +434,7 @@ jobs:
             report_json.json
             report_md.md
           retention-days: 30
+          overwrite: true
 
   dast-api:
     name: DAST - API Security Scan

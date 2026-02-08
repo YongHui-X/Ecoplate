@@ -214,6 +214,9 @@ def parse_js_audit(reports_dir):
         vulns = data.get("vulnerabilities", {})
         if isinstance(vulns, dict):
             for pkg, info in vulns.items():
+                # Skip devDependency-only vulnerabilities (not in production image)
+                if info.get("isDirect") is False and not info.get("effects"):
+                    continue
                 sev = info.get("severity", "moderate").lower()
                 sev_map = {"critical": "critical", "high": "high", "moderate": "medium", "low": "low"}
                 findings.append(Finding(
