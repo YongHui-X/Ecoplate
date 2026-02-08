@@ -9,7 +9,7 @@ import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { ArrowLeft, MapPin, Clock, Edit, Trash2, CheckCircle, ChevronLeft, ChevronRight, MessageCircle, BookmarkPlus, ShoppingCart } from "lucide-react";
+import { ArrowLeft, MapPin, Clock, Edit, Trash2, CheckCircle, ChevronLeft, ChevronRight, MessageCircle, ShoppingCart, Package, UserPlus, X, Loader2 } from "lucide-react";
 import { formatDate, getDaysUntilExpiry } from "../lib/utils";
 import { SimilarProducts } from "../components/marketplace/SimilarProducts";
 import { showBadgeToasts } from "../utils/badgeNotification";
@@ -22,6 +22,15 @@ export default function ListingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [interestedBuyers, setInterestedBuyers] = useState<Array<{
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    conversationId: number;
+  }>>([]);
+  const [showBuyerSelection, setShowBuyerSelection] = useState(false);
+  const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
+  const [loadingBuyers, setLoadingBuyers] = useState(false);
   const { user } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -126,18 +135,56 @@ export default function ListingDetailPage() {
     }
   };
 
-  const handleReserve = async () => {
+  // Seller: Load interested buyers who have messaged about this listing
+  const loadInterestedBuyers = async () => {
     if (!listing) return;
-    if (!window.confirm("Do you want to reserve this item? The seller will be notified.")) {
+    setLoadingBuyers(true);
+    try {
+      const buyers = await marketplaceService.getInterestedBuyers(listing.id);
+      setInterestedBuyers(buyers);
+      setShowBuyerSelection(true);
+      if (buyers.length === 0) {
+        addToast("No buyers have messaged about this listing yet", "info");
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to load interested buyers";
+      addToast(message, "error");
+    } finally {
+      setLoadingBuyers(false);
+    }
+  };
+
+  // Seller: Reserve the listing for a selected buyer
+  const handleReserveForBuyer = async () => {
+    if (!listing || !selectedBuyerId) return;
+    setActionLoading(true);
+    try {
+      await marketplaceService.reserveListingForBuyer(listing.id, selectedBuyerId);
+      addToast("Listing reserved for buyer!", "success");
+      setShowBuyerSelection(false);
+      setSelectedBuyerId(null);
+      loadListing();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to reserve listing";
+      addToast(message, "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Seller: Unreserve the listing
+  const handleUnreserve = async () => {
+    if (!listing) return;
+    if (!window.confirm("Cancel this reservation? The buyer will be notified.")) {
       return;
     }
     setActionLoading(true);
     try {
-      await marketplaceService.reserveListing(listing.id);
-      addToast("Item reserved successfully!", "success");
+      await marketplaceService.unreserveListing(listing.id);
+      addToast("Reservation cancelled", "success");
       loadListing();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to reserve listing";
+      const message = error instanceof Error ? error.message : "Failed to cancel reservation";
       addToast(message, "error");
     } finally {
       setActionLoading(false);
@@ -371,6 +418,94 @@ export default function ListingDetailPage() {
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Mark as Completed
                   </Button>
+                  <Button
+                    onClick={loadInterestedBuyers}
+                    disabled={actionLoading || loadingBuyers}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {loadingBuyers ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <UserPlus className="h-4 w-4 mr-2" />
+                    )}
+                    Reserve for Buyer
+                  </Button>
+
+                  {/* Buyer Selection UI */}
+                  {showBuyerSelection && (
+                    <Card className="border-primary">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold">Select a Buyer</h3>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setShowBuyerSelection(false);
+                              setSelectedBuyerId(null);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {interestedBuyers.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            No buyers have messaged about this listing yet.
+                          </p>
+                        ) : (
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {interestedBuyers.map((buyer) => (
+                              <button
+                                key={buyer.id}
+                                onClick={() => setSelectedBuyerId(buyer.id)}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition ${
+                                  selectedBuyerId === buyer.id
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-muted-foreground"
+                                }`}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                                  {buyer.avatarUrl ? (
+                                    <img
+                                      src={buyer.avatarUrl}
+                                      alt={buyer.name}
+                                      className="w-full h-full rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    buyer.name.charAt(0).toUpperCase()
+                                  )}
+                                </div>
+                                <span className="text-sm font-medium">{buyer.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {interestedBuyers.length > 0 && (
+                          <div className="flex gap-2 mt-4">
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setShowBuyerSelection(false);
+                                setSelectedBuyerId(null);
+                              }}
+                              className="flex-1"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleReserveForBuyer}
+                              disabled={!selectedBuyerId || actionLoading}
+                              className="flex-1"
+                            >
+                              Confirm
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
@@ -395,6 +530,35 @@ export default function ListingDetailPage() {
                   </div>
                 </>
               )}
+              {listing.status === "reserved" && (
+                <>
+                  <Card className="bg-primary/10 border-primary/20">
+                    <CardContent className="p-4">
+                      <p className="text-sm text-primary font-medium">
+                        Reserved for a buyer. Waiting for them to complete purchase.
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleMarkCompleted}
+                      disabled={actionLoading}
+                      className="flex-1"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Mark as Completed
+                    </Button>
+                    <Button
+                      onClick={handleUnreserve}
+                      disabled={actionLoading}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      Cancel Reservation
+                    </Button>
+                  </div>
+                </>
+              )}
               {listing.status === "completed" && listing.completedAt && (
                 <Card className="bg-success/10 border-success/20">
                   <CardContent className="p-4">
@@ -409,25 +573,26 @@ export default function ListingDetailPage() {
             <div className="space-y-3">
               {listing.status === "active" ? (
                 <>
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={handleReserve}
-                      disabled={actionLoading}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      <BookmarkPlus className="h-4 w-4 mr-2" />
-                      Reserve
-                    </Button>
-                    <Button
-                      onClick={handleBuy}
-                      disabled={actionLoading}
-                      className="flex-1"
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Buy
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={handleBuy}
+                    disabled={actionLoading}
+                    className="w-full"
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Buy
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const token = localStorage.getItem("token");
+                      window.location.href = `/ecolocker?token=${token}&listingId=${listing.id}`;
+                    }}
+                    disabled={actionLoading}
+                    variant="outline"
+                    className="w-full border-primary/50 hover:bg-primary/10"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Use EcoLocker Delivery
+                  </Button>
                   <Button
                     onClick={handleMessageSeller}
                     disabled={actionLoading}
@@ -443,7 +608,7 @@ export default function ListingDetailPage() {
                   <Card className="bg-primary/10 border-primary/20">
                     <CardContent className="p-4">
                       <p className="text-sm text-primary font-medium">
-                        You have reserved this item.
+                        This item has been reserved for you!
                       </p>
                     </CardContent>
                   </Card>
@@ -454,6 +619,18 @@ export default function ListingDetailPage() {
                   >
                     <ShoppingCart className="h-4 w-4 mr-2" />
                     Complete Purchase
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const token = localStorage.getItem("token");
+                      window.location.href = `/ecolocker?token=${token}&listingId=${listing.id}`;
+                    }}
+                    disabled={actionLoading}
+                    variant="outline"
+                    className="w-full border-primary/50 hover:bg-primary/10"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Use EcoLocker Delivery
                   </Button>
                   <Button
                     onClick={handleMessageSeller}

@@ -8,6 +8,8 @@ import { registerMessageRoutes } from "./routes/messages";
 import { registerDashboardRoutes } from "./routes/dashboard";
 import { registerGamificationRoutes } from "./routes/gamification";
 import { registerUploadRoutes } from "./routes/upload";
+import { registerEcoLockerRoutes } from "./routes/ecolocker";
+import { startLockerJobs } from "./jobs/locker-jobs";
 import { registerNotificationRoutes } from "./routes/notifications";
 import { registerRewardsRoutes } from "./routes/rewards";
 import * as schema from "./db/schema";
@@ -34,6 +36,7 @@ registerMessageRoutes(protectedRouter);
 registerDashboardRoutes(protectedRouter);
 registerGamificationRoutes(protectedRouter);
 registerUploadRoutes(protectedRouter);
+registerEcoLockerRoutes(protectedRouter);
 registerNotificationRoutes(protectedRouter);
 registerRewardsRoutes(protectedRouter);
 
@@ -63,24 +66,39 @@ function getMimeType(path: string): string {
 
 // Security headers to address OWASP ZAP findings
 function addSecurityHeaders(response: Response, isApi: boolean = false): Response {
-  // Set headers directly on the response to avoid creating a new Response
-  // from a ReadableStream body, which causes Bun to append malformed
-  // chunked encoding trailers through nginx proxy
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("X-XSS-Protection", "1; mode=block");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+  const headers = new Headers(response.headers);
+
+  // Hide server version information (override Bun's default Server header)
+  headers.set("Server", "");
+
+  // Prevent MIME type sniffing
+  headers.set("X-Content-Type-Options", "nosniff");
+  // Prevent clickjacking
+  headers.set("X-Frame-Options", "DENY");
+  // XSS Protection (legacy, but still useful)
+  headers.set("X-XSS-Protection", "1; mode=block");
+  // Referrer policy
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Permissions policy
+  headers.set("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+  // Cross-Origin isolation headers
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
 
   if (isApi) {
-    response.headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
-    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
-    response.headers.set("Pragma", "no-cache");
+    // API-specific headers
+    headers.set("Content-Security-Policy", "default-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'");
+    headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    headers.set("Pragma", "no-cache");
   } else {
-    response.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: wss:; font-src 'self' data:; frame-ancestors 'none'");
+    // SPA headers - allow inline scripts/styles for Vite
+    headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com; connect-src 'self' https://maps.googleapis.com; font-src 'self' https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'");
   }
 
-  return response;
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function serveStatic(path: string): Promise<Response | null> {
@@ -96,6 +114,28 @@ async function serveStatic(path: string): Promise<Response | null> {
       });
     }
     return null;
+  }
+
+  // Handle EcoLocker SPA under /ecolocker/
+  if (path.startsWith("/ecolocker")) {
+    const ecolockerDir = join(publicDir, "ecolocker");
+    // Strip the /ecolocker prefix to get the relative path
+    const relativePath = path.replace(/^\/ecolocker\/?/, "/") || "/";
+    let filePath = join(ecolockerDir, relativePath);
+
+    // SPA fallback: serve index.html for non-file paths
+    if (relativePath === "/" || !existsSync(filePath)) {
+      filePath = join(ecolockerDir, "index.html");
+    }
+
+    if (!existsSync(filePath)) {
+      return null;
+    }
+
+    const file = Bun.file(filePath);
+    return new Response(file, {
+      headers: { "Content-Type": getMimeType(filePath) },
+    });
   }
 
   let filePath = join(publicDir, path);
@@ -162,3 +202,6 @@ const server = Bun.serve({
 });
 
 console.log(`EcoPlate server running at http://localhost:${server.port}`);
+
+// Start EcoLocker background jobs
+startLockerJobs();

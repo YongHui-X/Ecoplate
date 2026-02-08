@@ -112,10 +112,29 @@ export const marketplaceService = {
   },
 
   /**
-   * Reserve a listing (as buyer)
+   * Reserve a listing for a specific buyer (seller only)
    */
-  async reserveListing(id: number): Promise<{ message: string }> {
-    return api.post<{ message: string }>(`/marketplace/listings/${id}/reserve`);
+  async reserveListingForBuyer(id: number, buyerId: number): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/marketplace/listings/${id}/reserve`, { buyerId });
+  },
+
+  /**
+   * Get interested buyers for a listing (users who messaged about it)
+   */
+  async getInterestedBuyers(listingId: number): Promise<Array<{
+    id: number;
+    name: string;
+    avatarUrl: string | null;
+    conversationId: number;
+  }>> {
+    return api.get(`/marketplace/listings/${listingId}/interested-buyers`);
+  },
+
+  /**
+   * Unreserve a listing (seller only)
+   */
+  async unreserveListing(id: number): Promise<{ message: string }> {
+    return api.post<{ message: string }>(`/marketplace/listings/${id}/unreserve`);
   },
 
   /**

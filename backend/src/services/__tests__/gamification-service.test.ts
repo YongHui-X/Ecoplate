@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeAll, beforeEach, mock } from "bun:test";
+import { describe, expect, test, beforeAll, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import * as schema from "../../db/schema";
@@ -48,6 +48,7 @@ sqlite.exec(`
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     today_date TEXT NOT NULL,
     quantity REAL,
+    unit TEXT,
     type TEXT
   );
 
@@ -69,29 +70,39 @@ sqlite.exec(`
     earned_at INTEGER NOT NULL DEFAULT (unixepoch()),
     UNIQUE(user_id, badge_id)
   );
+
+  CREATE TABLE notification_preferences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    expiring_products INTEGER NOT NULL DEFAULT 1,
+    badge_unlocked INTEGER NOT NULL DEFAULT 1,
+    streak_milestone INTEGER NOT NULL DEFAULT 1,
+    product_stale INTEGER NOT NULL DEFAULT 1,
+    stale_days_threshold INTEGER NOT NULL DEFAULT 7,
+    expiry_days_threshold INTEGER NOT NULL DEFAULT 3
+  );
+
+  CREATE TABLE notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    related_id INTEGER,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    read_at INTEGER,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
 `);
 
 const testDb = drizzle(sqlite, { schema });
 
-// Mock the db connection module (NOT index.ts which has server side effects)
-mock.module("../../db/connection", () => ({ db: testDb }));
+// Override the db instance directly — avoids mock.module which is unreliable on Linux CI.
+import { __setTestDb } from "../../db/connection";
+__setTestDb(testDb);
 
-// Mock notification service to avoid DB calls to notifications table
-mock.module("../notification-service", () => ({
-  notifyStreakMilestone: async () => {},
-  notifyBadgeUnlocked: async () => {},
-}));
-
-// Mock badge-service to break circular dependency (badge-service <-> gamification-service)
-mock.module("../badge-service", () => ({
-  checkAndAwardBadges: async () => [],
-  BADGE_DEFINITIONS: [],
-  getUserBadgeMetrics: async () => ({}),
-  getBadgeProgress: async () => ({}),
-}));
-
+// Import after db override and mocks are set up.
 // Use dynamic imports to guarantee mocks are applied before module resolution.
-// Static imports can be hoisted before mock.module on some platforms (Linux CI).
 const {
   POINT_VALUES,
   awardPoints,
@@ -109,26 +120,17 @@ let productId: number;
 beforeAll(() => {
   // Seed a test user
   const userStmt = sqlite.prepare(
-    "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?) RETURNING id"
+      "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?) RETURNING id"
   );
   const userRow = userStmt.get("test@eco.com", "hash123", "Test User") as { id: number };
   userId = userRow.id;
 
   // Seed a test product
   const prodStmt = sqlite.prepare(
-    "INSERT INTO products (user_id, product_name, category, quantity) VALUES (?, ?, ?, ?) RETURNING id"
+      "INSERT INTO products (user_id, product_name, category, quantity) VALUES (?, ?, ?, ?) RETURNING id"
   );
   const prodRow = prodStmt.get(userId, "Milk", "dairy", 1) as { id: number };
   productId = prodRow.id;
-
-  // Seed badge definitions (needed by checkAndAwardBadges which awardPoints calls)
-  const badgeStmt = sqlite.prepare(
-    "INSERT INTO badges (code, name, description, category, points_awarded, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
-  );
-  badgeStmt.run("first_action", "First Steps", "Complete your first sustainability action", "milestones", 25, 1);
-  badgeStmt.run("eco_starter", "Eco Starter", "Complete 10 sustainability actions", "milestones", 50, 2);
-  badgeStmt.run("first_consume", "Clean Plate", "Consume your first item", "waste-reduction", 25, 5);
-  badgeStmt.run("first_sale", "First Sale", "Sell your first marketplace item", "sharing", 25, 9);
 });
 
 beforeEach(() => {
@@ -136,6 +138,8 @@ beforeEach(() => {
   sqlite.exec("DELETE FROM user_badges");
   sqlite.exec("DELETE FROM product_sustainability_metrics");
   sqlite.exec("DELETE FROM user_points");
+  sqlite.exec("DELETE FROM notifications");
+  sqlite.exec("DELETE FROM notification_preferences");
 });
 
 // ── POINT_VALUES ─────────────────────────────────────────────────────

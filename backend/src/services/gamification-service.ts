@@ -1,7 +1,7 @@
 import { db } from "../db/connection";
 import * as schema from "../db/schema";
 import { eq, and, inArray, desc } from "drizzle-orm";
-import { checkAndAwardBadges } from "./badge-service";
+
 import { notifyStreakMilestone } from "./notification-service";
 
 // Point values for different actions
@@ -113,6 +113,7 @@ export async function awardPoints(
   }
 
   // Check and award any newly earned badges
+  const { checkAndAwardBadges } = await import("./badge-service");
   const newBadges = await checkAndAwardBadges(userId);
 
   return { action, amount, newTotal, newBadges, co2Saved };
@@ -153,7 +154,7 @@ export async function updateStreak(userId: number) {
     return;
   }
 
-  // Find the most recent interaction BEFORE today using string comparison
+  // Find the most recent interaction BEFORE today using string comparison.
   const previousInteraction = allInteractions.find((i) => i.todayDate < todayStr);
 
   let newStreak: number;

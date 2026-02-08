@@ -9,6 +9,7 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Skeleton } from "../components/ui/skeleton";
+import { Progress } from "../components/ui/progress";
 import {
   Plus,
   Camera,
@@ -25,10 +26,14 @@ import {
   Check,
   DollarSign,
   TrendingUp,
+  Calendar,
+  Receipt,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { formatCO2, getCO2ColorClass, calculateTotalCO2 } from "../utils/co2Utils";
+import { calculateCO2Emission } from "../utils/co2Calculator";
 import { PRODUCT_UNITS } from "../constants/units";
+import Compressor from "compressorjs";
 
 interface Product {
   id: number;
@@ -48,11 +53,13 @@ interface IdentifiedIngredient {
   name: string;
   matchedProductName: string;
   estimatedQuantity: number;
+  unit: string | null;
   category: string;
   unitPrice: number;
   co2Emission: number;
   confidence: "high" | "medium" | "low";
   interactionId?: number; // Added after confirm-ingredients
+  quantityError?: string;
 }
 
 
@@ -396,7 +403,7 @@ function ProductCard({
               )}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
-              <span>Qty: {product.quantity}{product.unit ? ` ${product.unit}` : ''}</span>
+              <span>Qty: {parseFloat(product.quantity.toFixed(2))}{product.unit ? ` ${product.unit}` : ''}</span>
               {product.unitPrice != null && (
                 <span>${product.unitPrice.toFixed(2)}</span>
               )}
@@ -456,13 +463,41 @@ function AddProductModal({
   const [purchaseDate, setPurchaseDate] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [quantityError, setQuantityError] = useState<string>("");
   const { addToast } = useToast();
+
+  const validateQuantity = (value: number): boolean => {
+    const MAX_QUANTITY = 99999; // Reasonable maximum
+
+    if (isNaN(value) || value <= 0) {
+      setQuantityError("Quantity must be greater than 0");
+      return false;
+    }
+
+    if (value > MAX_QUANTITY) {
+      setQuantityError(`Quantity cannot exceed ${MAX_QUANTITY.toLocaleString()}`);
+      return false;
+    }
+
+    setQuantityError("");
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate quantity before submission
+    if (!validateQuantity(quantity)) {
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Calculate CO2 before submitting
+      const calculatedCO2 = calculateCO2Emission(name, category || "other");
+      console.log(`[AddProduct] Calculated CO2 for "${name}" (${category || "other"}): ${calculatedCO2} kg`);
+
       await api.post("/myfridge/products", {
         productName: name,
         category: category || undefined,
@@ -471,6 +506,7 @@ function AddProductModal({
         unitPrice: unitPrice ? parseFloat(unitPrice) : undefined,
         purchaseDate: purchaseDate || undefined,
         description: description || undefined,
+        co2Emission: calculatedCO2,
       });
       addToast("Product added!", "success");
       onAdded();
@@ -533,12 +569,20 @@ function AddProductModal({
                   id="quantity"
                   type="number"
                   min="0.1"
+                  max="99999"
                   step="0.1"
                   value={quantity}
-                  onChange={(e) => setQuantity(parseFloat(e.target.value))}
-                  className="h-11"
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    setQuantity(value);
+                    validateQuantity(value);
+                  }}
+                  className={`h-11 ${quantityError ? 'border-red-500' : ''}`}
                   required
                 />
+                {quantityError && (
+                  <p className="text-sm text-red-500 mt-1">{quantityError}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -619,6 +663,7 @@ interface ScannedItem {
   unitPrice: number;
   category: string;
   co2Emission: number;
+  quantityError?: string;
 }
 
 function ScanReceiptModal({
@@ -632,6 +677,20 @@ function ScanReceiptModal({
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [purchaseDate, setPurchaseDate] = useState<string>(
+    new Date().toISOString().split("T")[0] // Today in YYYY-MM-DD format
+  );
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualItem, setManualItem] = useState({
+    name: "",
+    quantity: 1,
+    unit: "pcs",
+    category: "other",
+    unitPrice: 0,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { addToast } = useToast();
 
@@ -641,13 +700,35 @@ function ScanReceiptModal({
 
   const processBase64 = useCallback(
     async (base64: string) => {
+      console.log("[ProcessReceipt] processBase64 called with base64 length:", base64?.length || 0);
+
+      // Validate input
+      if (!base64 || base64.trim() === "") {
+        console.error("[ProcessReceipt] Invalid base64 input");
+        addToast("Invalid image data. Please try again.", "error");
+        setScanError("Invalid image data");
+        return;
+      }
+
+      // Check if base64 is a valid data URI
+      if (!base64.startsWith("data:image/")) {
+        console.error("[ProcessReceipt] base64 is not a valid data URI:", base64.substring(0, 50));
+        addToast("Invalid image format. Please try again.", "error");
+        setScanError("Invalid image format");
+        return;
+      }
+
       setScanning(true);
       setShowCamera(false);
+      const startTime = Date.now();
+      console.log("[ProcessReceipt] Starting API call to /myfridge/receipt/scan");
 
       try {
         const response = await api.post<{
           items: Array<{ name: string; quantity: number; category: string; unit: string; unitPrice: number; co2Emission: number }>;
         }>("/myfridge/receipt/scan", { imageBase64: base64 });
+
+        console.log("[ProcessReceipt] API response received, items count:", response.items?.length || 0);
 
         setScannedItems(
           response.items.map((item) => ({
@@ -656,19 +737,69 @@ function ScanReceiptModal({
           }))
         );
 
+        // Don't show toast - let the empty state UI handle it
         if (response.items.length === 0) {
-          addToast("No food items found in receipt", "info");
+          console.log("[ScanReceipt] No items found in receipt");
+        } else {
+          console.log("[ProcessReceipt] Successfully processed items:", response.items.length);
         }
-      } catch {
-        addToast("Failed to scan receipt", "error");
+      } catch (error) {
+        console.error("[ProcessReceipt] Error during scan:", error);
+        const message = error instanceof Error
+          ? error.message
+          : "Failed to analyze receipt. Please check image clarity.";
+        addToast(message, "error");
+        setScanError(message);
+        // Keep preview visible - don't clear capturedPreview
       } finally {
+        // Ensure loading screen shows for at least 800ms
+        const elapsedTime = Date.now() - startTime;
+        const minLoadingTime = 800;
+        const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+
+        if (remainingTime > 0) {
+          console.log(`[ProcessReceipt] Waiting ${remainingTime}ms to show loading feedback`);
+          await new Promise(resolve => setTimeout(resolve, remainingTime));
+        }
+
         setScanning(false);
+        console.log("[ProcessReceipt] Scan completed, scanning state set to false");
       }
     },
     [addToast]
   );
 
   const SUPPORTED_FORMATS = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+  const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      new Compressor(file, {
+        quality: 0.7,           // 70% quality
+        maxWidth: 1920,         // Max width in pixels
+        maxHeight: 1920,        // Max height in pixels
+        mimeType: "image/jpeg", // Convert to JPEG for better compression
+        success: (result) => {
+          const compressedFile = new File(
+            [result],
+            file.name.replace(/\.\w+$/, ".jpg"),
+            { type: "image/jpeg" }
+          );
+
+          // Show compression stats
+          const originalSize = (file.size / 1024 / 1024).toFixed(2);
+          const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+          console.log(`[Compression] ${originalSize}MB → ${compressedSize}MB`);
+
+          resolve(compressedFile);
+        },
+        error: (err) => {
+          console.error("[Compression] Failed:", err);
+          // If compression fails, use original
+          resolve(file);
+        },
+      });
+    });
+  };
 
   const processFile = async (file: File) => {
     if (!SUPPORTED_FORMATS.includes(file.type)) {
@@ -680,19 +811,25 @@ function ScanReceiptModal({
       return;
     }
 
+    // Compress image before converting to base64
+    const compressedFile = await compressImage(file);
+
     const base64 = await new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(compressedFile); // Use compressed file
     });
 
-    processBase64(base64);
+    // Show preview instead of processing immediately
+    setCapturedPreview(base64);
+    setShowPreview(true);
   };
 
-  // When user confirms captured photo, process it
+  // When user confirms captured photo, show preview
   const handleConfirmPhoto = () => {
     if (camera.capturedImage) {
-      processBase64(camera.capturedImage);
+      setCapturedPreview(camera.capturedImage);
+      setShowPreview(true);
       camera.stopCamera();
     }
   };
@@ -713,11 +850,75 @@ function ScanReceiptModal({
     );
   };
 
+  const addManualItem = () => {
+    if (!manualItem.name.trim()) {
+      addToast("Please enter item name", "error");
+      return;
+    }
+
+    const calculatedCO2 = calculateCO2Emission(manualItem.name, manualItem.category);
+    console.log(`[ManualItem] Calculated CO2 for "${manualItem.name}" (${manualItem.category}): ${calculatedCO2} kg`);
+
+    const newItem: ScannedItem = {
+      id: Math.random().toString(36).slice(2),
+      name: manualItem.name,
+      quantity: manualItem.quantity,
+      unit: manualItem.unit,
+      category: manualItem.category,
+      unitPrice: manualItem.unitPrice,
+      co2Emission: calculatedCO2,
+    };
+
+    setScannedItems((prev) => [...prev, newItem]);
+
+    // Reset form
+    setManualItem({
+      name: "",
+      quantity: 1,
+      unit: "pcs",
+      category: "other",
+      unitPrice: 0,
+    });
+    setShowManualEntry(false);
+
+    addToast("Item added manually", "success");
+  };
+
   const removeItem = (id: string) => {
     setScannedItems((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const validateItemQuantity = (id: string, value: number): boolean => {
+    const MAX_QUANTITY = 99999;
+    let error = "";
+
+    if (isNaN(value) || value <= 0) {
+      error = "Must be > 0";
+    } else if (value > MAX_QUANTITY) {
+      error = `Max ${MAX_QUANTITY.toLocaleString()}`;
+    }
+
+    setScannedItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, quantityError: error } : item))
+    );
+
+    return error === "";
+  };
+
   const handleAddAll = async () => {
+    // Validate all items first
+    let hasErrors = false;
+    scannedItems.forEach(item => {
+      if (!validateItemQuantity(item.id, item.quantity)) {
+        hasErrors = true;
+      }
+    });
+
+    if (hasErrors) {
+      addToast("Please fix quantity errors before adding items", "error");
+      return;
+    }
+
     setScanning(true);
     let addedCount = 0;
     try {
@@ -729,6 +930,7 @@ function ScanReceiptModal({
           category: item.category,
           unitPrice: item.unitPrice || undefined,
           co2Emission: item.co2Emission,
+          purchaseDate: purchaseDate,
         });
         addedCount++;
       }
@@ -858,6 +1060,109 @@ function ScanReceiptModal({
     );
   }
 
+  // --- Preview Screen ---
+  if (showPreview && capturedPreview) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <Card className="w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[85vh] flex flex-col">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between">
+              Review Photo
+              <Button variant="ghost" size="icon" onClick={() => {
+                setShowPreview(false);
+                setCapturedPreview(null);
+                setScanError(null);
+              }}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col overflow-hidden">
+            {/* Image Preview */}
+            <div className="flex-1 overflow-auto bg-muted rounded-lg mb-4 flex items-center justify-center">
+              <img
+                src={capturedPreview}
+                alt="Receipt preview"
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            </div>
+
+            {/* Quality Hints */}
+            <div className="space-y-2 mb-4">
+              <p className="text-sm font-medium">Photo Quality Tips:</p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div className="flex items-start gap-2">
+                  <Check className="h-3 w-3 mt-0.5 text-green-500 flex-shrink-0" />
+                  <span>Receipt is clear and readable</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-3 w-3 mt-0.5 text-green-500 flex-shrink-0" />
+                  <span>All items are visible</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-3 w-3 mt-0.5 text-green-500 flex-shrink-0" />
+                  <span>Good lighting, no shadows</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {scanError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-red-700">
+                    <p className="font-medium">Scan Failed</p>
+                    <p className="text-xs mt-0.5">{scanError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  console.log("[ProcessReceipt] Retake button clicked");
+                  setShowPreview(false);
+                  setCapturedPreview(null);
+                  setScanError(null);
+                  setShowCamera(true);
+                  camera.startCamera();
+                }}
+                className="flex-1"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                {scanError ? "Retake Photo" : "Retake"}
+              </Button>
+              <Button
+                onClick={() => {
+                  console.log("[ProcessReceipt] Button clicked, capturedPreview:", capturedPreview ? "valid" : "null");
+
+                  if (!capturedPreview) {
+                    console.error("[ProcessReceipt] capturedPreview is null, cannot process");
+                    addToast("No image to process. Please retake photo.", "error");
+                    return;
+                  }
+
+                  setScanError(null);
+                  setShowPreview(false); // Close preview immediately to show loading screen
+                  processBase64(capturedPreview);
+                }}
+                disabled={scanning}
+                className="flex-1"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                {scanError ? "Retry" : "Process Receipt"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // --- Main Modal ---
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -934,21 +1239,164 @@ function ScanReceiptModal({
               />
             </div>
           ) : scanning && scannedItems.length === 0 ? (
-            <div className="py-8 space-y-4">
-              <Skeleton className="h-20 w-full rounded-lg" />
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-6 w-32" />
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <Skeleton className="h-11 w-full" />
-                    <Skeleton className="h-11 w-full" />
-                    <Skeleton className="h-11 w-full" />
+            <div className="py-12 space-y-6">
+              {/* Icon and message */}
+              <div className="text-center space-y-3">
+                <div className="flex justify-center">
+                  <div className="relative">
+                    <Receipt className="h-16 w-16 text-primary/30" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
                   </div>
                 </div>
-              ))}
+                <div>
+                  <p className="font-medium text-lg">Analyzing Receipt...</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Using AI to extract items and prices
+                  </p>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="space-y-2">
+                <Progress value={45} className="h-2" />
+                <p className="text-xs text-center text-muted-foreground">
+                  This usually takes 5-10 seconds
+                </p>
+              </div>
+
+              {/* Quality reminder */}
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-xs text-muted-foreground text-center">
+                  💡 For best results, ensure the receipt is clear and well-lit
+                </p>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Purchase Date Field */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <label className="text-sm font-medium">Purchase Date</label>
+                </div>
+                <Input
+                  type="date"
+                  value={purchaseDate}
+                  onChange={(e) => setPurchaseDate(e.target.value)}
+                  max={new Date().toISOString().split("T")[0]}
+                  className="h-11"
+                />
+              </div>
+
+              {/* Manual Entry Toggle Button */}
+              <div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowManualEntry(!showManualEntry)}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {showManualEntry ? "Cancel Add Item" : "Add Item Manually"}
+                </Button>
+              </div>
+
+              {/* Manual Entry Form */}
+              {showManualEntry && (
+                <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Plus className="h-4 w-4 text-blue-600" />
+                    <p className="text-sm font-medium text-blue-900">Add Item Manually</p>
+                  </div>
+
+                  {/* Item Name */}
+                  <div>
+                    <label className="text-xs text-muted-foreground">Item Name</label>
+                    <Input
+                      value={manualItem.name}
+                      onChange={(e) => setManualItem({ ...manualItem, name: e.target.value })}
+                      placeholder="e.g., Tomatoes, Milk, Bread"
+                      className="h-11"
+                    />
+                  </div>
+
+                  {/* Qty + Unit */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Quantity</label>
+                      <Input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={manualItem.quantity}
+                        onChange={(e) => setManualItem({ ...manualItem, quantity: parseFloat(e.target.value) || 1 })}
+                        className="h-11"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Unit</label>
+                      <select
+                        value={manualItem.unit}
+                        onChange={(e) => setManualItem({ ...manualItem, unit: e.target.value })}
+                        className="w-full h-11 rounded-md border border-input bg-background px-3"
+                      >
+                        <option value="pcs">pcs</option>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="L">L</option>
+                        <option value="ml">ml</option>
+                        <option value="pack">pack</option>
+                        <option value="bottle">bottle</option>
+                        <option value="can">can</option>
+                        <option value="loaf">loaf</option>
+                        <option value="dozen">dozen</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Category + Price */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Category</label>
+                      <select
+                        value={manualItem.category}
+                        onChange={(e) => setManualItem({ ...manualItem, category: e.target.value })}
+                        className="w-full h-11 rounded-md border border-input bg-background px-3"
+                      >
+                        <option value="produce">Produce</option>
+                        <option value="dairy">Dairy</option>
+                        <option value="meat">Meat</option>
+                        <option value="bakery">Bakery</option>
+                        <option value="frozen">Frozen</option>
+                        <option value="beverages">Beverages</option>
+                        <option value="pantry">Pantry</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Price ($)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={manualItem.unitPrice}
+                        onChange={(e) => setManualItem({ ...manualItem, unitPrice: parseFloat(e.target.value) || 0 })}
+                        placeholder="0.00"
+                        className="h-11"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Add Button */}
+                  <Button onClick={addManualItem} className="w-full">
+                    <Check className="h-4 w-4 mr-2" />
+                    Add This Item
+                  </Button>
+                </div>
+              )}
+
+              {/* Item Count */}
               <p className="text-sm text-muted-foreground">
                 Found {scannedItems.length} items. Review and edit before adding:
               </p>
@@ -973,19 +1421,26 @@ function ScanReceiptModal({
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Row 1: Qty + Unit (always 2 columns) */}
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-muted-foreground">Qty</label>
                         <Input
                           type="number"
                           min="0.1"
+                          max="99999"
                           step="0.1"
                           value={item.quantity}
-                          onChange={(e) =>
-                            updateItem(item.id, "quantity", parseFloat(e.target.value) || 1)
-                          }
-                          className="h-11"
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 1;
+                            updateItem(item.id, "quantity", value);
+                            validateItemQuantity(item.id, value);
+                          }}
+                          className={`h-11 ${item.quantityError ? 'border-red-500' : ''}`}
                         />
+                        {item.quantityError && (
+                          <p className="text-xs text-red-500 mt-0.5">{item.quantityError}</p>
+                        )}
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Unit</label>
@@ -1006,22 +1461,10 @@ function ScanReceiptModal({
                           <option value="dozen">dozen</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Price ($)</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.unitPrice}
-                          onChange={(e) =>
-                            updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)
-                          }
-                          className="h-11"
-                          placeholder="0.00"
-                        />
-                      </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                    {/* Row 2: Category + CO2 (always 2 columns) */}
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-muted-foreground">Category</label>
                         <select
@@ -1050,18 +1493,69 @@ function ScanReceiptModal({
                         />
                       </div>
                     </div>
+
+                    {/* Row 3: Price (full width, optional styling) */}
+                    <div>
+                      <label className="text-xs text-muted-foreground">Price (optional)</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.unitPrice}
+                        onChange={(e) =>
+                          updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)
+                        }
+                        className="h-11"
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
-              {scannedItems.length === 0 && (
-                <p className="text-center text-sm text-muted py-4">
-                  All items removed. Scan another receipt or close.
-                </p>
+              {scannedItems.length === 0 && !scanning && (
+                <div className="text-center py-8 space-y-4">
+                  <div className="flex justify-center">
+                    <div className="bg-muted rounded-full p-4">
+                      <Receipt className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-medium">No Items Found</p>
+                    <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
+                      The receipt might be unclear or contain no food items
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 max-w-[200px] mx-auto">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setScannedItems([]);
+                        setPurchaseDate(new Date().toISOString().split("T")[0]);
+                      }}
+                      className="w-full"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Try Again
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        onClose();
+                      }}
+                      className="w-full"
+                    >
+                      Add Manually
+                    </Button>
+                  </div>
+                </div>
               )}
               <div className="flex gap-2 pt-4">
                 <Button
                   variant="outline"
-                  onClick={() => setScannedItems([])}
+                  onClick={() => {
+                    setScannedItems([]);
+                    setPurchaseDate(new Date().toISOString().split("T")[0]);
+                  }}
                   className="flex-1"
                 >
                   Scan Again
@@ -1117,8 +1611,10 @@ function TrackConsumptionModal({
     productId?: number;
     productName: string;
     quantity: number;
+    unit: string | null;
     category: string;
     co2Emission: number;
+    quantityError?: string;
   }>>([]);
 
   const SUPPORTED_FORMATS = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -1175,6 +1671,7 @@ function TrackConsumptionModal({
             name: string;
             matchedProductName: string;
             estimatedQuantity: number;
+            unit: string | null;
             category: string;
             unitPrice: number;
             co2Emission: number;
@@ -1232,6 +1729,7 @@ function TrackConsumptionModal({
               productName: string;
               quantityWasted: number;
               productId: number;
+              unit?: string | null;
             }>;
             overallObservation: string;
           };
@@ -1241,6 +1739,7 @@ function TrackConsumptionModal({
             productId: ing.productId,
             productName: ing.name,
             quantityUsed: ing.estimatedQuantity,
+            unit: ing.unit,
             category: ing.category,
             unitPrice: ing.unitPrice,
             co2Emission: ing.co2Emission,
@@ -1255,6 +1754,7 @@ function TrackConsumptionModal({
           productId: item.productId,
           productName: item.productName,
           quantity: item.quantityWasted,
+          unit: item.unit || ingredients.find((i) => i.productId === item.productId)?.unit || null,
           category: ingredients.find((i) => i.productId === item.productId)?.category || "other",
           co2Emission: ingredients.find((i) => i.productId === item.productId)?.co2Emission || 0,
         }));
@@ -1302,6 +1802,40 @@ function TrackConsumptionModal({
     setIngredients((prev) => prev.filter((ing) => ing.id !== id));
   };
 
+  const validateIngredientQuantity = (id: string, value: number): boolean => {
+    const MAX_QUANTITY = 99999;
+    let error = "";
+
+    if (isNaN(value) || value <= 0) {
+      error = "Must be > 0";
+    } else if (value > MAX_QUANTITY) {
+      error = `Max ${MAX_QUANTITY.toLocaleString()}`;
+    }
+
+    setIngredients((prev) =>
+      prev.map((ing) => (ing.id === id ? { ...ing, quantityError: error } : ing))
+    );
+
+    return error === "";
+  };
+
+  const validateWasteQuantity = (id: string, value: number): boolean => {
+    const MAX_QUANTITY = 99999;
+    let error = "";
+
+    if (isNaN(value) || value <= 0) {
+      error = "Must be > 0";
+    } else if (value > MAX_QUANTITY) {
+      error = `Max ${MAX_QUANTITY.toLocaleString()}`;
+    }
+
+    setEditableWasteItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, quantityError: error } : item))
+    );
+
+    return error === "";
+  };
+
   const addIngredient = () => {
     setIngredients((prev) => [
       ...prev,
@@ -1311,6 +1845,7 @@ function TrackConsumptionModal({
         name: "",
         matchedProductName: "",
         estimatedQuantity: 1,
+        unit: null,
         category: "other",
         unitPrice: 0,
         co2Emission: 0,
@@ -1336,8 +1871,10 @@ function TrackConsumptionModal({
         id: crypto.randomUUID(),
         productName: "",
         quantity: 1,
+        unit: null,
         category: "other",
         co2Emission: 0,
+        quantityError: undefined,
       },
     ]);
   };
@@ -1630,6 +2167,19 @@ function TrackConsumptionModal({
 
   // Handle confirming ingredients (step 2 -> step 3)
   const handleConfirmIngredients = async () => {
+    // Validate all ingredients first
+    let hasErrors = false;
+    ingredients.forEach(ing => {
+      if (!validateIngredientQuantity(ing.id, ing.estimatedQuantity)) {
+        hasErrors = true;
+      }
+    });
+
+    if (hasErrors) {
+      addToast("Please fix quantity errors", "error");
+      return;
+    }
+
     setConfirmingIngredients(true);
     try {
       // Create pending record first (if not exists)
@@ -1650,6 +2200,7 @@ function TrackConsumptionModal({
           productId: ing.productId,
           productName: ing.name,
           quantityUsed: ing.estimatedQuantity,
+          unit: ing.unit,
           category: ing.category,
           unitPrice: ing.unitPrice,
           co2Emission: ing.co2Emission,
@@ -1726,19 +2277,45 @@ function TrackConsumptionModal({
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div>
                         <label className="text-xs text-muted-foreground">Qty</label>
                         <Input
                           type="number"
                           min="0.1"
+                          max="99999"
                           step="0.1"
                           value={ing.estimatedQuantity}
-                          onChange={(e) =>
-                            updateIngredient(ing.id, "estimatedQuantity", parseFloat(e.target.value) || 0)
-                          }
-                          className="h-11"
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            updateIngredient(ing.id, "estimatedQuantity", value);
+                            validateIngredientQuantity(ing.id, value);
+                          }}
+                          className={`h-11 ${ing.quantityError ? 'border-red-500' : ''}`}
                         />
+                        {ing.quantityError && (
+                          <p className="text-xs text-red-500 mt-0.5">{ing.quantityError}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Unit</label>
+                        <select
+                          value={ing.unit || ""}
+                          onChange={(e) => updateIngredient(ing.id, "unit", e.target.value || "")}
+                          className="w-full h-11 rounded-md border border-input bg-background px-3"
+                        >
+                          <option value="">Select...</option>
+                          <option value="pcs">pcs</option>
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="L">L</option>
+                          <option value="ml">ml</option>
+                          <option value="pack">pack</option>
+                          <option value="bottle">bottle</option>
+                          <option value="can">can</option>
+                          <option value="loaf">loaf</option>
+                          <option value="dozen">dozen</option>
+                        </select>
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Category</label>
@@ -1951,6 +2528,19 @@ function TrackConsumptionModal({
 
   // Handle confirming waste (step 4 -> step 5)
   const handleConfirmWaste = async () => {
+    // Validate all waste quantities
+    let hasErrors = false;
+    editableWasteItems.forEach(item => {
+      if (!validateWasteQuantity(item.id, item.quantity)) {
+        hasErrors = true;
+      }
+    });
+
+    if (hasErrors) {
+      addToast("Please fix quantity errors before confirming", "error");
+      return;
+    }
+
     setConfirmingWaste(true);
     try {
       const response = await api.post<{
@@ -1968,6 +2558,7 @@ function TrackConsumptionModal({
           productId: ing.productId,
           productName: ing.name,
           quantityUsed: ing.estimatedQuantity,
+          unit: ing.unit,
           interactionId: ing.interactionId,
           category: ing.category,
           unitPrice: ing.unitPrice,
@@ -1977,6 +2568,7 @@ function TrackConsumptionModal({
           productId: item.productId || 0,
           productName: item.productName,
           quantityWasted: item.quantity,
+          unit: item.unit,
         })),
         pendingRecordId,
       });
@@ -2045,19 +2637,45 @@ function TrackConsumptionModal({
                         <Trash2 className="h-4 w-4 text-muted hover:text-red-500" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div>
                         <label className="text-xs text-muted-foreground">Qty Wasted</label>
                         <Input
                           type="number"
-                          min="0"
+                          min="0.1"
+                          max="99999"
                           step="0.1"
                           value={item.quantity}
-                          onChange={(e) =>
-                            updateWasteItem(item.id, "quantity", parseFloat(e.target.value) || 0)
-                          }
-                          className="h-11"
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            updateWasteItem(item.id, "quantity", value);
+                            validateWasteQuantity(item.id, value);
+                          }}
+                          className={`h-11 ${item.quantityError ? 'border-red-500' : ''}`}
                         />
+                        {item.quantityError && (
+                          <p className="text-xs text-red-500 mt-0.5">{item.quantityError}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Unit</label>
+                        <select
+                          value={item.unit || ""}
+                          onChange={(e) => updateWasteItem(item.id, "unit", e.target.value || "")}
+                          className="w-full h-11 rounded-md border border-input bg-background px-3"
+                        >
+                          <option value="">Select...</option>
+                          <option value="pcs">pcs</option>
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="L">L</option>
+                          <option value="ml">ml</option>
+                          <option value="pack">pack</option>
+                          <option value="bottle">bottle</option>
+                          <option value="can">can</option>
+                          <option value="loaf">loaf</option>
+                          <option value="dozen">dozen</option>
+                        </select>
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Category</label>

@@ -6,4 +6,9 @@ const dbPath = process.env.DATABASE_PATH || "ecoplate.db";
 const sqlite = new Database(dbPath);
 sqlite.exec("PRAGMA journal_mode = WAL;");
 
-export const db = drizzle(sqlite, { schema });
+export let db = drizzle(sqlite, { schema });
+
+/** Override the db instance (for testing only) */
+export function __setTestDb(testDb: typeof db) {
+  db = testDb;
+}

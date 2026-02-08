@@ -1,11 +1,7 @@
 import { db } from "../db/connection";
 import * as schema from "../db/schema";
 import { eq, and } from "drizzle-orm";
-// Dynamic import to break circular dependency (gamification-service imports badge-service)
-async function getOrCreateUserPoints(userId: number) {
-  const { getOrCreateUserPoints: fn } = await import("./gamification-service");
-  return fn(userId);
-}
+import { getOrCreateUserPoints } from "./gamification-service";
 import { notifyBadgeUnlocked } from "./notification-service";
 
 // ==================== Types ====================
@@ -185,7 +181,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     pointsAwarded: 25,
     sortOrder: 13,
     condition: (m) => m.longestStreak >= 3,
-    progress: (m) => ({ current: Math.min(m.currentStreak, 3), target: 3, percentage: Math.min(100, (m.longestStreak / 3) * 100) }),
+    progress: (m) => ({ current: Math.min(m.longestStreak, 3), target: 3, percentage: Math.min(100, (m.longestStreak / 3) * 100) }),
   },
   {
     code: "streak_7",
@@ -195,7 +191,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     pointsAwarded: 75,
     sortOrder: 14,
     condition: (m) => m.longestStreak >= 7,
-    progress: (m) => ({ current: Math.min(m.currentStreak, 7), target: 7, percentage: Math.min(100, (m.longestStreak / 7) * 100) }),
+    progress: (m) => ({ current: Math.min(m.longestStreak, 7), target: 7, percentage: Math.min(100, (m.longestStreak / 7) * 100) }),
   },
   {
     code: "streak_14",
@@ -205,7 +201,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     pointsAwarded: 125,
     sortOrder: 15,
     condition: (m) => m.longestStreak >= 14,
-    progress: (m) => ({ current: Math.min(m.currentStreak, 14), target: 14, percentage: Math.min(100, (m.longestStreak / 14) * 100) }),
+    progress: (m) => ({ current: Math.min(m.longestStreak, 14), target: 14, percentage: Math.min(100, (m.longestStreak / 14) * 100) }),
   },
   {
     code: "streak_30",
@@ -215,7 +211,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     pointsAwarded: 250,
     sortOrder: 16,
     condition: (m) => m.longestStreak >= 30,
-    progress: (m) => ({ current: Math.min(m.currentStreak, 30), target: 30, percentage: Math.min(100, (m.longestStreak / 30) * 100) }),
+    progress: (m) => ({ current: Math.min(m.longestStreak, 30), target: 30, percentage: Math.min(100, (m.longestStreak / 30) * 100) }),
   },
 ];
 

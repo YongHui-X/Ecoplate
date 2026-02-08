@@ -7,7 +7,7 @@
     "frontend"
   ],
   "scripts": {
-    "postinstall": "patch-package && bash scripts/fix-capacitor-proguard.sh",
+    "postinstall": "patch-package",
     "dev:backend": "cd backend && bun --watch src/index.ts",
     "dev:frontend": "cd frontend && bun run dev",
     "dev:recommendation": "cd recommendation-engine && python app.py",

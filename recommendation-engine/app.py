@@ -344,8 +344,8 @@ class PriceRecommender:
         min_price = round(original_price * (1 - max_discount), 2)
         max_price = round(original_price * (1 - min_discount), 2)
 
-        # Ensure minimum viable price
-        floor_price = round(original_price * PRICE_FLOOR_RATIO, 2)
+        # Ensure minimum viable price (at least 0.01 for any positive original price)
+        floor_price = max(round(original_price * PRICE_FLOOR_RATIO, 2), 0.01)
         recommended_price = max(recommended_price, floor_price)
         min_price = max(min_price, floor_price)
 

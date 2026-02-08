@@ -325,3 +325,116 @@ export async function recordConsumptionInteractions(
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+// ==================== CO2 and Category Helper Functions ====================
+
+/**
+ * Get CO2 emission estimate based on product name keywords.
+ * Used when the AI model doesn't provide CO2 values (offloading calculation to backend).
+ */
+export function getCO2Emission(productName: string, category?: string): number {
+  const name = productName.toLowerCase();
+
+  // Check specific keywords first (ordered by specificity)
+  if (name.includes('beef') || name.includes('steak') || name.includes('ground beef')) return 27.0;
+  if (name.includes('lamb')) return 39.0;
+  if (name.includes('chicken') || name.includes('poultry') || name.includes('turkey')) return 6.9;
+  if (name.includes('pork') || name.includes('bacon') || name.includes('ham') || name.includes('sausage')) return 7.2;
+  if (name.includes('salmon')) return 6.0;
+  if (name.includes('tuna')) return 5.5;
+  if (name.includes('shrimp') || name.includes('prawn')) return 12.0;
+  if (name.includes('fish') || name.includes('cod') || name.includes('tilapia')) return 5.0;
+  if (name.includes('milk')) return 3.2;
+  if (name.includes('cheese')) return 13.5;
+  if (name.includes('yogurt')) return 2.5;
+  if (name.includes('butter')) return 12.0;
+  if (name.includes('cream')) return 8.0;
+  if (name.includes('egg')) return 4.8;
+  if (name.includes('rice')) return 2.7;
+  if (name.includes('bread') || name.includes('bagel') || name.includes('muffin')) return 1.4;
+  if (name.includes('pasta') || name.includes('noodle')) return 1.8;
+  if (name.includes('tofu') || name.includes('tempeh')) return 2.0;
+  if (name.includes('bean') || name.includes('lentil') || name.includes('chickpea')) return 0.9;
+  if (name.includes('apple') || name.includes('orange') || name.includes('banana')) return 0.4;
+  if (name.includes('berry') || name.includes('strawberr') || name.includes('blueberr')) return 1.1;
+  if (name.includes('tomato') || name.includes('lettuce') || name.includes('spinach')) return 0.7;
+  if (name.includes('potato') || name.includes('carrot') || name.includes('onion')) return 0.3;
+  if (name.includes('broccoli') || name.includes('cauliflower')) return 0.8;
+  if (name.includes('avocado')) return 2.5;
+  if (name.includes('oil') || name.includes('olive')) return 3.5;
+  if (name.includes('sugar') || name.includes('honey')) return 1.2;
+  if (name.includes('coffee')) return 8.0;
+  if (name.includes('tea')) return 0.5;
+  if (name.includes('juice') || name.includes('soda') || name.includes('drink')) return 0.8;
+  if (name.includes('water')) return 0.1;
+  if (name.includes('cereal') || name.includes('oat')) return 1.5;
+  if (name.includes('flour')) return 1.1;
+  if (name.includes('nut') || name.includes('almond') || name.includes('walnut') || name.includes('peanut')) return 2.3;
+
+  // Fallback to category-based defaults
+  const categoryDefaults: Record<string, number> = {
+    meat: 15.0,
+    dairy: 5.0,
+    produce: 1.0,
+    bakery: 1.5,
+    frozen: 3.0,
+    beverages: 0.8,
+    pantry: 2.0,
+    other: 3.0,
+  };
+
+  return categoryDefaults[category || 'other'] || 3.0;
+}
+
+/**
+ * Classify product into a category based on product name keywords.
+ * Used when the AI model doesn't provide category (offloading classification to backend).
+ */
+export function classifyCategory(productName: string): string {
+  const name = productName.toLowerCase();
+
+  // Meat & Seafood
+  if (/beef|chicken|pork|lamb|turkey|duck|fish|salmon|tuna|shrimp|prawn|bacon|sausage|ham|steak|ground|seafood|crab|lobster/.test(name)) {
+    return 'meat';
+  }
+
+  // Dairy
+  if (/milk|cheese|yogurt|butter|cream|cottage|sour cream|half.and.half|cheddar|mozzarella|parmesan/.test(name)) {
+    return 'dairy';
+  }
+
+  // Produce (fruits and vegetables)
+  if (/apple|banana|orange|lemon|lime|grape|berry|strawberr|blueberr|raspberr|mango|pineapple|watermelon|melon|peach|pear|plum|cherry|kiwi|avocado/.test(name)) {
+    return 'produce';
+  }
+  if (/tomato|lettuce|spinach|kale|carrot|onion|potato|broccoli|cauliflower|celery|cucumber|pepper|zucchini|squash|corn|cabbage|mushroom|garlic|ginger/.test(name)) {
+    return 'produce';
+  }
+
+  // Bakery
+  if (/bread|bagel|muffin|croissant|roll|bun|donut|doughnut|pastry|cake|cookie|pie|tort/.test(name)) {
+    return 'bakery';
+  }
+
+  // Frozen
+  if (/frozen|ice cream|gelato|sorbet|popsicle|freezer|fries|nugget/.test(name)) {
+    return 'frozen';
+  }
+
+  // Beverages
+  if (/juice|soda|pop|water|coffee|tea|drink|beverage|lemonade|smoothie|beer|wine|spirit/.test(name)) {
+    return 'beverages';
+  }
+
+  // Pantry (grains, canned goods, staples)
+  if (/rice|pasta|noodle|flour|sugar|oil|cereal|oat|bean|lentil|chickpea|can|canned|sauce|soup|broth|stock|spice|seasoning|salt|pepper|vinegar|honey|syrup|jam|jelly|peanut butter|nut|almond|walnut/.test(name)) {
+    return 'pantry';
+  }
+
+  // Eggs
+  if (/egg/.test(name)) {
+    return 'dairy'; // Eggs are typically grouped with dairy in grocery categories
+  }
+
+  return 'other';
+}

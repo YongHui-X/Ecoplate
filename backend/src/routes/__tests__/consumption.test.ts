@@ -19,28 +19,7 @@ mock.module("openai", () => {
               ? userMessage.find((c: any) => c.type === "text")?.text ?? ""
               : userMessage ?? "";
 
-            if (textContent.includes("identify") || textContent.includes("match")) {
-              // API 1: identify ingredients
-              return {
-                choices: [
-                  {
-                    message: {
-                      content: JSON.stringify({
-                        ingredients: [
-                          {
-                            productId: 1,
-                            name: "Chicken Breast",
-                            estimatedQuantity: 0.5,
-                            confidence: "high",
-                          },
-                        ],
-                      }),
-                    },
-                    finish_reason: "stop",
-                  },
-                ],
-              };
-            } else {
+            if (textContent.includes("waste analyst") || textContent.includes("AFTER a meal")) {
               // API 2: analyze waste
               return {
                 choices: [
@@ -56,6 +35,27 @@ mock.module("openai", () => {
                         ],
                         overallObservation:
                           "Minimal waste observed. Most food was consumed.",
+                      }),
+                    },
+                    finish_reason: "stop",
+                  },
+                ],
+              };
+            } else {
+              // API 1: identify ingredients
+              return {
+                choices: [
+                  {
+                    message: {
+                      content: JSON.stringify({
+                        ingredients: [
+                          {
+                            productId: 1,
+                            name: "Chicken Breast",
+                            estimatedQuantity: 0.5,
+                            confidence: "high",
+                          },
+                        ],
                       }),
                     },
                     finish_reason: "stop",
@@ -116,6 +116,7 @@ beforeAll(async () => {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       today_date TEXT NOT NULL,
       quantity REAL,
+    unit TEXT,
       type TEXT
     );
   `);

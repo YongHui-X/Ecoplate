@@ -607,6 +607,35 @@ const sampleConversationMessages = [
   { text: "That works for me. See you then!", fromBuyer: false },
 ];
 
+// EcoLocker locations - 20 Singapore locker stations
+const singaporeLockers = [
+  // Central
+  { name: "Orchard Gateway", address: "277 Orchard Rd, Singapore 238858", coordinates: "1.3008,103.8442", compartments: 16, hours: "24/7" },
+  { name: "Somerset MRT", address: "1 Somerset Rd, Singapore 238162", coordinates: "1.3006,103.8387", compartments: 12, hours: "6:00 AM - 12:00 AM" },
+  { name: "Raffles City", address: "252 North Bridge Rd, Singapore 179103", coordinates: "1.2937,103.8530", compartments: 16, hours: "24/7" },
+  { name: "Marina Bay Sands", address: "10 Bayfront Ave, Singapore 018956", coordinates: "1.2834,103.8607", compartments: 20, hours: "10:00 AM - 11:00 PM" },
+  // East
+  { name: "Tampines Mall", address: "4 Tampines Central 5, Singapore 529510", coordinates: "1.3525,103.9447", compartments: 16, hours: "24/7" },
+  { name: "Bedok Mall", address: "311 New Upper Changi Rd, Singapore 467360", coordinates: "1.3244,103.9302", compartments: 12, hours: "10:00 AM - 10:00 PM" },
+  { name: "Changi City Point", address: "5 Changi Business Park Central 1, Singapore 486038", coordinates: "1.3341,103.9670", compartments: 12, hours: "24/7" },
+  { name: "Paya Lebar Quarter", address: "10 Paya Lebar Rd, Singapore 409057", coordinates: "1.3177,103.8929", compartments: 16, hours: "24/7" },
+  // West
+  { name: "Jurong Point", address: "63 Jurong West Central 3, Singapore 648331", coordinates: "1.3397,103.7066", compartments: 16, hours: "24/7" },
+  { name: "Clementi Mall", address: "3155 Commonwealth Ave West, Singapore 129588", coordinates: "1.3148,103.7641", compartments: 12, hours: "10:00 AM - 10:00 PM" },
+  { name: "Westgate", address: "3 Gateway Dr, Singapore 608532", coordinates: "1.3340,103.7424", compartments: 16, hours: "24/7" },
+  { name: "JEM", address: "50 Jurong Gateway Rd, Singapore 608549", coordinates: "1.3333,103.7431", compartments: 12, hours: "10:00 AM - 10:00 PM" },
+  // North
+  { name: "Northpoint City", address: "930 Yishun Ave 2, Singapore 769098", coordinates: "1.4299,103.8359", compartments: 16, hours: "24/7" },
+  { name: "Causeway Point", address: "1 Woodlands Square, Singapore 738099", coordinates: "1.4363,103.7864", compartments: 16, hours: "24/7" },
+  { name: "Sun Plaza", address: "30 Sembawang Dr, Singapore 757713", coordinates: "1.4489,103.8201", compartments: 12, hours: "10:00 AM - 10:00 PM" },
+  { name: "Ang Mo Kio Hub", address: "53 Ang Mo Kio Ave 3, Singapore 569933", coordinates: "1.3691,103.8488", compartments: 16, hours: "24/7" },
+  // Northeast
+  { name: "NEX Serangoon", address: "23 Serangoon Central, Singapore 556083", coordinates: "1.3506,103.8718", compartments: 16, hours: "24/7" },
+  { name: "Punggol Waterway Point", address: "83 Punggol Central, Singapore 828761", coordinates: "1.4061,103.9024", compartments: 12, hours: "10:00 AM - 10:00 PM" },
+  { name: "Compass One", address: "1 Sengkang Square, Singapore 545078", coordinates: "1.3920,103.8953", compartments: 12, hours: "10:00 AM - 10:00 PM" },
+  { name: "Hougang Mall", address: "90 Hougang Ave 10, Singapore 538766", coordinates: "1.3726,103.8937", compartments: 12, hours: "10:00 AM - 10:00 PM" },
+];
+
 // Badge definitions (16 badges across 4 categories)
 const sampleBadges = [
   // --- Milestones ---
@@ -635,13 +664,15 @@ async function seed() {
   try {
     // Clear existing data in correct order (respecting foreign keys)
     console.log("Clearing existing data...");
+    sqlite.exec("DELETE FROM locker_notifications");
+    sqlite.exec("DELETE FROM locker_orders");
+    sqlite.exec("DELETE FROM lockers");
     sqlite.exec("DELETE FROM messages");
     sqlite.exec("DELETE FROM conversations");
+    sqlite.exec("DELETE FROM listing_images");
     sqlite.exec("DELETE FROM product_sustainability_metrics");
     sqlite.exec("DELETE FROM user_points");
     sqlite.exec("DELETE FROM marketplace_listings");
-    sqlite.exec("DELETE FROM listing_images");
-    sqlite.exec("DELETE FROM product_sustainability_metrics");
     sqlite.exec("DELETE FROM products");
     sqlite.exec("DELETE FROM user_badges");
     sqlite.exec("DELETE FROM user_points");
@@ -667,6 +698,21 @@ async function seed() {
 
       createdUsers.push({ id: created.id, name: created.name });
       console.log(`  ✓ ${user.email}`);
+    }
+
+    // Create EcoLocker locations
+    console.log("\nCreating EcoLocker locations...");
+    for (const locker of singaporeLockers) {
+      await db.insert(schema.lockers).values({
+        name: locker.name,
+        address: locker.address,
+        coordinates: locker.coordinates,
+        totalCompartments: locker.compartments,
+        availableCompartments: locker.compartments,
+        operatingHours: locker.hours,
+        status: "active",
+      });
+      console.log(`  ✓ ${locker.name}`);
     }
 
     // Create badges
@@ -1161,6 +1207,7 @@ async function seed() {
     console.log(`  - ${createdListings.length + additionalActiveCount} active`);
     console.log(`  - ${soldItems.length + additionalSoldCount} sold`);
     console.log(`  - ${additionalExpiredCount} expired/cancelled`);
+    console.log(`Created ${singaporeLockers.length} EcoLocker locations`);
     console.log(`Created ${metricsCount} sustainability metrics`);
     console.log("\nML Training Data Ready!");
     console.log("========================================\n");

@@ -1,7 +1,8 @@
 import { Router, json, error, parseBody } from "../utils/router";
 import { db } from "../db/connection";
-import { marketplaceListings } from "../db/schema";
+import { marketplaceListings, conversations } from "../db/schema";
 import { eq, and, desc, ne } from "drizzle-orm";
+import { createNotification } from "../services/notification-service";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
 import { calculateDistance, parseCoordinates, type Coordinates } from "../utils/distance";
@@ -547,10 +548,22 @@ export function registerMarketplaceRoutes(router: Router) {
     return json({ message: "Listing deleted" });
   });
 
-  // Reserve listing
+  // Reserve listing for buyer (seller-initiated)
+  const reserveForBuyerSchema = z.object({
+    buyerId: z.number(),
+  });
+
   router.post("/api/v1/marketplace/listings/:id/reserve", async (req, params) => {
     const user = getUser(req);
     const listingId = parseInt(params.id, 10);
+
+    // Parse and validate request body
+    const body = await parseBody<{ buyerId: number }>(req);
+    const parseResult = reserveForBuyerSchema.safeParse(body);
+    if (!parseResult.success) {
+      return error("buyerId is required", 400);
+    }
+    const { buyerId } = parseResult.data;
 
     const listing = await db.query.marketplaceListings.findFirst({
       where: eq(marketplaceListings.id, listingId),
@@ -560,23 +573,46 @@ export function registerMarketplaceRoutes(router: Router) {
       return error("Listing not found", 404);
     }
 
+    // Verify caller is the SELLER (not buyer)
+    if (listing.sellerId !== user.id) {
+      return error("Only the seller can reserve a listing for a buyer", 403);
+    }
+
     if (listing.status !== "active") {
-      return error("Listing is not available", 400);
+      return error("Listing is not available for reservation", 400);
     }
 
-    if (listing.sellerId === user.id) {
-      return error("Cannot reserve your own listing", 400);
+    // Verify buyerId is from someone who messaged about this listing
+    const conversation = await db.query.conversations.findFirst({
+      where: and(
+        eq(conversations.listingId, listingId),
+        eq(conversations.buyerId, buyerId)
+      ),
+    });
+
+    if (!conversation) {
+      return error("Buyer must have messaged about this listing first", 400);
     }
 
+    // Update listing status to reserved with buyerId
     await db
       .update(marketplaceListings)
       .set({
         status: "reserved",
-        buyerId: user.id,
+        buyerId: buyerId,
       })
       .where(eq(marketplaceListings.id, listingId));
 
-    return json({ message: "Listing reserved" });
+    // Create notification for the buyer
+    await createNotification(
+      buyerId,
+      "listing_reserved",
+      "Listing Reserved For You!",
+      `"${listing.title}" has been reserved for you by the seller.`,
+      listingId
+    );
+
+    return json({ message: "Listing reserved for buyer" });
   });
 
   // Buy listing (buyer directly purchases)
@@ -615,6 +651,89 @@ export function registerMarketplaceRoutes(router: Router) {
       .where(eq(marketplaceListings.id, listingId));
 
     return json({ message: "Purchase successful" });
+  });
+
+  // Get interested buyers for a listing (users who messaged about it)
+  router.get("/api/v1/marketplace/listings/:id/interested-buyers", async (req, params) => {
+    const user = getUser(req);
+    const listingId = parseInt(params.id, 10);
+
+    // Verify caller is the seller
+    const listing = await db.query.marketplaceListings.findFirst({
+      where: and(
+        eq(marketplaceListings.id, listingId),
+        eq(marketplaceListings.sellerId, user.id)
+      ),
+    });
+
+    if (!listing) {
+      return error("Listing not found or you are not the seller", 404);
+    }
+
+    // Get all conversations for this listing (each conversation = one interested buyer)
+    const listingConversations = await db.query.conversations.findMany({
+      where: eq(conversations.listingId, listingId),
+      with: {
+        buyer: {
+          columns: { id: true, name: true, avatarUrl: true },
+        },
+      },
+    });
+
+    // Return buyers with their info
+    const interestedBuyers = listingConversations.map((conv) => ({
+      id: conv.buyer.id,
+      name: conv.buyer.name,
+      avatarUrl: conv.buyer.avatarUrl,
+      conversationId: conv.id,
+    }));
+
+    return json(interestedBuyers);
+  });
+
+  // Unreserve a listing (seller only)
+  router.post("/api/v1/marketplace/listings/:id/unreserve", async (req, params) => {
+    const user = getUser(req);
+    const listingId = parseInt(params.id, 10);
+
+    const listing = await db.query.marketplaceListings.findFirst({
+      where: and(
+        eq(marketplaceListings.id, listingId),
+        eq(marketplaceListings.sellerId, user.id)
+      ),
+    });
+
+    if (!listing) {
+      return error("Listing not found or you are not the seller", 404);
+    }
+
+    if (listing.status !== "reserved") {
+      return error("Listing is not reserved", 400);
+    }
+
+    const previousBuyerId = listing.buyerId;
+
+    // Reset listing to active
+    await db
+      .update(marketplaceListings)
+      .set({
+        status: "active",
+        buyerId: null,
+      })
+      .where(eq(marketplaceListings.id, listingId));
+
+    // Notify the previous buyer if there was one
+    if (previousBuyerId) {
+      await createNotification(
+        previousBuyerId,
+        "listing_reserved",
+        "Reservation Cancelled",
+        `The reservation for "${listing.title}" has been cancelled by the seller.`,
+        listingId
+      );
+    }
+
+    return json({ message: "Listing reservation cancelled" });
   });
 
   // Mark as sold

@@ -7,7 +7,8 @@ export type NotificationType =
   | "expiring_soon"
   | "badge_unlocked"
   | "streak_milestone"
-  | "product_stale";
+  | "product_stale"
+  | "listing_reserved";
 
 // Notification preferences type
 export interface NotificationPreferences {
