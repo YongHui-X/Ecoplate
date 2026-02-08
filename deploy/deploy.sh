@@ -99,8 +99,16 @@ deploy() {
         exit 1
     fi
 
-    # Step 5: Update Nginx upstream and reload
+    # Step 5: Ensure Nginx headers-more module is installed (to hide Server header)
+    if ! nginx -V 2>&1 | grep -q "headers-more"; then
+        log "Installing nginx headers-more module..."
+        sudo apt-get install -y -qq libnginx-mod-http-headers-more-filter 2>/dev/null || \
+            warn "Could not install headers-more module, Server header will not be fully hidden"
+    fi
+
+    # Step 6: Update Nginx configuration and reload
     log "Updating Nginx configuration..."
+    sudo cp "${DEPLOY_DIR}/nginx.conf" /etc/nginx/conf.d/default.conf
     sudo cp "${DEPLOY_DIR}/nginx-upstream.conf" /etc/nginx/ecoplate-upstream.conf
     sudo nginx -t && sudo nginx -s reload
 

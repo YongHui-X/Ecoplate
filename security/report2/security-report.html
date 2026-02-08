@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoPlate Security Report</title>
+<style>
+:root { --bg: #f1f5f9; --card: #fff; --text: #1e293b; --muted: #64748b; --border: #e2e8f0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 1200px; margin: 0 auto; }
+header { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #2563eb 100%); color: #fff; padding: 2.5rem; border-radius: 16px; margin-bottom: 2rem; }
+header h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+header .meta { opacity: 0.8; font-size: 0.875rem; }
+header .meta span { margin-right: 1.5rem; }
+.overall { text-align: center; margin: 1.5rem 0; }
+.overall .badge-lg { display: inline-block; padding: 0.5rem 2rem; border-radius: 9999px; font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin: 2rem 0; }
+.card { background: var(--card); border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid var(--border); text-align: center; }
+.card .num { font-size: 2rem; font-weight: 700; }
+.card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.25rem; }
+.section { background: var(--card); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.section h2 { font-size: 1.1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; }
+.badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; color: #fff; }
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-top: 0.75rem; }
+th { background: #f8fafc; text-align: left; padding: 0.6rem 0.75rem; font-weight: 600; border-bottom: 2px solid var(--border); }
+td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); }
+tr:hover { background: #f8fafc; }
+.sev-badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; color: #fff; text-transform: uppercase; }
+details { margin-top: 0.75rem; }
+details summary { cursor: pointer; font-weight: 500; padding: 0.5rem; border-radius: 6px; }
+details summary:hover { background: #f1f5f9; }
+.overview-table td:nth-child(3) { text-align: center; }
+.overview-table td:nth-child(4), .overview-table td:nth-child(5), .overview-table td:nth-child(6), .overview-table td:nth-child(7) { text-align: center; }
+.overview-table th:nth-child(3), .overview-table th:nth-child(4), .overview-table th:nth-child(5), .overview-table th:nth-child(6), .overview-table th:nth-child(7) { text-align: center; }
+footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 2rem 0; }
+@media print { body { padding: 0; } header { border-radius: 0; } .section { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<header>
+    <h1>EcoPlate DevSecOps Security Report</h1>
+    <div class="meta">
+        <span>Branch: <strong>main</strong></span>
+        <span>Commit: <strong>eacf4fd1</strong></span>
+        <span>Generated: <strong>2026-02-08 03:48 UTC</strong></span>
+        <span>Repo: <strong>GDIPSA-Team2/ecoplate</strong></span>
+    </div>
+</header>
+
+<div class="overall">
+    <span class="badge-lg" style="background:#dc2626;color:#fff">Overall: FAIL</span>
+</div>
+
+<div class="cards">
+    <div class="card" style="border-left-color:#6b7280"><div class="num">66</div><div class="label">Total Findings</div></div>
+    <div class="card" style="border-left-color:#dc2626"><div class="num" style="color:#dc2626">4</div><div class="label">Critical</div></div>
+    <div class="card" style="border-left-color:#ea580c"><div class="num" style="color:#ea580c">18</div><div class="label">High</div></div>
+    <div class="card" style="border-left-color:#ca8a04"><div class="num" style="color:#ca8a04">43</div><div class="label">Medium</div></div>
+    <div class="card" style="border-left-color:#2563eb"><div class="num" style="color:#2563eb">1</div><div class="label">Low</div></div>
+    <div class="card" style="border-left-color:#16a34a"><div class="num">13</div><div class="label">Scans Run</div></div>
+</div>
+
+<div class="section">
+    <h2>Scan Overview</h2>
+    <table class="overview-table">
+        <thead><tr><th>Tool</th><th>Category</th><th>Status</th><th>Critical</th><th>High</th><th>Medium</th><th>Low</th></tr></thead>
+        <tbody><tr>
+            <td>Semgrep</td>
+            <td>SAST</td>
+            <td><span class="badge" style="background:#ca8a04">WARN</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">12</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>Bandit</td>
+            <td>SAST</td>
+            <td><span class="badge" style="background:#16a34a">PASS</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">-</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>Trufflehog</td>
+            <td>Secrets</td>
+            <td><span class="badge" style="background:#dc2626">FAIL</span></td>
+            <td style="color:#dc2626">3</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">-</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>pip-audit</td>
+            <td>SCA</td>
+            <td><span class="badge" style="background:#16a34a">PASS</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">-</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>npm audit</td>
+            <td>SCA</td>
+            <td><span class="badge" style="background:#dc2626">FAIL</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">2</td>
+            <td style="color:#ca8a04">2</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>Checkov</td>
+            <td>IaC</td>
+            <td><span class="badge" style="background:#16a34a">PASS</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">-</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>pip-licenses</td>
+            <td>License</td>
+            <td><span class="badge" style="background:#16a34a">PASS</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">-</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>Syft (Source)</td>
+            <td>SBOM</td>
+            <td><span class="badge" style="background:#16a34a">PASS</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">-</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>Trivy (App Image)</td>
+            <td>Container</td>
+            <td><span class="badge" style="background:#dc2626">FAIL</span></td>
+            <td style="color:#dc2626">1</td>
+            <td style="color:#ea580c">1</td>
+            <td style="color:#ca8a04">23</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>Trivy (Rec Image)</td>
+            <td>Container</td>
+            <td><span class="badge" style="background:#16a34a">PASS</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">-</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>Syft (Container)</td>
+            <td>SBOM</td>
+            <td><span class="badge" style="background:#16a34a">PASS</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">-</td>
+            <td style="color:#ca8a04">-</td>
+            <td style="color:#2563eb">-</td>
+        </tr><tr>
+            <td>ZAP Baseline</td>
+            <td>DAST</td>
+            <td><span class="badge" style="background:#dc2626">FAIL</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">8</td>
+            <td style="color:#ca8a04">5</td>
+            <td style="color:#2563eb">1</td>
+        </tr><tr>
+            <td>ZAP API Scan</td>
+            <td>DAST</td>
+            <td><span class="badge" style="background:#dc2626">FAIL</span></td>
+            <td style="color:#dc2626">-</td>
+            <td style="color:#ea580c">7</td>
+            <td style="color:#ca8a04">1</td>
+            <td style="color:#2563eb">-</td>
+        </tr></tbody>
+    </table>
+</div>
+
+
+        <div class="section">
+            <h2><span class="badge" style="background:#ca8a04">WARN</span> Semgrep <span style="color:var(--muted);font-size:0.85rem;font-weight:400">(SAST)</span></h2>
+            <p style="color:var(--muted);margin-bottom:0.5rem">12 issue(s) found</p>
+            <details>
+                <summary>View 12 finding(s)</summary>
+                <table>
+                    <thead><tr><th style="width:100px">Severity</th><th>Finding</th><th>Location</th><th>Description</th></tr></thead>
+                    <tbody><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout</td>
+                <td>.github/workflows/cd.yml:58</td>
+                <td>This GitHub Actions workflow file uses `workflow_run` and checks out code from the incoming pull request. When using `wo</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout</td>
+                <td>.github/workflows/cd.yml:302</td>
+                <td>This GitHub Actions workflow file uses `workflow_run` and checks out code from the incoming pull request. When using `wo</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout</td>
+                <td>.github/workflows/cd.yml:341</td>
+                <td>This GitHub Actions workflow file uses `workflow_run` and checks out code from the incoming pull request. When using `wo</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout</td>
+                <td>.github/workflows/security-report.yml:23</td>
+                <td>This GitHub Actions workflow file uses `workflow_run` and checks out code from the incoming pull request. When using `wo</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>javascript.express.security.x-frame-options-misconfiguration.x-frame-options-misconfiguration</td>
+                <td>backend/src/index.ts:70</td>
+                <td>By letting user input control `X-Frame-Options` header, there is a risk that software does not properly verify whether o</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal</td>
+                <td>backend/src/index.ts:91</td>
+                <td>Detected possible user input going into a `path.join` or `path.resolve` function. This could possibly lead to a path tra</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal</td>
+                <td>backend/src/index.ts:101</td>
+                <td>Detected possible user input going into a `path.join` or `path.resolve` function. This could possibly lead to a path tra</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp</td>
+                <td>backend/src/utils/router.ts:32</td>
+                <td>RegExp() called with a `path` function argument, this might allow an attacker to cause a Regular Expression Denial-of-Se</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>generic.nginx.security.header-redefinition.header-redefinition</td>
+                <td>deploy/nginx.conf:45</td>
+                <td>The &#x27;add_header&#x27; directive is called in a &#x27;location&#x27; block after headers have been set at the server block. Calling &#x27;add</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>generic.nginx.security.possible-h2c-smuggling.possible-nginx-h2c-smuggling</td>
+                <td>deploy/nginx.conf:66</td>
+                <td>Conditions for Nginx H2C smuggling identified. H2C smuggling allows upgrading HTTP/1.1 connections to lesser-known HTTP/</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>python.flask.security.audit.app-run-param-config.avoid_app_run_with_bad_host</td>
+                <td>recommendation-engine/app.py:552</td>
+                <td>Running flask app with host 0.0.0.0 could expose the server publicly.</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>python.flask.security.audit.hardcoded-config.avoid_hardcoded_config_TESTING</td>
+                <td>recommendation-engine/test_app.py:30</td>
+                <td>Hardcoded variable `TESTING` detected. Use environment variables or config files instead</td>
+            </tr></tbody>
+                </table>
+            </details>
+        </div>
+        <div class="section">
+            <h2><span class="badge" style="background:#dc2626">FAIL</span> Trufflehog <span style="color:var(--muted);font-size:0.85rem;font-weight:400">(Secrets)</span></h2>
+            <p style="color:var(--muted);margin-bottom:0.5rem">3 secret(s) found</p>
+            <details>
+                <summary>View 3 finding(s)</summary>
+                <table>
+                    <thead><tr><th style="width:100px">Severity</th><th>Finding</th><th>Location</th><th>Description</th></tr></thead>
+                    <tbody><tr>
+                <td><span class="sev-badge" style="background:#dc2626">CRITICAL</span></td>
+                <td>Secret</td>
+                <td></td>
+                <td>Verified secret detected</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#dc2626">CRITICAL</span></td>
+                <td>Secret</td>
+                <td></td>
+                <td>Verified secret detected</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#dc2626">CRITICAL</span></td>
+                <td>Secret</td>
+                <td></td>
+                <td>Verified secret detected</td>
+            </tr></tbody>
+                </table>
+            </details>
+        </div>
+        <div class="section">
+            <h2><span class="badge" style="background:#dc2626">FAIL</span> npm audit <span style="color:var(--muted);font-size:0.85rem;font-weight:400">(SCA)</span></h2>
+            <p style="color:var(--muted);margin-bottom:0.5rem">4 vulnerability(ies)</p>
+            <details>
+                <summary>View 4 finding(s)</summary>
+                <table>
+                    <thead><tr><th style="width:100px">Severity</th><th>Finding</th><th>Location</th><th>Description</th></tr></thead>
+                    <tbody><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>[backend] drizzle-kit</td>
+                <td>backend</td>
+                <td>Severity: moderate</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>[backend] esbuild</td>
+                <td>backend</td>
+                <td>Severity: moderate</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>[frontend] @capacitor/cli</td>
+                <td>frontend</td>
+                <td>Severity: high</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>[frontend] tar</td>
+                <td>frontend</td>
+                <td>Severity: high</td>
+            </tr></tbody>
+                </table>
+            </details>
+        </div>
+        <div class="section">
+            <h2><span class="badge" style="background:#dc2626">FAIL</span> Trivy (App Image) <span style="color:var(--muted);font-size:0.85rem;font-weight:400">(Container)</span></h2>
+            <p style="color:var(--muted);margin-bottom:0.5rem">25 vulnerability(ies)</p>
+            <details>
+                <summary>View 25 finding(s)</summary>
+                <table>
+                    <thead><tr><th style="width:100px">Severity</th><th>Finding</th><th>Location</th><th>Description</th></tr></thead>
+                    <tbody><tr>
+                <td><span class="sev-badge" style="background:#dc2626">CRITICAL</span></td>
+                <td>CVE-2023-24538</td>
+                <td></td>
+                <td>│ stdlib  │ CVE-2023-24538 │ CRITICAL │ fixed  │ 1.19.3            │ 1.19.8, 1.20.3                   │ golang: html/tem</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-24540</td>
+                <td></td>
+                <td>│         │ CVE-2023-24540 │          │        │                   │ 1.19.9, 1.20.4                   │ golang: html/tem</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2024-24790</td>
+                <td></td>
+                <td>│         │ CVE-2024-24790 │          │        │                   │ 1.21.11, 1.22.4                  │ golang: net/neti</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>CVE-2022-41720</td>
+                <td></td>
+                <td>│         │ CVE-2022-41720 │ HIGH     │        │                   │ 1.18.9, 1.19.4                   │ golang: os, net/</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2022-41722</td>
+                <td></td>
+                <td>│         │ CVE-2022-41722 │          │        │                   │ 1.19.6, 1.20.1                   │ golang: path/fil</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2022-41723</td>
+                <td></td>
+                <td>│         │ CVE-2022-41723 │          │        │                   │                                  │ golang.org/x/net</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2022-41724</td>
+                <td></td>
+                <td>│         │ CVE-2022-41724 │          │        │                   │                                  │ golang: crypto/t</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2022-41725</td>
+                <td></td>
+                <td>│         │ CVE-2022-41725 │          │        │                   │                                  │ golang: net/http</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-24534</td>
+                <td></td>
+                <td>│         │ CVE-2023-24534 │          │        │                   │ 1.19.8, 1.20.3                   │ golang: net/http</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-24536</td>
+                <td></td>
+                <td>│         │ CVE-2023-24536 │          │        │                   │                                  │ golang: net/http</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-24537</td>
+                <td></td>
+                <td>│         │ CVE-2023-24537 │          │        │                   │                                  │ golang: go/parse</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-24539</td>
+                <td></td>
+                <td>│         │ CVE-2023-24539 │          │        │                   │ 1.19.9, 1.20.4                   │ golang: html/tem</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-29400</td>
+                <td></td>
+                <td>│         │ CVE-2023-29400 │          │        │                   │                                  │ golang: html/tem</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-29403</td>
+                <td></td>
+                <td>│         │ CVE-2023-29403 │          │        │                   │ 1.19.10, 1.20.5                  │ golang: runtime:</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-39325</td>
+                <td></td>
+                <td>│         │ CVE-2023-39325 │          │        │                   │ 1.20.10, 1.21.3                  │ golang: net/http</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-44487</td>
+                <td></td>
+                <td>│         │                │          │        │                   │                                  │ excessive work (</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-45283</td>
+                <td></td>
+                <td>│         │ CVE-2023-45283 │          │        │                   │ 1.20.11, 1.21.4, 1.20.12, 1.21.5 │ The filepath pac</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-45287</td>
+                <td></td>
+                <td>│         │ CVE-2023-45287 │          │        │                   │ 1.20.0                           │ golang: crypto/t</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2023-45288</td>
+                <td></td>
+                <td>│         │ CVE-2023-45288 │          │        │                   │ 1.21.9, 1.22.2                   │ golang: net/http</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2024-34156</td>
+                <td></td>
+                <td>│         │ CVE-2024-34156 │          │        │                   │ 1.22.7, 1.23.1                   │ encoding/gob: go</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2025-47907</td>
+                <td></td>
+                <td>│         │ CVE-2025-47907 │          │        │                   │ 1.23.12, 1.24.6                  │ database/sql: Po</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2025-58183</td>
+                <td></td>
+                <td>│         │ CVE-2025-58183 │          │        │                   │ 1.24.8, 1.25.2                   │ golang: archive/</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2025-61726</td>
+                <td></td>
+                <td>│         │ CVE-2025-61726 │          │        │                   │ 1.24.12, 1.25.6                  │ golang: net/url:</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2025-61728</td>
+                <td></td>
+                <td>│         │ CVE-2025-61728 │          │        │                   │                                  │ golang: archive/</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>CVE-2025-61729</td>
+                <td></td>
+                <td>│         │ CVE-2025-61729 │          │        │                   │ 1.24.11, 1.25.5                  │ crypto/x509: gol</td>
+            </tr></tbody>
+                </table>
+            </details>
+        </div>
+        <div class="section">
+            <h2><span class="badge" style="background:#dc2626">FAIL</span> ZAP Baseline <span style="color:var(--muted);font-size:0.85rem;font-weight:400">(DAST)</span></h2>
+            <p style="color:var(--muted);margin-bottom:0.5rem">14 alert(s)</p>
+            <details>
+                <summary>View 14 finding(s)</summary>
+                <table>
+                    <thead><tr><th style="width:100px">Severity</th><th>Finding</th><th>Location</th><th>Description</th></tr></thead>
+                    <tbody><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>CSP: Wildcard Directive</td>
+                <td></td>
+                <td>&lt;p&gt;Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attack</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>CSP: script-src unsafe-inline</td>
+                <td></td>
+                <td>&lt;p&gt;Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attack</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>CSP: style-src unsafe-inline</td>
+                <td></td>
+                <td>&lt;p&gt;Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attack</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>Insufficient Site Isolation Against Spectre Vulnerability</td>
+                <td></td>
+                <td>&lt;p&gt;Cross-Origin-Embedder-Policy header is a response header that prevents a document from loading any cross-origin resou</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>Private IP Disclosure</td>
+                <td></td>
+                <td>&lt;p&gt;A private IP (such as 10.x.x.x, 172.x.x.x, 192.168.x.x) or an Amazon EC2 private hostname (for example, ip-10-0-56-78</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Server Leaks Version Information via &quot;Server&quot; HTTP Response Header Field</td>
+                <td></td>
+                <td>&lt;p&gt;The web/application server is leaking version information via the &quot;Server&quot; HTTP response header. Access to such infor</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>Base64 Disclosure</td>
+                <td></td>
+                <td>&lt;p&gt;Base64 encoded data was disclosed by the application/web server. Note: in the interests of performance not all base64</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#2563eb">LOW</span></td>
+                <td>Information Disclosure - Suspicious Comments</td>
+                <td></td>
+                <td>&lt;p&gt;The response appears to contain suspicious comments which may help an attacker.&lt;/p&gt;</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>Modern Web Application</td>
+                <td></td>
+                <td>&lt;p&gt;The application appears to be a modern web application. If you need to explore it automatically then the Ajax Spider </td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Sec-Fetch-Dest Header is Missing</td>
+                <td></td>
+                <td>&lt;p&gt;Specifies how and where the data would be used. For instance, if the value is audio, then the requested resource must</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Sec-Fetch-Mode Header is Missing</td>
+                <td></td>
+                <td>&lt;p&gt;Allows to differentiate between requests for navigating between HTML pages and requests for loading resources like im</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Sec-Fetch-Site Header is Missing</td>
+                <td></td>
+                <td>&lt;p&gt;Specifies the relationship between request initiator&#x27;s origin and target&#x27;s origin.&lt;/p&gt;</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Sec-Fetch-User Header is Missing</td>
+                <td></td>
+                <td>&lt;p&gt;Specifies if a navigation request was initiated by a user.&lt;/p&gt;</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>Storable and Cacheable Content</td>
+                <td></td>
+                <td>&lt;p&gt;The response contents are storable by caching components such as proxy servers, and may be retrieved directly from th</td>
+            </tr></tbody>
+                </table>
+            </details>
+        </div>
+        <div class="section">
+            <h2><span class="badge" style="background:#dc2626">FAIL</span> ZAP API Scan <span style="color:var(--muted);font-size:0.85rem;font-weight:400">(DAST)</span></h2>
+            <p style="color:var(--muted);margin-bottom:0.5rem">8 alert(s)</p>
+            <details>
+                <summary>View 8 finding(s)</summary>
+                <table>
+                    <thead><tr><th style="width:100px">Severity</th><th>Finding</th><th>Location</th><th>Description</th></tr></thead>
+                    <tbody><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Server Leaks Version Information via &quot;Server&quot; HTTP Response Header Field</td>
+                <td></td>
+                <td>&lt;p&gt;The web/application server is leaking version information via the &quot;Server&quot; HTTP response header. Access to such infor</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Unexpected Content-Type was returned</td>
+                <td></td>
+                <td>&lt;p&gt;A Content-Type of text/html was returned by the server.&lt;/p&gt;&lt;p&gt;This is not one of the types expected to be returned by</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>A Client Error response code was returned by the server</td>
+                <td></td>
+                <td>&lt;p&gt;A response code of 404 was returned by the server.&lt;/p&gt;&lt;p&gt;This may indicate that the application is failing to handle </td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ca8a04">MEDIUM</span></td>
+                <td>Non-Storable Content</td>
+                <td></td>
+                <td>&lt;p&gt;The response contents are not storable by caching components such as proxy servers. If the response does not contain </td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Sec-Fetch-Dest Header is Missing</td>
+                <td></td>
+                <td>&lt;p&gt;Specifies how and where the data would be used. For instance, if the value is audio, then the requested resource must</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Sec-Fetch-Mode Header is Missing</td>
+                <td></td>
+                <td>&lt;p&gt;Allows to differentiate between requests for navigating between HTML pages and requests for loading resources like im</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Sec-Fetch-Site Header is Missing</td>
+                <td></td>
+                <td>&lt;p&gt;Specifies the relationship between request initiator&#x27;s origin and target&#x27;s origin.&lt;/p&gt;</td>
+            </tr><tr>
+                <td><span class="sev-badge" style="background:#ea580c">HIGH</span></td>
+                <td>Sec-Fetch-User Header is Missing</td>
+                <td></td>
+                <td>&lt;p&gt;Specifies if a navigation request was initiated by a user.&lt;/p&gt;</td>
+            </tr></tbody>
+                </table>
+            </details>
+        </div>
+
+<footer>
+    Generated by EcoPlate DevSecOps Pipeline &middot; 2026-02-08 03:48 UTC
+</footer>
+</body>
+</html>
