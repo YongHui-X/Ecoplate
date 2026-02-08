@@ -80,8 +80,9 @@ COPY --from=backend-builder /app/backend/tsconfig.json ./
 COPY --from=backend-builder /app/backend/drizzle.config.ts ./
 COPY --from=backend-builder /app/backend/bun.lockb* ./
 
-# Install production-only dependencies (excludes devDependencies like drizzle-kit/esbuild)
-RUN bun install --frozen-lockfile --production
+# Install production-only dependencies and remove esbuild Go binary (CVE-2023-24538, CVE-2022-41720)
+RUN bun install --production && \
+    rm -rf node_modules/@esbuild node_modules/esbuild node_modules/drizzle-kit
 
 # Copy frontend build output to be served by backend
 COPY --from=frontend-builder /app/frontend/dist ./public

@@ -68,8 +68,8 @@ function getMimeType(path: string): string {
 function addSecurityHeaders(response: Response, isApi: boolean = false): Response {
   const headers = new Headers(response.headers);
 
-  // Hide server version information
-  headers.delete("Server");
+  // Hide server version information (override Bun's default Server header)
+  headers.set("Server", "");
 
   // Prevent MIME type sniffing
   headers.set("X-Content-Type-Options", "nosniff");
@@ -91,7 +91,7 @@ function addSecurityHeaders(response: Response, isApi: boolean = false): Respons
     headers.set("Pragma", "no-cache");
   } else {
     // SPA headers - allow inline scripts/styles for Vite
-    headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com; connect-src 'self' https://maps.googleapis.com wss:; font-src 'self' https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'");
+    headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com; connect-src 'self' https://maps.googleapis.com; font-src 'self' https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'");
   }
 
   return new Response(response.body, {
