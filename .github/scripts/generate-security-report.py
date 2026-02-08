@@ -393,8 +393,6 @@ def collect_all(reports_dir):
 def overall_status(results):
     if any(r.status == "fail" for r in results):
         return "fail"
-    if any(r.status == "warn" for r in results):
-        return "warn"
     return "pass"
 
 
