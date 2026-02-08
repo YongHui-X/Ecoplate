@@ -8,20 +8,6 @@
       "when": 1770428312759,
       "tag": "0000_cool_sandman",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1770428312760,
-      "tag": "0001_add_rewards_tables",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1770428312761,
-      "tag": "0002_add_unit_to_metrics",
-      "breakpoints": true
     }
   ]
 }
