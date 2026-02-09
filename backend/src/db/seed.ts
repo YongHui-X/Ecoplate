@@ -143,6 +143,7 @@ const sampleListings = [
     expiryDays: 5,
     location: "Queenstown MRT Station|1.2946,103.8060",
     sellerIndex: 0, // Alice
+    imageUrl: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400",
   },
   {
     title: "Red Fuji Apples",
@@ -155,6 +156,7 @@ const sampleListings = [
     expiryDays: 7,
     location: "Tampines Mall|1.3525,103.9447",
     sellerIndex: 2, // Charlie
+    imageUrl: "https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?w=400",
   },
   {
     title: "Green Granny Smith Apples",
@@ -167,6 +169,7 @@ const sampleListings = [
     expiryDays: 6,
     location: "Jurong Point|1.3397,103.7066",
     sellerIndex: 3, // Diana
+    imageUrl: "https://images.unsplash.com/photo-1619546813926-a78fa6372cd2?w=400",
   },
   // PRODUCE - Other fruits
   {
@@ -180,6 +183,7 @@ const sampleListings = [
     expiryDays: 3,
     location: "Bishan MRT|1.3513,103.8492",
     sellerIndex: 4, // Evan
+    imageUrl: "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400",
   },
   {
     title: "Organic Oranges",
@@ -192,6 +196,7 @@ const sampleListings = [
     expiryDays: 10,
     location: "Clementi MRT|1.3151,103.7654",
     sellerIndex: 1, // Bob
+    imageUrl: "https://images.unsplash.com/photo-1547514701-42782101795e?w=400",
   },
   {
     title: "Fresh Strawberries",
@@ -204,6 +209,7 @@ const sampleListings = [
     expiryDays: 2,
     location: "Tampines Hub|1.3535,103.9395",
     sellerIndex: 2, // Charlie
+    imageUrl: "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=400",
   },
   // PRODUCE - Vegetables
   {
@@ -217,6 +223,7 @@ const sampleListings = [
     expiryDays: 3,
     location: "Jurong East MRT|1.3331,103.7422",
     sellerIndex: 3, // Diana
+    imageUrl: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400",
   },
   {
     title: "Fresh Tomatoes",
@@ -229,6 +236,7 @@ const sampleListings = [
     expiryDays: 5,
     location: "Queenstown|1.2946,103.8060",
     sellerIndex: 0, // Alice
+    imageUrl: "https://images.unsplash.com/photo-1546470427-0d4db154ceb8?w=400",
   },
   // DAIRY
   {
@@ -242,6 +250,7 @@ const sampleListings = [
     expiryDays: 2,
     location: "Bishan Junction 8|1.3500,103.8488",
     sellerIndex: 4, // Evan
+    imageUrl: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400",
   },
   {
     title: "Greek Yogurt Tub",
@@ -254,6 +263,7 @@ const sampleListings = [
     expiryDays: 5,
     location: "Clementi Mall|1.3148,103.7641",
     sellerIndex: 1, // Bob
+    imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400",
   },
   {
     title: "Cheddar Cheese Block",
@@ -266,6 +276,7 @@ const sampleListings = [
     expiryDays: 14,
     location: "Tampines|1.3525,103.9447",
     sellerIndex: 2, // Charlie
+    imageUrl: "https://images.unsplash.com/photo-1618164436241-4473940d1f5c?w=400",
   },
   // BAKERY
   {
@@ -279,6 +290,7 @@ const sampleListings = [
     expiryDays: 2,
     location: "Clementi Mall|1.3148,103.7641",
     sellerIndex: 1, // Bob
+    imageUrl: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400",
   },
   {
     title: "Croissants Pack",
@@ -291,6 +303,7 @@ const sampleListings = [
     expiryDays: 1,
     location: "Jurong Point|1.3397,103.7066",
     sellerIndex: 3, // Diana
+    imageUrl: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400",
   },
   {
     title: "Sourdough Loaf",
@@ -303,6 +316,7 @@ const sampleListings = [
     expiryDays: 3,
     location: "Bishan|1.3513,103.8492",
     sellerIndex: 4, // Evan
+    imageUrl: "https://images.unsplash.com/photo-1585478259715-876acc5be8eb?w=400",
   },
   // MEAT
   {
@@ -316,6 +330,7 @@ const sampleListings = [
     expiryDays: 2,
     location: "Queenstown|1.2946,103.8060",
     sellerIndex: 0, // Alice
+    imageUrl: "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=400",
   },
   {
     title: "Minced Beef",
@@ -328,6 +343,7 @@ const sampleListings = [
     expiryDays: 1,
     location: "Tampines|1.3525,103.9447",
     sellerIndex: 2, // Charlie
+    imageUrl: "https://images.unsplash.com/photo-1602470520998-f4a52199a3d6?w=400",
   },
   // FROZEN
   {
@@ -341,6 +357,7 @@ const sampleListings = [
     expiryDays: 30,
     location: "Jurong East|1.3331,103.7422",
     sellerIndex: 3, // Diana
+    imageUrl: "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=400",
   },
   {
     title: "Frozen Mixed Vegetables",
@@ -353,6 +370,7 @@ const sampleListings = [
     expiryDays: 60,
     location: "Bishan|1.3513,103.8492",
     sellerIndex: 4, // Evan
+    imageUrl: "https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=400",
   },
   // BEVERAGES
   {
@@ -366,6 +384,7 @@ const sampleListings = [
     expiryDays: 3,
     location: "Clementi|1.3151,103.7654",
     sellerIndex: 1, // Bob
+    imageUrl: "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400",
   },
   {
     title: "Coconut Water Pack",
@@ -378,6 +397,7 @@ const sampleListings = [
     expiryDays: 30,
     location: "Queenstown|1.2946,103.8060",
     sellerIndex: 0, // Alice
+    imageUrl: "https://images.unsplash.com/photo-1536657464919-892534f60d6e?w=400",
   },
   // PANTRY
   {
@@ -391,6 +411,7 @@ const sampleListings = [
     expiryDays: 180,
     location: "Tampines|1.3525,103.9447",
     sellerIndex: 2, // Charlie
+    imageUrl: "https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=400",
   },
   {
     title: "Canned Tuna",
@@ -403,6 +424,7 @@ const sampleListings = [
     expiryDays: 365,
     location: "Jurong|1.3397,103.7066",
     sellerIndex: 3, // Diana
+    imageUrl: "https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?w=400",
   },
 ];
 
@@ -424,58 +446,58 @@ const locations = [
 
 const productTemplates = [
   // Produce
-  { title: "Fresh Carrots", category: "produce", unit: "kg", basePrice: 3.0 },
-  { title: "Organic Lettuce", category: "produce", unit: "pcs", basePrice: 4.0 },
-  { title: "Ripe Mangoes", category: "produce", unit: "kg", basePrice: 8.0 },
-  { title: "Fresh Grapes", category: "produce", unit: "kg", basePrice: 12.0 },
-  { title: "Watermelon Half", category: "produce", unit: "pcs", basePrice: 6.0 },
-  { title: "Papaya", category: "produce", unit: "pcs", basePrice: 5.0 },
-  { title: "Dragon Fruit", category: "produce", unit: "pcs", basePrice: 4.0 },
-  { title: "Fresh Corn", category: "produce", unit: "pcs", basePrice: 2.0 },
-  { title: "Bell Peppers", category: "produce", unit: "kg", basePrice: 6.0 },
-  { title: "Mushrooms Pack", category: "produce", unit: "pcs", basePrice: 5.0 },
+  { title: "Fresh Carrots", category: "produce", unit: "kg", basePrice: 3.0, imageUrl: "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=400" },
+  { title: "Organic Lettuce", category: "produce", unit: "pcs", basePrice: 4.0, imageUrl: "https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=400" },
+  { title: "Ripe Mangoes", category: "produce", unit: "kg", basePrice: 8.0, imageUrl: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=400" },
+  { title: "Fresh Grapes", category: "produce", unit: "kg", basePrice: 12.0, imageUrl: "https://images.unsplash.com/photo-1537640538966-79f369143f8f?w=400" },
+  { title: "Watermelon Half", category: "produce", unit: "pcs", basePrice: 6.0, imageUrl: "https://images.unsplash.com/photo-1589984662646-e7b2e4962f18?w=400" },
+  { title: "Papaya", category: "produce", unit: "pcs", basePrice: 5.0, imageUrl: "https://images.unsplash.com/photo-1517282009859-f000ec3b26fe?w=400" },
+  { title: "Dragon Fruit", category: "produce", unit: "pcs", basePrice: 4.0, imageUrl: "https://images.unsplash.com/photo-1527325678964-54921661f888?w=400" },
+  { title: "Fresh Corn", category: "produce", unit: "pcs", basePrice: 2.0, imageUrl: "https://images.unsplash.com/photo-1551754655-cd27e38d2076?w=400" },
+  { title: "Bell Peppers", category: "produce", unit: "kg", basePrice: 6.0, imageUrl: "https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?w=400" },
+  { title: "Mushrooms Pack", category: "produce", unit: "pcs", basePrice: 5.0, imageUrl: "https://images.unsplash.com/photo-1504545102780-26774c1bb073?w=400" },
   // Dairy
-  { title: "Fresh Butter", category: "dairy", unit: "pcs", basePrice: 7.0 },
-  { title: "Cream Cheese", category: "dairy", unit: "pcs", basePrice: 6.0 },
-  { title: "Sour Cream", category: "dairy", unit: "pcs", basePrice: 4.0 },
-  { title: "Cottage Cheese", category: "dairy", unit: "pcs", basePrice: 5.0 },
-  { title: "Flavored Yogurt Pack", category: "dairy", unit: "pcs", basePrice: 6.0 },
+  { title: "Fresh Butter", category: "dairy", unit: "pcs", basePrice: 7.0, imageUrl: "https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=400" },
+  { title: "Cream Cheese", category: "dairy", unit: "pcs", basePrice: 6.0, imageUrl: "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400" },
+  { title: "Sour Cream", category: "dairy", unit: "pcs", basePrice: 4.0, imageUrl: "https://images.unsplash.com/photo-1627482891550-3eda31e1f7dc?w=400" },
+  { title: "Cottage Cheese", category: "dairy", unit: "pcs", basePrice: 5.0, imageUrl: "https://images.unsplash.com/photo-1628088062854-d1870b4553da?w=400" },
+  { title: "Flavored Yogurt Pack", category: "dairy", unit: "pcs", basePrice: 6.0, imageUrl: "https://images.unsplash.com/photo-1571212515416-fef01fc43637?w=400" },
   // Meat
-  { title: "Pork Ribs", category: "meat", unit: "kg", basePrice: 15.0 },
-  { title: "Duck Breast", category: "meat", unit: "kg", basePrice: 20.0 },
-  { title: "Lamb Leg", category: "meat", unit: "kg", basePrice: 25.0 },
-  { title: "Beef Steak", category: "meat", unit: "kg", basePrice: 30.0 },
-  { title: "Chicken Wings", category: "meat", unit: "kg", basePrice: 8.0 },
+  { title: "Pork Ribs", category: "meat", unit: "kg", basePrice: 15.0, imageUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?w=400" },
+  { title: "Duck Breast", category: "meat", unit: "kg", basePrice: 20.0, imageUrl: "https://images.unsplash.com/photo-1580554530778-ca36943938b2?w=400" },
+  { title: "Lamb Leg", category: "meat", unit: "kg", basePrice: 25.0, imageUrl: "https://images.unsplash.com/photo-1603048297172-c92544798d5a?w=400" },
+  { title: "Beef Steak", category: "meat", unit: "kg", basePrice: 30.0, imageUrl: "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=400" },
+  { title: "Chicken Wings", category: "meat", unit: "kg", basePrice: 8.0, imageUrl: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=400" },
   // Bakery
-  { title: "Baguette", category: "bakery", unit: "pcs", basePrice: 4.0 },
-  { title: "Cinnamon Rolls", category: "bakery", unit: "pcs", basePrice: 8.0 },
-  { title: "Muffins Pack", category: "bakery", unit: "pcs", basePrice: 6.0 },
-  { title: "Danish Pastry", category: "bakery", unit: "pcs", basePrice: 5.0 },
-  { title: "Birthday Cake Slice", category: "bakery", unit: "pcs", basePrice: 7.0 },
+  { title: "Baguette", category: "bakery", unit: "pcs", basePrice: 4.0, imageUrl: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=400" },
+  { title: "Cinnamon Rolls", category: "bakery", unit: "pcs", basePrice: 8.0, imageUrl: "https://images.unsplash.com/photo-1509365465985-25d11c17e812?w=400" },
+  { title: "Muffins Pack", category: "bakery", unit: "pcs", basePrice: 6.0, imageUrl: "https://images.unsplash.com/photo-1607958996333-41aef7caefaa?w=400" },
+  { title: "Danish Pastry", category: "bakery", unit: "pcs", basePrice: 5.0, imageUrl: "https://images.unsplash.com/photo-1509983165097-0c31a863e3f3?w=400" },
+  { title: "Birthday Cake Slice", category: "bakery", unit: "pcs", basePrice: 7.0, imageUrl: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400" },
   // Frozen
-  { title: "Frozen Pizza", category: "frozen", unit: "pcs", basePrice: 12.0 },
-  { title: "Ice Cream Pint", category: "frozen", unit: "pcs", basePrice: 8.0 },
-  { title: "Frozen Fish Sticks", category: "frozen", unit: "pcs", basePrice: 7.0 },
-  { title: "Frozen Waffles", category: "frozen", unit: "pcs", basePrice: 5.0 },
-  { title: "Frozen Berries Mix", category: "frozen", unit: "kg", basePrice: 10.0 },
+  { title: "Frozen Pizza", category: "frozen", unit: "pcs", basePrice: 12.0, imageUrl: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400" },
+  { title: "Ice Cream Pint", category: "frozen", unit: "pcs", basePrice: 8.0, imageUrl: "https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?w=400" },
+  { title: "Frozen Fish Sticks", category: "frozen", unit: "pcs", basePrice: 7.0, imageUrl: "https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=400" },
+  { title: "Frozen Waffles", category: "frozen", unit: "pcs", basePrice: 5.0, imageUrl: "https://images.unsplash.com/photo-1562376552-0d160a2f238d?w=400" },
+  { title: "Frozen Berries Mix", category: "frozen", unit: "kg", basePrice: 10.0, imageUrl: "https://images.unsplash.com/photo-1465056836041-7f43ac27dcb5?w=400" },
   // Beverages
-  { title: "Apple Juice", category: "beverages", unit: "L", basePrice: 5.0 },
-  { title: "Almond Milk", category: "beverages", unit: "L", basePrice: 6.0 },
-  { title: "Iced Tea Pack", category: "beverages", unit: "pcs", basePrice: 8.0 },
-  { title: "Smoothie Bottle", category: "beverages", unit: "pcs", basePrice: 7.0 },
-  { title: "Coconut Milk", category: "beverages", unit: "L", basePrice: 4.0 },
+  { title: "Apple Juice", category: "beverages", unit: "L", basePrice: 5.0, imageUrl: "https://images.unsplash.com/photo-1576673442511-7e39b6545c87?w=400" },
+  { title: "Almond Milk", category: "beverages", unit: "L", basePrice: 6.0, imageUrl: "https://images.unsplash.com/photo-1600788907416-456578634209?w=400" },
+  { title: "Iced Tea Pack", category: "beverages", unit: "pcs", basePrice: 8.0, imageUrl: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400" },
+  { title: "Smoothie Bottle", category: "beverages", unit: "pcs", basePrice: 7.0, imageUrl: "https://images.unsplash.com/photo-1505252585461-04db1eb84625?w=400" },
+  { title: "Coconut Milk", category: "beverages", unit: "L", basePrice: 4.0, imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400" },
   // Pantry
-  { title: "Olive Oil", category: "pantry", unit: "L", basePrice: 15.0 },
-  { title: "Peanut Butter", category: "pantry", unit: "pcs", basePrice: 6.0 },
-  { title: "Maple Syrup", category: "pantry", unit: "pcs", basePrice: 12.0 },
-  { title: "Rice Crackers", category: "pantry", unit: "pcs", basePrice: 4.0 },
-  { title: "Instant Noodles Pack", category: "pantry", unit: "pcs", basePrice: 5.0 },
+  { title: "Olive Oil", category: "pantry", unit: "L", basePrice: 15.0, imageUrl: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400" },
+  { title: "Peanut Butter", category: "pantry", unit: "pcs", basePrice: 6.0, imageUrl: "https://images.unsplash.com/photo-1600189020840-c6f165e672dd?w=400" },
+  { title: "Maple Syrup", category: "pantry", unit: "pcs", basePrice: 12.0, imageUrl: "https://images.unsplash.com/photo-1589496933738-f5c27bc146e3?w=400" },
+  { title: "Rice Crackers", category: "pantry", unit: "pcs", basePrice: 4.0, imageUrl: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400" },
+  { title: "Instant Noodles Pack", category: "pantry", unit: "pcs", basePrice: 5.0, imageUrl: "https://images.unsplash.com/photo-1612929633738-8fe44f7ec841?w=400" },
   // Snacks
-  { title: "Chocolate Bar", category: "snacks", unit: "pcs", basePrice: 3.0 },
-  { title: "Chips Variety Pack", category: "snacks", unit: "pcs", basePrice: 8.0 },
-  { title: "Trail Mix", category: "snacks", unit: "pcs", basePrice: 6.0 },
-  { title: "Cookies Box", category: "snacks", unit: "pcs", basePrice: 7.0 },
-  { title: "Granola Bars", category: "snacks", unit: "pcs", basePrice: 5.0 },
+  { title: "Chocolate Bar", category: "snacks", unit: "pcs", basePrice: 3.0, imageUrl: "https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=400" },
+  { title: "Chips Variety Pack", category: "snacks", unit: "pcs", basePrice: 8.0, imageUrl: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400" },
+  { title: "Trail Mix", category: "snacks", unit: "pcs", basePrice: 6.0, imageUrl: "https://images.unsplash.com/photo-1604068549290-dea0e4a305ca?w=400" },
+  { title: "Cookies Box", category: "snacks", unit: "pcs", basePrice: 7.0, imageUrl: "https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=400" },
+  { title: "Granola Bars", category: "snacks", unit: "pcs", basePrice: 5.0, imageUrl: "https://images.unsplash.com/photo-1558864559-ed673ba3610b?w=400" },
 ];
 
 // Generate additional active listings
@@ -501,6 +523,7 @@ for (let i = 0; i < 80; i++) {
     expiryDays,
     location: locations[locationIdx],
     sellerIndex,
+    imageUrl: template.imageUrl,
   });
 }
 
@@ -660,10 +683,80 @@ const sampleBadges = [
   { code: "streak_30", name: "Monthly Champion", description: "30-day sustainability streak", category: "streaks", pointsAwarded: 250, sortOrder: 16 },
 ];
 
+// Sample rewards for EcoPoints redemption (all vouchers)
+const sampleRewards = [
+  {
+    name: "Starbucks Gift Card $5",
+    description: "Enjoy a $5 Starbucks gift card. Perfect for your morning coffee!",
+    imageUrl: "/uploads/rewards/Starbucks.svg.png",
+    category: "voucher",
+    pointsCost: 300,
+    stock: 50,
+  },
+  {
+    name: "Grab Voucher $5",
+    description: "Redeem for a $5 Grab voucher. Use for rides or GrabFood!",
+    imageUrl: "/uploads/rewards/Grab.jpg",
+    category: "voucher",
+    pointsCost: 350,
+    stock: 75,
+  },
+  {
+    name: "Luckin Coffee $3",
+    description: "Enjoy a $3 Luckin Coffee voucher. Great value for quality coffee!",
+    imageUrl: "/uploads/rewards/Luckin.jpeg",
+    category: "voucher",
+    pointsCost: 200,
+    stock: 100,
+  },
+  {
+    name: "CHAGEE Voucher $5",
+    description: "Redeem for a $5 CHAGEE voucher. Premium tea at your fingertips!",
+    imageUrl: "/uploads/rewards/Logo-variation-01.webp",
+    category: "voucher",
+    pointsCost: 300,
+    stock: 80,
+  },
+  {
+    name: "EZ-Link Card Top-up $5",
+    description: "Get $5 credit for your EZ-Link card. Use for public transport!",
+    imageUrl: "/uploads/rewards/ezlink.png",
+    category: "voucher",
+    pointsCost: 400,
+    stock: 60,
+  },
+  {
+    name: "Cates Voucher $5",
+    description: "Redeem for a $5 Cates voucher. Enjoy quality food and beverages!",
+    imageUrl: "/uploads/rewards/cates.png",
+    category: "voucher",
+    pointsCost: 300,
+    stock: 80,
+  },
+  {
+    name: "Adidas Voucher $10",
+    description: "Get a $10 Adidas voucher. Treat yourself to sustainable sportswear!",
+    imageUrl: "https://logos-world.net/wp-content/uploads/2020/04/Adidas-Logo.png",
+    category: "voucher",
+    pointsCost: 800,
+    stock: 30,
+  },
+  {
+    name: "Nike Voucher $10",
+    description: "Redeem for a $10 Nike voucher. Gear up with eco-conscious style!",
+    imageUrl: "https://logos-world.net/wp-content/uploads/2020/04/Nike-Logo.png",
+    category: "voucher",
+    pointsCost: 800,
+    stock: 30,
+  },
+];
+
 async function seed() {
   try {
     // Clear existing data in correct order (respecting foreign keys)
     console.log("Clearing existing data...");
+    sqlite.exec("DELETE FROM user_redemptions");
+    sqlite.exec("DELETE FROM rewards");
     sqlite.exec("DELETE FROM locker_notifications");
     sqlite.exec("DELETE FROM locker_orders");
     sqlite.exec("DELETE FROM lockers");
@@ -720,6 +813,21 @@ async function seed() {
     for (const badge of sampleBadges) {
       await db.insert(schema.badges).values(badge);
       console.log(`  ✓ ${badge.name}`);
+    }
+
+    // Create rewards
+    console.log("\nCreating rewards...");
+    for (const reward of sampleRewards) {
+      await db.insert(schema.rewards).values({
+        name: reward.name,
+        description: reward.description,
+        imageUrl: reward.imageUrl,
+        category: reward.category,
+        pointsCost: reward.pointsCost,
+        stock: reward.stock,
+        isActive: true,
+      });
+      console.log(`  ✓ ${reward.name} (${reward.pointsCost} points)`);
     }
 
     // Create user points for all users
@@ -798,6 +906,7 @@ async function seed() {
         pickupLocation: listing.location,
         status: "active",
         co2Saved,
+        images: listing.imageUrl ? JSON.stringify([listing.imageUrl]) : null,
       }).returning();
 
       createdListings.push({ id: created.id, sellerId: seller.id, title: created.title });
@@ -1003,6 +1112,7 @@ async function seed() {
         pickupLocation: listing.location,
         status: "active",
         co2Saved,
+        images: listing.imageUrl ? JSON.stringify([listing.imageUrl]) : null,
       });
       additionalActiveCount++;
     }

@@ -152,11 +152,11 @@ export default function RewardsPage() {
   }
 
   return (
-    <div className="container max-w-4xl mx-auto px-4 py-6 pb-24">
+    <div className="w-full px-4 py-6 pb-24 lg:pb-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Rewards</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold">Rewards</h1>
           <p className="text-muted-foreground">Redeem your EcoPoints for rewards</p>
         </div>
         <Button
@@ -213,21 +213,21 @@ export default function RewardsPage() {
 
       {/* Rewards Grid */}
       {filteredRewards.length === 0 ? (
-        <Card className="p-8 text-center">
+        <Card className="p-8 text-center max-w-md mx-auto">
           <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
           <p className="text-muted-foreground">No rewards available</p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredRewards.map((reward) => (
             <Card
               key={reward.id}
-              className={`overflow-hidden ${
+              className={`overflow-hidden hover:shadow-lg transition-shadow ${
                 reward.stock === 0 ? "opacity-60" : ""
               }`}
             >
               {/* Image */}
-              <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden">
+              <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden">
                 {reward.imageUrl ? (
                   <img
                     src={reward.imageUrl}
@@ -241,9 +241,9 @@ export default function RewardsPage() {
                 )}
               </div>
 
-              <div className="p-4">
+              <div className="p-5">
                 <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold">{reward.name}</h3>
+                  <h3 className="font-semibold text-lg">{reward.name}</h3>
                   <Badge variant="secondary" className="text-xs">
                     {getCategoryIcon(reward.category)}
                     <span className="ml-1">
