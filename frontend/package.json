@@ -51,8 +51,7 @@
     "react-router-dom": "^6.22.0",
     "recharts": "^3.7.0",
     "tailwind-merge": "^3.4.0",
-    "tailwindcss-animate": "^1.0.7",
-    "uuid": "^9.0.0"
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.2",
