@@ -38,7 +38,7 @@ export const config = {
 
   // Health check settings
   healthCheck: {
-    endpoint: '/api/health',
+    endpoint: '/api/v1/health',
     maxAttempts: 30,
     intervalMs: 5000,
   },

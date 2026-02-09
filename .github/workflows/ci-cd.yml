@@ -894,15 +894,30 @@ jobs:
         run: |
           cd e2e
           npm install
+          mkdir -p reports screenshots
 
       - name: Run E2E tests
         id: e2e
         run: |
           cd e2e
-          HEADLESS=true BASE_URL=http://${{ steps.target.outputs.host }} npm test || echo "e2e_failed=true" >> $GITHUB_OUTPUT
+          HEADLESS=true BASE_URL=http://${{ steps.target.outputs.host }} npm test 2>&1 | tee test-output.log
+          TEST_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $TEST_EXIT_CODE -ne 0 ]; then
+            echo "e2e_failed=true" >> $GITHUB_OUTPUT
+          fi
+          exit 0
         env:
           HEADLESS: "true"
         continue-on-error: true
+
+      - name: Generate fallback report if missing
+        if: always()
+        run: |
+          if [ ! -f e2e/reports/test-report.html ]; then
+            echo "Creating fallback report..."
+            mkdir -p e2e/reports
+            echo '<!DOCTYPE html><html><head><title>E2E Test Report</title></head><body><h1>E2E Test Report</h1><p>0 tests passed, 1 tests failed</p><p class="failed">Test execution failed - see workflow logs for details</p></body></html>' > e2e/reports/test-report.html
+          fi
 
       - name: Upload test screenshots
         if: always()
