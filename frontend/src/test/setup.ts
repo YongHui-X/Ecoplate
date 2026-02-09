@@ -1,10 +1,20 @@
 import '@testing-library/jest-dom';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+
+// Setup portal container for Radix UI dialogs before each test
+beforeEach(() => {
+  // Create a portal root for Radix UI components (Dialog, Popover, etc.)
+  const portalRoot = document.createElement('div');
+  portalRoot.setAttribute('id', 'radix-portal');
+  document.body.appendChild(portalRoot);
+});
 
 // Cleanup after each test
 afterEach(() => {
   cleanup();
+  // Remove any portal elements created during tests
+  document.body.innerHTML = '';
 });
 
 // Mock Capacitor for tests

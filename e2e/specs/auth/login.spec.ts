@@ -32,10 +32,10 @@ describe('Login', () => {
 
   it('should login with valid credentials', async () => {
     await loginPage.login(testUsers.primary.email, testUsers.primary.password);
-    
-    // Wait for navigation to dashboard
-    await loginPage.waitForUrl('/');
-    
+
+    // Wait for navigation away from login page
+    await loginPage.waitForUrlToNotContain('/login');
+
     const url = await loginPage.getCurrentUrl();
     expect(url).not.toContain('/login');
   });

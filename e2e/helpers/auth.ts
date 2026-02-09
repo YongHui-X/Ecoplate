@@ -6,10 +6,10 @@ import { config } from '../selenium.config';
 export async function loginAsTestUser(driver: WebDriver, userType: 'primary' | 'secondary' = 'primary'): Promise<void> {
   const loginPage = new LoginPage(driver);
   const user = testUsers[userType];
-  
+
   await loginPage.goto();
   await loginPage.login(user.email, user.password);
-  await loginPage.waitForUrl('/');
+  await loginPage.waitForUrlToNotContain('/login');
 }
 
 export async function ensureLoggedOut(driver: WebDriver): Promise<void> {

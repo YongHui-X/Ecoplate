@@ -13,3 +13,4 @@ export * from './EcoPointsPage';
 export * from './BadgesPage';
 export * from './MessagesPage';
 export * from './AccountPage';
+export * from './RewardsPage';

@@ -60,4 +60,11 @@ export abstract class BasePage {
   async waitForUrl(urlPattern: string, timeout = 10000): Promise<void> {
     await this.driver.wait(until.urlContains(urlPattern), timeout);
   }
+
+  async waitForUrlToNotContain(urlPattern: string, timeout = 10000): Promise<void> {
+    await this.driver.wait(async () => {
+      const url = await this.driver.getCurrentUrl();
+      return !url.includes(urlPattern);
+    }, timeout);
+  }
 }

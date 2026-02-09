@@ -32,6 +32,15 @@ vi.mock("../hooks/useCamera", () => ({
   })),
 }));
 
+// Mock usePoints hook
+vi.mock("../contexts/PointsContext", () => ({
+  usePoints: vi.fn(() => ({
+    points: { totalPoints: 500, currentStreak: 3, totalCo2Saved: 10.5 },
+    loading: false,
+    refreshPoints: vi.fn(),
+  })),
+}));
+
 // Mock Capacitor
 vi.mock("@capacitor/core", () => ({
   Capacitor: {
@@ -156,7 +165,7 @@ describe("MyFridgePage", () => {
   });
 });
 
-describe.skip("ScanReceiptModal", () => {
+describe.skip("ScanReceiptModal (requires custom modal testing setup)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.get).mockResolvedValue([]);
@@ -792,7 +801,7 @@ describe("ProductCard actions", () => {
   });
 });
 
-describe.skip("TrackConsumptionModal", () => {
+describe.skip("TrackConsumptionModal (requires complex API mock setup)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.get).mockResolvedValue([]);
