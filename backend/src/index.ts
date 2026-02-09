@@ -65,6 +65,43 @@ function getMimeType(path: string): string {
   return mimeTypes[ext] || "application/octet-stream";
 }
 
+// Security headers to address OWASP ZAP findings
+function addSecurityHeaders(response: Response, isApi: boolean = false): Response {
+  const headers = new Headers(response.headers);
+
+  // Hide server version information (override Bun's default Server header)
+  headers.set("Server", "");
+
+  // Prevent MIME type sniffing
+  headers.set("X-Content-Type-Options", "nosniff");
+  // Prevent clickjacking
+  headers.set("X-Frame-Options", "DENY");
+  // XSS Protection (legacy, but still useful)
+  headers.set("X-XSS-Protection", "1; mode=block");
+  // Referrer policy
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Permissions policy
+  headers.set("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+  // Cross-Origin isolation headers
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
+
+  if (isApi) {
+    // API-specific headers
+    headers.set("Content-Security-Policy", "default-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'");
+    headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    headers.set("Pragma", "no-cache");
+  } else {
+    // SPA headers - allow inline scripts/styles for Vite
+    headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com; connect-src 'self' https://maps.googleapis.com; font-src 'self' https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function serveStatic(path: string): Promise<Response | null> {
   const publicDir = join(import.meta.dir, "../public");
 
@@ -120,26 +157,26 @@ const server = Bun.serve({
       let response = await publicRouter.handle(req);
       if (response) {
         response.headers.set("Access-Control-Allow-Origin", "*");
-        return response;
+        return addSecurityHeaders(response, true);
       }
 
       // Then protected routes
       response = await protectedRouter.handle(req);
       if (response) {
         response.headers.set("Access-Control-Allow-Origin", "*");
-        return response;
+        return addSecurityHeaders(response, true);
       }
 
-      return error("Not found", 404);
+      return addSecurityHeaders(error("Not found", 404), true);
     }
 
     // Static files / SPA
     const staticResponse = await serveStatic(url.pathname);
     if (staticResponse) {
-      return staticResponse;
+      return addSecurityHeaders(staticResponse, false);
     }
 
-    return error("Not found", 404);
+    return addSecurityHeaders(error("Not found", 404), false);
   },
 });
 

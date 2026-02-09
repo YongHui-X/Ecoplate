@@ -152,16 +152,15 @@ export default function RewardsPage() {
   }
 
   return (
-    <div className="container max-w-4xl mx-auto px-4 py-6 pb-24">
+    <div className="w-full px-4 py-6 pb-24 lg:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Rewards</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold">Rewards</h1>
           <p className="text-muted-foreground">Redeem your EcoPoints for rewards</p>
         </div>
         <Button
           variant="outline"
-          size="sm"
           onClick={() => navigate("/rewards/my-redemptions")}
         >
           <History className="h-4 w-4 mr-2" />
@@ -170,17 +169,17 @@ export default function RewardsPage() {
       </div>
 
       {/* Balance Card */}
-      <Card className="p-4 mb-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+      <Card className="p-6 mb-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm opacity-90">Your Balance</p>
             <div className="flex items-center gap-2">
-              <Coins className="h-6 w-6" />
-              <span className="text-3xl font-bold">{balance.toLocaleString()}</span>
-              <span className="text-lg">points</span>
+              <Coins className="h-8 w-8" />
+              <span className="text-4xl font-bold">{balance.toLocaleString()}</span>
+              <span className="text-xl">points</span>
             </div>
           </div>
-          <Gift className="h-12 w-12 opacity-50" />
+          <Gift className="h-16 w-16 opacity-50" />
         </div>
       </Card>
 
@@ -188,25 +187,22 @@ export default function RewardsPage() {
       <div className="flex gap-2 mb-6">
         <Button
           variant={filter === "all" ? "default" : "outline"}
-          size="sm"
           onClick={() => setFilter("all")}
         >
           All
         </Button>
         <Button
           variant={filter === "physical" ? "default" : "outline"}
-          size="sm"
           onClick={() => setFilter("physical")}
         >
-          <Package className="h-4 w-4 mr-1" />
+          <Package className="h-4 w-4 mr-2" />
           Physical
         </Button>
         <Button
           variant={filter === "voucher" ? "default" : "outline"}
-          size="sm"
           onClick={() => setFilter("voucher")}
         >
-          <Ticket className="h-4 w-4 mr-1" />
+          <Ticket className="h-4 w-4 mr-2" />
           Vouchers
         </Button>
       </div>
@@ -218,16 +214,16 @@ export default function RewardsPage() {
           <p className="text-muted-foreground">No rewards available</p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredRewards.map((reward) => (
             <Card
               key={reward.id}
-              className={`overflow-hidden ${
+              className={`overflow-hidden hover:shadow-lg transition-shadow ${
                 reward.stock === 0 ? "opacity-60" : ""
               }`}
             >
               {/* Image */}
-              <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden">
+              <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center overflow-hidden">
                 {reward.imageUrl ? (
                   <img
                     src={reward.imageUrl}
@@ -235,16 +231,16 @@ export default function RewardsPage() {
                     className="w-full h-full object-contain bg-white"
                   />
                 ) : reward.category === "physical" ? (
-                  <Package className="h-12 w-12 text-muted-foreground" />
+                  <Package className="h-16 w-16 text-muted-foreground" />
                 ) : (
-                  <Ticket className="h-12 w-12 text-muted-foreground" />
+                  <Ticket className="h-16 w-16 text-muted-foreground" />
                 )}
               </div>
 
               <div className="p-4">
                 <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold">{reward.name}</h3>
-                  <Badge variant="secondary" className="text-xs">
+                  <h3 className="font-semibold text-lg">{reward.name}</h3>
+                  <Badge variant="secondary" className="text-xs flex-shrink-0">
                     {getCategoryIcon(reward.category)}
                     <span className="ml-1">
                       {reward.category === "physical" ? "Physical" : "Voucher"}
@@ -253,33 +249,32 @@ export default function RewardsPage() {
                 </div>
 
                 {reward.description && (
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                     {reward.description}
                   </p>
                 )}
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-primary font-semibold">
-                    <Coins className="h-4 w-4" />
-                    <span>{reward.pointsCost.toLocaleString()}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1 text-primary font-semibold text-lg">
+                      <Coins className="h-5 w-5" />
+                      <span>{reward.pointsCost.toLocaleString()}</span>
+                    </div>
                     <span className="text-xs text-muted-foreground">
                       Stock: {reward.stock}
                     </span>
-                    <Button
-                      size="sm"
-                      disabled={reward.stock === 0 || balance < reward.pointsCost}
-                      onClick={() => setSelectedReward(reward)}
-                    >
-                      {reward.stock === 0
-                        ? "Out of Stock"
-                        : balance < reward.pointsCost
-                        ? "Not Enough Points"
-                        : "Redeem"}
-                    </Button>
                   </div>
+
+                  <Button
+                    disabled={reward.stock === 0 || balance < reward.pointsCost}
+                    onClick={() => setSelectedReward(reward)}
+                  >
+                    {reward.stock === 0
+                      ? "Out of Stock"
+                      : balance < reward.pointsCost
+                      ? "Not Enough"
+                      : "Redeem"}
+                  </Button>
                 </div>
               </div>
             </Card>

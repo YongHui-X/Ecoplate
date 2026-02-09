@@ -118,93 +118,105 @@ export default function MyRedemptionsPage() {
   }
 
   return (
-    <div className="container max-w-2xl mx-auto px-4 py-6 pb-24">
+    <div className="w-full px-4 py-6 pb-24 lg:pb-6">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="icon" onClick={() => navigate("/rewards")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">My Redemptions</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold">My Redemptions</h1>
           <p className="text-muted-foreground">Your redemption history</p>
         </div>
       </div>
 
       {/* Redemptions List */}
       {redemptions.length === 0 ? (
-        <Card className="p-8 text-center">
+        <Card className="p-8 text-center max-w-md mx-auto">
           <Package className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
           <p className="text-muted-foreground mb-4">No redemptions yet</p>
           <Button onClick={() => navigate("/rewards")}>Browse Rewards</Button>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {redemptions.map((redemption) => (
-            <Card key={redemption.id} className="overflow-hidden">
-              <div className="p-4">
+            <Card key={redemption.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              <div className="p-5">
                 <div className="flex items-start gap-4">
-                  {/* Icon */}
-                  <div className="h-12 w-12 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                    {redemption.reward.category === "physical" ? (
-                      <Package className="h-6 w-6 text-muted-foreground" />
+                  {/* Reward Image */}
+                  <div className="h-16 w-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {redemption.reward.imageUrl ? (
+                      <img
+                        src={redemption.reward.imageUrl}
+                        alt={redemption.reward.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : redemption.reward.category === "physical" ? (
+                      <Package className="h-7 w-7 text-muted-foreground" />
                     ) : (
-                      <Ticket className="h-6 w-6 text-muted-foreground" />
+                      <Ticket className="h-7 w-7 text-muted-foreground" />
                     )}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold">{redemption.reward.name}</h3>
+                      <h3 className="font-semibold text-lg">{redemption.reward.name}</h3>
                       {getStatusBadge(redemption.status)}
                     </div>
 
                     <p className="text-sm text-muted-foreground mt-1">
                       {redemption.pointsSpent.toLocaleString()} points
                     </p>
-
-                    {/* Redemption Code */}
-                    <div className="mt-3 bg-muted p-3 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            Redemption Code
-                          </p>
-                          <p className="font-mono font-bold text-lg">
-                            {redemption.redemptionCode}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(redemption.redemptionCode)}
-                        >
-                          {copiedCode === redemption.redemptionCode ? (
-                            <Check className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Dates */}
-                    <div className="mt-3 text-xs text-muted-foreground space-y-1">
-                      <p>Redeemed: {formatDate(redemption.createdAt)}</p>
-                      {redemption.status === "pending" && redemption.expiresAt && (
-                        <p>
-                          Expires:{" "}
-                          {formatDate(redemption.expiresAt)}
-                        </p>
-                      )}
-                      {redemption.status === "collected" && redemption.collectedAt && (
-                        <p>
-                          Collected:{" "}
-                          {formatDate(redemption.collectedAt)}
-                        </p>
-                      )}
-                    </div>
                   </div>
+                </div>
+
+                {/* Redemption Code */}
+                <div className="mt-4 bg-muted p-4 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Redemption Code
+                      </p>
+                      <p className="font-mono font-bold text-xl">
+                        {redemption.redemptionCode}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToClipboard(redemption.redemptionCode)}
+                    >
+                      {copiedCode === redemption.redemptionCode ? (
+                        <>
+                          <Check className="h-4 w-4 text-green-600 mr-1" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div className="mt-4 text-sm text-muted-foreground space-y-1 border-t pt-4">
+                  <p>Redeemed: {formatDate(redemption.createdAt)}</p>
+                  {redemption.status === "pending" && redemption.expiresAt && (
+                    <p>
+                      Expires:{" "}
+                      {formatDate(redemption.expiresAt)}
+                    </p>
+                  )}
+                  {redemption.status === "collected" && redemption.collectedAt && (
+                    <p>
+                      Collected:{" "}
+                      {formatDate(redemption.collectedAt)}
+                    </p>
+                  )}
                 </div>
               </div>
             </Card>
