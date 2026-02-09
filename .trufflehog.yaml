@@ -1,0 +1,43 @@
+# Trufflehog Configuration
+# This file configures secret scanning exclusions for false positives
+
+# Exclude patterns that are not real secrets
+detectors:
+  - name: privatekey
+    # Exclude test/example keys that are clearly labeled
+    keywords:
+      - "example"
+      - "test"
+      - "sample"
+      - "demo"
+
+# Paths to exclude from scanning
+exclude_paths:
+  # Test files may contain mock/test secrets
+  - "**/*test*"
+  - "**/*.test.*"
+  - "**/test_*"
+
+  # Documentation may reference example secrets
+  - "**/*.md"
+  - "**/docs/**"
+
+  # Lock files
+  - "**/bun.lockb"
+  - "**/package-lock.json"
+  - "**/yarn.lock"
+
+  # Build outputs
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/node_modules/**"
+
+  # IDE and cache
+  - "**/.vscode/**"
+  - "**/.idea/**"
+  - "**/__pycache__/**"
+
+# Entropy filtering - reduce false positives from high-entropy non-secrets
+entropy:
+  # Only flag strings with very high entropy (reduce false positives)
+  min_entropy: 4.5

@@ -13,8 +13,12 @@ build/
 backend/public/assets/
 *.js.map
 
-# Database (allow ecoplate.db for shared dev data)
-# *.db
+# Uploaded files (local development)
+backend/public/uploads/
+
+# Database (each developer maintains their own local database)
+*.db
+*.sqlite
 *.db-journal
 *.db-wal
 *.db-shm
@@ -38,6 +42,7 @@ backend/public/assets/
 # OS
 .DS_Store
 Thumbs.db
+nul
 
 # Logs
 logs/
@@ -51,13 +56,44 @@ npm-debug.log*
 
 # Testing
 coverage/
+.coverage
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ML models and training artifacts (regenerated via training)
+recommendation-engine/models/*.joblib
+recommendation-engine/models/model_metadata.json
+recommendation-engine/reports/*.json
+recommendation-engine/reports/*.log
 
 # Misc
+docs/
+PRDs/
 *.pem
 .vercel
+claude.md
+agents/
+design/
+hooks/
+mcp-configs/
+rules/
+scripts/
+!.github/scripts/
+skills/
+testimg/
+tests/
 
 # Mobile platforms
 android/
 ios/
 !android/.gitignore  # Keep the Android .gitignore
 !ios/.gitignore      # Keep the iOS .gitignore
+design/
+backend/db-full-reset.ts
+backend/db-reset.ts
+backend/test-db.ts
+
+# Deploy secrets and state
+deploy/.env
+deploy/.active-env

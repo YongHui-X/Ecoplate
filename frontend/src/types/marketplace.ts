@@ -14,6 +14,7 @@ export interface Product {
   productName: string;
   category: string | null;
   quantity: number;
+  unit: string | null;
   unitPrice: number | null;
   purchaseDate: string | null;
   description: string | null;
@@ -29,13 +30,16 @@ export interface MarketplaceListing {
   description: string | null;
   category: string | null;
   quantity: number;
+  unit: string | null;
   price: number | null;
   originalPrice: number | null;
   expiryDate: string | null;
   pickupLocation: string | null;
+  images: string | null; // JSON string: '["url1.jpg", "url2.jpg"]'
   status: string;
   createdAt: string;
   completedAt: string | null;
+  co2Saved: number | null; // Estimated kg CO2 saved by sharing this food
   seller?: {
     id: number;
     name: string;
@@ -63,6 +67,7 @@ export interface CreateListingRequest {
   description?: string;
   category?: string;
   quantity: number;
+  unit?: string;
   price?: number | null;
   originalPrice?: number;
   expiryDate?: string;
@@ -71,6 +76,7 @@ export interface CreateListingRequest {
     latitude: number;
     longitude: number;
   };
+  images?: string[]; // Array of image URLs
 }
 
 export interface UpdateListingRequest {
@@ -79,6 +85,7 @@ export interface UpdateListingRequest {
   description?: string;
   category?: string;
   quantity?: number;
+  unit?: string;
   price?: number | null;
   originalPrice?: number;
   expiryDate?: string;
@@ -87,6 +94,7 @@ export interface UpdateListingRequest {
     latitude: number;
     longitude: number;
   };
+  images?: string[]; // Array of image URLs
 }
 
 export interface CompleteListingRequest {

@@ -32,8 +32,8 @@ export function useGeolocation(
 ): UseGeolocationReturn {
   const {
     enableHighAccuracy = true,
-    timeout = 10000,
-    maximumAge = 0,
+    timeout = 30000, // Increased timeout for laptops/desktops
+    maximumAge = 60000, // Allow cached position up to 1 minute
     watchPosition = false,
   } = options;
 
@@ -65,8 +65,38 @@ export function useGeolocation(
 
         return granted;
       } else {
-        // For web, permission is requested when getting position
-        setState((prev) => ({ ...prev, permission: 'granted' }));
+        // For web, check if geolocation is available
+        if (!navigator.geolocation) {
+          setState((prev) => ({
+            ...prev,
+            permission: 'denied',
+            error: 'Geolocation is not supported by your browser',
+          }));
+          return false;
+        }
+
+        // Check permission status if available (modern browsers)
+        if (navigator.permissions) {
+          try {
+            const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+            if (permissionStatus.state === 'denied') {
+              setState((prev) => ({
+                ...prev,
+                permission: 'denied',
+                error: 'Location permission denied. Please enable it in your browser settings.',
+              }));
+              return false;
+            }
+            // If prompt or granted, we can proceed
+            setState((prev) => ({ ...prev, permission: permissionStatus.state === 'granted' ? 'granted' : 'prompt' }));
+            return true;
+          } catch {
+            // Permission API not supported, proceed anyway
+          }
+        }
+
+        // Permission will be requested when getting position
+        setState((prev) => ({ ...prev, permission: 'prompt' }));
         return true;
       }
     } catch (error) {
@@ -126,14 +156,14 @@ export function useGeolocation(
             let errorMessage = 'Failed to get location';
             switch (error.code) {
               case error.PERMISSION_DENIED:
-                errorMessage = 'Location permission denied';
+                errorMessage = 'Location permission denied. Please enable location access in your browser settings.';
                 setState((prev) => ({ ...prev, permission: 'denied' }));
                 break;
               case error.POSITION_UNAVAILABLE:
-                errorMessage = 'Location information unavailable';
+                errorMessage = 'Location unavailable. Your device may not have GPS or location services may be disabled.';
                 break;
               case error.TIMEOUT:
-                errorMessage = 'Location request timed out';
+                errorMessage = 'Location request timed out. Please ensure location services are enabled and try again.';
                 break;
             }
 

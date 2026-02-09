@@ -1,0 +1,283 @@
+import { Router, json } from "../utils/router";
+import { db } from "../db/connection";
+import * as schema from "../db/schema";
+import { eq, desc, and } from "drizzle-orm";
+import { getUser } from "../middleware/auth";
+import { getOrCreateUserPoints, getUserMetrics, getDetailedPointsStats, awardPoints } from "../services/gamification-service";
+import { POINT_VALUES } from "../services/gamification-service";
+import { getBadgeProgress } from "../services/badge-service";
+
+export function registerGamificationRoutes(router: Router) {
+  // ================================
+  // GET /api/v1/gamification/points
+  // ================================
+  router.get("/api/v1/gamification/points", async (req) => {
+    try {
+      const user = getUser(req);
+
+      const points = await getOrCreateUserPoints(user.id);
+      const detailedStats = await getDetailedPointsStats(user.id);
+
+      // Get recent interactions as "transactions" for the UI
+      const recentInteractions = await db.query.productSustainabilityMetrics.findMany({
+        where: eq(schema.productSustainabilityMetrics.userId, user.id),
+        orderBy: [
+          desc(schema.productSustainabilityMetrics.todayDate),
+          desc(schema.productSustainabilityMetrics.id),
+        ],
+        limit: 20,
+        with: {
+          product: {
+            columns: { productName: true, unit: true },
+          },
+        },
+      });
+
+      // Map interactions to transaction like format, filtering out "add" entries
+      const transactions = recentInteractions
+        .filter((i) => {
+          const t = (i.type || "").toLowerCase();
+          return t !== "add" && t !== "shared";
+        })
+        .map((i) => {
+          const normalizedType = (i.type || "").toLowerCase() as keyof typeof POINT_VALUES;
+          const baseAmount = POINT_VALUES[normalizedType] ?? 0;
+          const scaled = Math.round(baseAmount * (i.quantity ?? 1));
+          const amount = scaled === 0 ? Math.sign(baseAmount) : scaled;
+
+          return {
+            id: i.id,
+            amount,
+            type: amount < 0 ? "penalty" : "earned",
+            action: normalizedType,
+            createdAt: i.todayDate,
+            productName: i.product?.productName || (({ sold: "Sold", consumed: "Consumed", wasted: "Wasted" } as Record<string, string>)[normalizedType] ?? normalizedType),
+            quantity: i.quantity ?? 1,
+            unit: i.product?.unit ?? "pcs",
+          };
+        });
+
+      return json({
+        points: {
+          total: points.totalPoints,
+          available: points.totalPoints,
+          lifetime: points.totalPoints,
+          currentStreak: points.currentStreak,
+          longestStreak: detailedStats.longestStreak,
+        },
+        stats: {
+          totalActiveDays: detailedStats.totalActiveDays,
+          lastActiveDate: detailedStats.lastActiveDate,
+          firstActivityDate: detailedStats.firstActivityDate,
+          pointsToday: detailedStats.pointsToday,
+          pointsThisWeek: detailedStats.pointsThisWeek,
+          pointsThisMonth: detailedStats.pointsThisMonth,
+          bestDayPoints: detailedStats.bestDayPoints,
+          averagePointsPerActiveDay: detailedStats.averagePointsPerActiveDay,
+        },
+        breakdown: detailedStats.breakdownByType,
+        pointsByMonth: detailedStats.pointsByMonth,
+        transactions,
+      });
+    } catch (error) {
+      console.error("Error fetching gamification points:", error);
+      return json({ error: "Failed to fetch points data" }, 500);
+    }
+  });
+
+  // ================================
+  // GET /api/v1/gamification/metrics
+  // ================================
+  router.get("/api/v1/gamification/metrics", async (req) => {
+    const user = getUser(req);
+
+    const metrics = await getUserMetrics(user.id);
+
+    return json(metrics);
+  });
+
+  // ================================
+  // GET /api/v1/gamification/leaderboard
+  // ================================
+  router.get("/api/v1/gamification/leaderboard", async (req) => {
+    // Get all users with their points
+    const allUserPoints = await db.query.userPoints.findMany({
+      with: {
+        user: {
+          columns: { id: true, name: true },
+        },
+      },
+      orderBy: [desc(schema.userPoints.totalPoints)],
+      limit: 10,
+    });
+
+    const leaderboard = allUserPoints.map((up, index) => ({
+      rank: index + 1,
+      userId: up.userId,
+      name: up.user?.name || "Unknown",
+      points: up.totalPoints,
+      streak: up.currentStreak,
+    }));
+
+    return json(leaderboard);
+  });
+
+  // ================================
+  // GET /api/v1/gamification/badges
+  // ================================
+  router.get("/api/v1/gamification/badges", async (req) => {
+    const user = getUser(req);
+
+    // Get all badges
+    const allBadges = await db.query.badges.findMany({
+      orderBy: [schema.badges.sortOrder],
+    });
+
+    // Get user's earned badges
+    const earnedBadges = await db.query.userBadges.findMany({
+      where: eq(schema.userBadges.userId, user.id),
+      with: {
+        badge: true,
+      },
+    });
+
+    const earnedBadgeIds = new Set(earnedBadges.map((ub) => ub.badgeId));
+
+    // Get progress data for all badges
+    const progress = await getBadgeProgress(user.id);
+
+    // Combine all badges with earned status and progress
+    const badgesWithStatus = allBadges.map((badge) => ({
+      id: badge.id,
+      code: badge.code,
+      name: badge.name,
+      description: badge.description,
+      category: badge.category,
+      pointsAwarded: badge.pointsAwarded,
+      imageUrl: badge.badgeImageUrl,
+      earned: earnedBadgeIds.has(badge.id),
+      earnedAt: earnedBadges.find((ub) => ub.badgeId === badge.id)?.earnedAt || null,
+      progress: progress[badge.code] || null,
+    }));
+
+    return json({
+      badges: badgesWithStatus,
+      totalEarned: earnedBadges.length,
+      totalAvailable: allBadges.length,
+    });
+  });
+
+  // ================================
+  // GET /api/v1/gamification/dashboard
+  // ================================
+  router.get("/api/v1/gamification/dashboard", async (req) => {
+    const user = getUser(req);
+
+    // Get all products in the user's fridge
+    const userProducts = await db.query.products.findMany({
+      where: eq(schema.products.userId, user.id),
+    });
+
+    // Get user listings
+    const userListings = await db.query.marketplaceListings.findMany({
+      where: eq(schema.marketplaceListings.sellerId, user.id),
+    });
+
+    const activeListings = userListings.filter((l) => l.status === "active");
+    const soldListings = userListings.filter((l) => l.status === "completed");
+
+    const points = await getOrCreateUserPoints(user.id);
+    const metrics = await getUserMetrics(user.id);
+
+    return json({
+      products: {
+        total: userProducts.length,
+      },
+      listings: {
+        active: activeListings.length,
+        sold: soldListings.length,
+      },
+      gamification: {
+        points: points.totalPoints,
+        streak: points.currentStreak,
+        wasteReductionRate: metrics.wasteReductionRate,
+        co2Saved: metrics.estimatedCo2Saved,
+      },
+    });
+  });
+
+  // ================================
+  // POST /api/v1/gamification/sync-badges
+  // Check and award any badges the user has earned but not received
+  // ================================
+  router.post("/api/v1/gamification/sync-badges", async (req) => {
+    const user = getUser(req);
+
+    const { checkAndAwardBadges } = await import("../services/badge-service");
+    const newBadges = await checkAndAwardBadges(user.id);
+
+    return json({
+      message: newBadges.length > 0 ? `Awarded ${newBadges.length} new badges` : "No new badges earned",
+      newBadges,
+    });
+  });
+
+  // ================================
+  // POST /api/v1/gamification/sync-sold-points
+  // Backfill points for historical sold products
+  // ================================
+  router.post("/api/v1/gamification/sync-sold-points", async (req) => {
+    const user = getUser(req);
+
+    // Get all sold listings for this user
+    const soldListings = await db.query.marketplaceListings.findMany({
+      where: and(
+        eq(schema.marketplaceListings.sellerId, user.id),
+        eq(schema.marketplaceListings.status, "sold")
+      ),
+    });
+
+    // Get existing "sold" metrics count for this user
+    const existingMetrics = await db.query.productSustainabilityMetrics.findMany({
+      where: and(
+        eq(schema.productSustainabilityMetrics.userId, user.id),
+        eq(schema.productSustainabilityMetrics.type, "sold")
+      ),
+    });
+
+    const soldCount = soldListings.length;
+    const metricCount = existingMetrics.length;
+
+    // Calculate how many sales are missing points
+    const missingSales = soldCount - metricCount;
+
+    if (missingSales <= 0) {
+      const userPoints = await getOrCreateUserPoints(user.id);
+      return json({
+        message: "All sold listings already have points",
+        synced: 0,
+        alreadySynced: soldCount,
+        pointsAwarded: 0,
+        newTotal: userPoints.totalPoints,
+      });
+    }
+
+    // Award points for the missing sales
+    let totalPointsAwarded = 0;
+    for (let i = 0; i < missingSales; i++) {
+      const result = await awardPoints(user.id, "sold");
+      totalPointsAwarded += result.amount;
+    }
+
+    // Get updated total points
+    const userPoints = await getOrCreateUserPoints(user.id);
+
+    return json({
+      message: `Synced ${missingSales} sold listings`,
+      synced: missingSales,
+      alreadySynced: metricCount,
+      pointsAwarded: totalPointsAwarded,
+      newTotal: userPoints.totalPoints,
+    });
+  });
+}

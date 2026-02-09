@@ -1,0 +1,29 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "EcoPlate Gitleaks Config"
+
+[extend]
+useDefault = true
+
+# Allow specific patterns (false positives)
+[allowlist]
+description = "Allowlisted files and patterns"
+paths = [
+    '''\.lock$''',
+    '''package-lock\.json$''',
+    '''bun\.lockb$''',
+    '''\.min\.js$''',
+    '''\.map$''',
+]
+
+# Custom rules for common patterns in this project
+[[rules]]
+id = "jwt-test-secret"
+description = "Test JWT secrets (allowed in test files)"
+regex = '''ci-test-secret'''
+allowlist = { paths = ['''\.github/workflows/.*\.yml$'''] }
+
+# Additional entropy checks
+[rules.entropy]
+enabled = true

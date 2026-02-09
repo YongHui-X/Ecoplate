@@ -1,13 +1,20 @@
 # Recommendation Engine Dockerfile
 # Python Flask API for buyer/seller matching
 
-FROM python:3.12-slim AS production
+FROM python:3.12-slim-bookworm AS production
 
 WORKDIR /app
 
+# Update system packages to get security patches
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application
 COPY . .

@@ -18,7 +18,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = (message: string, type: Toast["type"] = "info") => {
-    const id = Math.random().toString(36).slice(2);
+    const id = crypto.randomUUID();
     setToasts((prev) => [...prev, { id, message, type }]);
 
     setTimeout(() => {
@@ -37,12 +37,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`px-4 py-3 rounded-lg shadow-lg text-white ${
+            className={`px-4 py-3 rounded-lg shadow-lg cursor-pointer transition-opacity hover:opacity-90 ${
               toast.type === "success"
-                ? "bg-green-600"
+                ? "bg-success text-success-foreground"
                 : toast.type === "error"
-                ? "bg-red-600"
-                : "bg-gray-800"
+                ? "bg-destructive text-destructive-foreground"
+                : "bg-primary text-primary-foreground"
             }`}
             onClick={() => removeToast(toast.id)}
           >

@@ -1,18 +1,24 @@
-import { Database } from "bun:sqlite";
-import { drizzle } from "drizzle-orm/bun-sqlite";
 import { Router, json, error } from "./utils/router";
 import { authMiddleware } from "./middleware/auth";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerMarketplaceRoutes } from "./routes/marketplace";
+import { registerMyFridgeRoutes } from "./routes/myfridge";
+import { registerConsumptionRoutes } from "./routes/consumption";
+import { registerMessageRoutes } from "./routes/messages";
+import { registerDashboardRoutes } from "./routes/dashboard";
+import { registerGamificationRoutes } from "./routes/gamification";
+import { registerUploadRoutes } from "./routes/upload";
+import { registerEcoLockerRoutes } from "./routes/ecolocker";
+import { startLockerJobs } from "./jobs/locker-jobs";
+import { registerNotificationRoutes } from "./routes/notifications";
+import { registerRewardsRoutes } from "./routes/rewards";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join } from "path";
+import { db } from "./db/connection";
 
-// Initialize database
-const sqlite = new Database("ecoplate.db");
-export const db = drizzle(sqlite, { schema });
-
-
+// Re-export db for backwards compatibility
+export { db };
 
 // Create routers
 const publicRouter = new Router();
@@ -24,6 +30,15 @@ protectedRouter.use(authMiddleware);
 // Register routes
 registerAuthRoutes(publicRouter);
 registerMarketplaceRoutes(protectedRouter);
+registerMyFridgeRoutes(protectedRouter);
+registerConsumptionRoutes(protectedRouter, db);
+registerMessageRoutes(protectedRouter);
+registerDashboardRoutes(protectedRouter);
+registerGamificationRoutes(protectedRouter);
+registerUploadRoutes(protectedRouter);
+registerEcoLockerRoutes(protectedRouter);
+registerNotificationRoutes(protectedRouter);
+registerRewardsRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));
@@ -49,13 +64,49 @@ function getMimeType(path: string): string {
   return mimeTypes[ext] || "application/octet-stream";
 }
 
+// Security headers to address OWASP ZAP findings
+function addSecurityHeaders(response: Response, isApi: boolean = false): Response {
+  const headers = new Headers(response.headers);
+
+  // Hide server version information (override Bun's default Server header)
+  headers.set("Server", "");
+
+  // Prevent MIME type sniffing
+  headers.set("X-Content-Type-Options", "nosniff");
+  // Prevent clickjacking
+  headers.set("X-Frame-Options", "DENY");
+  // XSS Protection (legacy, but still useful)
+  headers.set("X-XSS-Protection", "1; mode=block");
+  // Referrer policy
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Permissions policy
+  headers.set("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+  // Cross-Origin isolation headers
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
+
+  if (isApi) {
+    // API-specific headers
+    headers.set("Content-Security-Policy", "default-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'");
+    headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    headers.set("Pragma", "no-cache");
+  } else {
+    // SPA headers - allow inline scripts/styles for Vite
+    headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com; connect-src 'self' https://maps.googleapis.com; font-src 'self' https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function serveStatic(path: string): Promise<Response | null> {
   const publicDir = join(import.meta.dir, "../public");
-  const uploadsDir = join(import.meta.dir, "../uploads");
 
-  // Handle uploads directory
+  // Handle uploads directory (stored in public/uploads/)
   if (path.startsWith("/uploads/")) {
-    const uploadPath = join(uploadsDir, path.replace("/uploads/", ""));
+    const uploadPath = join(publicDir, path);
     if (existsSync(uploadPath)) {
       const file = Bun.file(uploadPath);
       return new Response(file, {
@@ -63,6 +114,28 @@ async function serveStatic(path: string): Promise<Response | null> {
       });
     }
     return null;
+  }
+
+  // Handle EcoLocker SPA under /ecolocker/
+  if (path.startsWith("/ecolocker")) {
+    const ecolockerDir = join(publicDir, "ecolocker");
+    // Strip the /ecolocker prefix to get the relative path
+    const relativePath = path.replace(/^\/ecolocker\/?/, "/") || "/";
+    let filePath = join(ecolockerDir, relativePath);
+
+    // SPA fallback: serve index.html for non-file paths
+    if (relativePath === "/" || !existsSync(filePath)) {
+      filePath = join(ecolockerDir, "index.html");
+    }
+
+    if (!existsSync(filePath)) {
+      return null;
+    }
+
+    const file = Bun.file(filePath);
+    return new Response(file, {
+      headers: { "Content-Type": getMimeType(filePath) },
+    });
   }
 
   let filePath = join(publicDir, path);
@@ -105,27 +178,30 @@ const server = Bun.serve({
       let response = await publicRouter.handle(req);
       if (response) {
         response.headers.set("Access-Control-Allow-Origin", "*");
-        return response;
+        return addSecurityHeaders(response, true);
       }
 
       // Then protected routes
       response = await protectedRouter.handle(req);
       if (response) {
         response.headers.set("Access-Control-Allow-Origin", "*");
-        return response;
+        return addSecurityHeaders(response, true);
       }
 
-      return error("Not found", 404);
+      return addSecurityHeaders(error("Not found", 404), true);
     }
 
     // Static files / SPA
     const staticResponse = await serveStatic(url.pathname);
     if (staticResponse) {
-      return staticResponse;
+      return addSecurityHeaders(staticResponse, false);
     }
 
-    return error("Not found", 404);
+    return addSecurityHeaders(error("Not found", 404), false);
   },
 });
 
 console.log(`EcoPlate server running at http://localhost:${server.port}`);
+
+// Start EcoLocker background jobs
+startLockerJobs();

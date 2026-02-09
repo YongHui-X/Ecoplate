@@ -8,17 +8,18 @@
     "dev": "bun --watch src/index.ts",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/db/seed.ts",
-    "db:reset": "rm -f ecoplate.db && bun run db:migrate && bun run db:seed"
+    "db:reset": "rm -f ecoplate.db && bun run db:migrate && bun run db:seed",
+    "test": "bun test"
   },
   "dependencies": {
     "drizzle-orm": "^0.30.0",
     "jose": "^5.2.0",
-    "zod": "^3.22.0",
-    "openai": "^4.28.0"
+    "openai": "^4.28.0",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
     "@types/bun": "^1.0.0",
-    "drizzle-kit": "^0.20.0",
+    "drizzle-kit": "^0.31.0",
     "typescript": "^5.3.0"
   }
 }

@@ -45,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      localStorage.removeItem("ecoplate_unread_count");
+    };
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("auth:unauthorized", handleUnauthorized);
+  }, []);
+
   const login = async (email: string, password: string) => {
     const response = await api.post<{
       user: User;
@@ -54,6 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("token", response.token);
     localStorage.setItem("user", JSON.stringify(response.user));
     setUser(response.user);
+
+    // Dispatch event to notify other contexts (like UnreadCount) that user logged in
+    window.dispatchEvent(new CustomEvent("auth:login"));
   };
 
   const register = async (email: string, password: string, name: string, userLocation?: string, avatarUrl?: string) => {
@@ -71,11 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.patch<User>("/auth/profile", data);
     localStorage.setItem("user", JSON.stringify(response));
     setUser(response);
+    // Dispatch event to notify components of profile update
+    window.dispatchEvent(new CustomEvent("auth:profileUpdate", { detail: response }));
   };
 
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("ecoplate_unread_count");
     setUser(null);
   };
 

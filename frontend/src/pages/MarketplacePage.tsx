@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { marketplaceService } from "../services/marketplace";
+import { messageService } from "../services/messages";
+import { uploadService } from "../services/upload";
+import { formatQuantityWithUnit } from "../constants/units";
+import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
-import { Plus, Search, MapPin, Clock, List, Map, Package } from "lucide-react";
+import { SkeletonProductCard } from "../components/ui/skeleton";
+import { Plus, Search, MapPin, Clock, List, Map, Package, MessageCircle, ShoppingBag } from "lucide-react";
 import { getDaysUntilExpiry } from "../lib/utils";
 import MarketplaceMap from "./Marketplace/MarketplaceMap";
+import { Co2Badge } from "../components/common/Co2Badge";
 import type { MarketplaceListing, MarketplaceListingWithDistance } from "../types/marketplace";
 import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
 
@@ -72,51 +78,73 @@ export default function MarketplacePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-8 w-40 skeleton rounded-lg" />
+            <div className="h-4 w-56 skeleton rounded-lg" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonProductCard key={i} />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
+    <div className="space-y-5 h-full flex flex-col">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Marketplace</h1>
-          <p className="text-gray-600">Find great deals on near-expiry food</p>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Marketplace</h1>
+          <p className="text-muted-foreground mt-1">Find great deals on near-expiry food</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* View Toggle */}
-          <div className="flex items-center border rounded-lg overflow-hidden">
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
+          <div className="flex items-center bg-muted rounded-xl p-1">
+            <button
               onClick={() => setViewMode("list")}
-              className="rounded-none"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === "list"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <List className="h-4 w-4 mr-2" />
-              List View
-            </Button>
-            <Button
-              variant={viewMode === "map" ? "default" : "ghost"}
-              size="sm"
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline">List</span>
+            </button>
+            <button
               onClick={() => setViewMode("map")}
-              className="rounded-none"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                viewMode === "map"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <Map className="h-4 w-4 mr-2" />
-              Map View
-            </Button>
+              <Map className="h-4 w-4" />
+              <span className="hidden sm:inline">Map</span>
+            </button>
           </div>
-          <Button variant="outline" asChild>
+          <Button variant="outline" size="sm" asChild>
             <Link to="/marketplace/my-listings">
-              <Package className="h-4 w-4 mr-2" />
-              My Listings
+              <Package className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">My Listings</span>
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/marketplace/my-purchases">
+              <ShoppingBag className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">My Purchases</span>
             </Link>
           </Button>
           <Button asChild>
             <Link to="/marketplace/create">
               <Plus className="h-4 w-4 mr-2" />
-              Create Listing
+              <span className="hidden sm:inline">Create</span>
+              <span className="sm:hidden">New</span>
             </Link>
           </Button>
         </div>
@@ -133,27 +161,29 @@ export default function MarketplacePage() {
       ) : (
         <>
           {/* Search and filters */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search listings..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-11"
               />
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
               {categories.map((cat) => (
-                <Button
+                <button
                   key={cat}
-                  variant={selectedCategory === cat ? "default" : "outline"}
-                  size="sm"
                   onClick={() => setSelectedCategory(cat)}
-                  className="whitespace-nowrap"
+                  className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    selectedCategory === cat
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
                 >
                   {cat === "All" ? cat : cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </Button>
+                </button>
               ))}
             </div>
           </div>
@@ -162,14 +192,17 @@ export default function MarketplacePage() {
           {filteredListings.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
-                <p className="text-gray-500 mb-4">No listings found</p>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+                  <Package className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground mb-4">No listings found</p>
                 <Button asChild>
                   <Link to="/marketplace/create">Create the first listing</Link>
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4">
               {filteredListings.map((listing) => (
                 <ListingCard key={listing.id} listing={listing} />
               ))}
@@ -182,84 +215,132 @@ export default function MarketplacePage() {
 }
 
 function ListingCard({ listing }: { listing: MarketplaceListing }) {
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  const [messagingLoading, setMessagingLoading] = useState(false);
   const daysUntil = getDaysUntilExpiry(listing.expiryDate);
   const discount =
     listing.originalPrice && listing.price
       ? Math.round((1 - listing.price / listing.originalPrice) * 100)
       : null;
 
+  // Get first image as thumbnail
+  const imageUrls = uploadService.getListingImageUrls(listing.images);
+  const thumbnailUrl = imageUrls[0];
+
+  const handleMessageClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMessagingLoading(true);
+    try {
+      const conversation = await messageService.getOrCreateConversationForListing(listing.id);
+      navigate(`/messages/${conversation.id}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to start conversation";
+      addToast(message, "error");
+    } finally {
+      setMessagingLoading(false);
+    }
+  };
+
   return (
     <Link to={`/marketplace/${listing.id}`}>
-      <Card className="hover:shadow-md transition-shadow overflow-hidden">
-        <div className="aspect-video bg-gray-100 relative flex items-center justify-center border-b">
-          <div className="text-gray-400 text-4xl">📦</div>
-          {discount && (
-            <Badge className="absolute top-2 right-2 bg-red-500">
-              -{discount}%
-            </Badge>
+      <Card className="card-hover press-effect overflow-hidden h-full">
+        {/* Image */}
+        <div className="aspect-square sm:aspect-[4/3] bg-muted relative flex items-center justify-center overflow-hidden">
+          {thumbnailUrl ? (
+            <img
+              src={thumbnailUrl}
+              alt={listing.title}
+              className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+            />
+          ) : (
+            <div className="text-muted-foreground text-3xl sm:text-5xl">📦</div>
           )}
-        </div>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold line-clamp-1">{listing.title}</h3>
-            {listing.category && (
-              <Badge variant="secondary" className="shrink-0">
-                {listing.category}
+          {/* Badges overlay */}
+          <div className="absolute top-1.5 sm:top-2 left-1.5 sm:left-2 right-1.5 sm:right-2 flex justify-between items-start">
+            <div className="flex flex-col gap-1">
+              {listing.category && (
+                <Badge variant="secondary" className="text-[10px] sm:text-xs bg-card/90 backdrop-blur-sm px-1.5 sm:px-2">
+                  {listing.category}
+                </Badge>
+              )}
+              {listing.co2Saved && (
+                <Co2Badge co2Saved={listing.co2Saved} variant="compact" className="bg-card/90 backdrop-blur-sm text-[10px] sm:text-xs" />
+              )}
+            </div>
+            {discount && (
+              <Badge className="bg-destructive text-destructive-foreground text-[10px] sm:text-xs px-1.5 sm:px-2">
+                -{discount}%
               </Badge>
             )}
           </div>
+          {/* Expiry indicator */}
+          {listing.expiryDate && daysUntil !== null && (
+            <div className={`absolute bottom-1.5 sm:bottom-2 left-1.5 sm:left-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-medium backdrop-blur-sm ${
+              daysUntil < 0
+                ? "bg-destructive/90 text-destructive-foreground"
+                : daysUntil <= 2
+                ? "bg-warning/90 text-warning-foreground"
+                : "bg-card/90 text-foreground"
+            }`}>
+              <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 inline mr-0.5 sm:mr-1" />
+              {daysUntil < 0 ? "Expired" : daysUntil === 0 ? "Today" : `${daysUntil}d`}
+            </div>
+          )}
+        </div>
 
-          <div className="mt-2 space-y-1 text-sm text-gray-600">
-            {listing.expiryDate && (
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {daysUntil !== null ? (
-                  daysUntil < 0 ? (
-                    <span className="text-red-600">Expired</span>
-                  ) : daysUntil === 0 ? (
-                    <span className="text-yellow-600">Expires today</span>
-                  ) : (
-                    <span>{daysUntil} days left</span>
-                  )
-                ) : (
-                  <span>No expiry set</span>
-                )}
-              </div>
-            )}
-            {listing.pickupLocation && (
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                <span className="line-clamp-1">{listing.pickupLocation}</span>
-              </div>
-            )}
-          </div>
+        <CardContent className="p-2.5 sm:p-4">
+          {/* Title */}
+          <h3 className="font-semibold line-clamp-1 text-foreground text-sm sm:text-base">{listing.title}</h3>
 
-          <div className="mt-3 flex items-center justify-between">
-            <div>
+          {/* Location - hidden on very small screens */}
+          {listing.pickupLocation && (
+            <div className="hidden sm:flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 flex-shrink-0" />
+              <span className="line-clamp-1">{listing.pickupLocation}</span>
+            </div>
+          )}
+
+          {/* Price and Quantity */}
+          <div className="mt-2 sm:mt-3 flex items-end justify-between gap-1">
+            <div className="min-w-0">
               {listing.price === null || listing.price === 0 ? (
-                <span className="text-lg font-bold text-green-600">Free</span>
+                <span className="text-sm sm:text-lg font-bold text-success">Free</span>
               ) : (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-bold">${listing.price.toFixed(2)}</span>
+                <div className="flex items-baseline gap-1 sm:gap-2 flex-wrap">
+                  <span className="text-base sm:text-xl font-bold text-foreground">${listing.price.toFixed(2)}</span>
                   {listing.originalPrice && (
-                    <span className="text-sm text-gray-400 line-through">
+                    <span className="text-[10px] sm:text-sm text-muted-foreground line-through">
                       ${listing.originalPrice.toFixed(2)}
                     </span>
                   )}
                 </div>
               )}
             </div>
-            <div className="text-sm text-gray-500">
-              Qty: {listing.quantity}
+            <div className="text-[10px] sm:text-xs text-muted-foreground bg-muted px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg flex-shrink-0">
+              {formatQuantityWithUnit(listing.quantity, listing.unit)}
             </div>
           </div>
 
+          {/* Seller - hidden on mobile for compact view */}
           {listing.seller && (
-            <div className="mt-3 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs text-primary font-medium">
-                {listing.seller.name.charAt(0).toUpperCase()}
+            <div className="hidden sm:flex mt-3 pt-3 border-t items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                  {listing.seller.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-sm text-muted-foreground truncate">{listing.seller.name}</span>
               </div>
-              <span className="text-sm text-gray-600">{listing.seller.name}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleMessageClick}
+                disabled={messagingLoading}
+                className="h-8 w-8 rounded-full flex-shrink-0"
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </CardContent>

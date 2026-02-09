@@ -1,49 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
-// @ts-ignore - react-leaflet-cluster doesn't have proper types
-import MarkerClusterGroup from "react-leaflet-cluster";
-import { Icon, LatLngExpression } from "leaflet";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useGeolocation } from "../../hooks/useGeolocation";
-import { filterListingsByRadius, type Coordinates } from "../../utils/distance";
+import { filterListingsByRadius } from "../../utils/distance";
 import { ListingMapCard } from "../../components/marketplace/ListingMapCard";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Label } from "../../components/ui/label";
-import { Input } from "../../components/ui/input";
 import { List, Map as MapIcon, Loader2, MapPin, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import "leaflet/dist/leaflet.css";
-import "leaflet.markercluster/dist/MarkerCluster.css";
-import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import { createRoot } from "react-dom/client";
 import type { MarketplaceListingWithDistance } from "../../types/marketplace";
-
-// Fix Leaflet default marker icon issue
-import icon from "leaflet/dist/images/marker-icon.png";
-import iconShadow from "leaflet/dist/images/marker-shadow.png";
-import iconRetina from "leaflet/dist/images/marker-icon-2x.png";
-
-const DefaultIcon = new Icon({
-  iconUrl: icon,
-  iconRetinaUrl: iconRetina,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-const UserLocationIcon = new Icon({
-  iconUrl:
-    "data:image/svg+xml;base64," +
-    btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10" fill="#3b82f6" stroke="white" stroke-width="3"/>
-      <circle cx="12" cy="12" r="3" fill="white"/>
-    </svg>
-  `),
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-});
 
 interface MarketplaceMapProps {
   listings?: MarketplaceListingWithDistance[];
@@ -51,24 +16,33 @@ interface MarketplaceMapProps {
   onToggleView?: () => void;
 }
 
-/**
- * Component to recenter map when user location changes
- */
-function RecenterMap({ center }: { center: LatLngExpression }) {
-  const map = useMap();
+// Default center (Singapore) - only used for initial map view when no listings
+const DEFAULT_CENTER = { lat: 1.3521, lng: 103.8198 };
 
-  useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
+// Load Google Maps script
+function loadGoogleMapsScript(apiKey: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.google?.maps) {
+      resolve();
+      return;
+    }
 
-  return null;
+    const existingScript = document.getElementById("google-maps-script");
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve());
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google Maps"));
+    document.head.appendChild(script);
+  });
 }
-
-// Default location for postal code 169648 (Queenstown, Singapore)
-const DEFAULT_USER_LOCATION: Coordinates = {
-  latitude: 1.2905,
-  longitude: 103.8006,
-};
 
 export default function MarketplaceMap({
   listings = [],
@@ -85,38 +59,202 @@ export default function MarketplaceMap({
     clearError,
   } = useGeolocation();
 
+  const mapRef = useRef<HTMLDivElement>(null);
+  const googleMapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.Marker[]>([]);
+  const userMarkerRef = useRef<google.maps.Marker | null>(null);
+  const circleRef = useRef<google.maps.Circle | null>(null);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+
   const [radiusKm, setRadiusKm] = useState<number>(5);
-  const [useDefaultLocation, setUseDefaultLocation] = useState(false);
-  const [mapCenter, setMapCenter] = useState<LatLngExpression>([
-    DEFAULT_USER_LOCATION.latitude,
-    DEFAULT_USER_LOCATION.longitude,
-  ]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Actual user location to use (either from GPS or default)
-  const effectiveUserLocation = useDefaultLocation
-    ? DEFAULT_USER_LOCATION
-    : userLocation;
+  // Filter listings by radius only if user location is available
+  const displayListings = useMemo(() => {
+    const listingsWithCoords = listings.filter((l) => l.coordinates);
 
-  // Filter listings by radius
-  const filteredListings = useMemo(() => {
-    if (!effectiveUserLocation) return listings;
-
-    return filterListingsByRadius(
-      listings.filter((l) => l.coordinates),
-      effectiveUserLocation,
-      radiusKm
-    );
-  }, [listings, effectiveUserLocation, radiusKm]);
-
-  // Update map center when user location is available
-  useEffect(() => {
-    if (effectiveUserLocation) {
-      setMapCenter([
-        effectiveUserLocation.latitude,
-        effectiveUserLocation.longitude,
-      ]);
+    // If no user location, show all listings
+    if (!userLocation) {
+      return listingsWithCoords;
     }
-  }, [effectiveUserLocation]);
+
+    // Filter by radius when location is available
+    return filterListingsByRadius(listingsWithCoords, userLocation, radiusKm);
+  }, [listings, userLocation, radiusKm]);
+
+  // Load Google Maps
+  useEffect(() => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      setLoadError("Google Maps API key not configured");
+      return;
+    }
+
+    loadGoogleMapsScript(apiKey)
+      .then(() => setIsLoaded(true))
+      .catch((err) => setLoadError(err.message));
+  }, []);
+
+  // Initialize map
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current || googleMapRef.current) return;
+
+    googleMapRef.current = new google.maps.Map(mapRef.current, {
+      center: DEFAULT_CENTER,
+      zoom: 12,
+      disableDefaultUI: false,
+      zoomControl: true,
+      streetViewControl: false,
+      mapTypeControl: false,
+      fullscreenControl: true,
+    });
+
+    infoWindowRef.current = new google.maps.InfoWindow();
+  }, [isLoaded]);
+
+  // Fit map to show all listings when no user location
+  const fitMapToListings = useCallback(() => {
+    if (!googleMapRef.current || displayListings.length === 0) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    displayListings.forEach((listing) => {
+      if (listing.coordinates) {
+        bounds.extend({
+          lat: listing.coordinates.latitude,
+          lng: listing.coordinates.longitude,
+        });
+      }
+    });
+
+    googleMapRef.current.fitBounds(bounds);
+
+    // Don't zoom in too much for single listing
+    const listener = google.maps.event.addListener(googleMapRef.current, "idle", () => {
+      const zoom = googleMapRef.current?.getZoom();
+      if (zoom && zoom > 15) {
+        googleMapRef.current?.setZoom(15);
+      }
+      google.maps.event.removeListener(listener);
+    });
+  }, [displayListings]);
+
+  // Update map view based on location availability
+  useEffect(() => {
+    if (!googleMapRef.current || !isLoaded) return;
+
+    if (userLocation) {
+      // Pan to user location
+      googleMapRef.current.panTo({
+        lat: userLocation.latitude,
+        lng: userLocation.longitude,
+      });
+      googleMapRef.current.setZoom(13);
+
+      // Show user marker
+      if (userMarkerRef.current) {
+        userMarkerRef.current.setPosition({
+          lat: userLocation.latitude,
+          lng: userLocation.longitude,
+        });
+        userMarkerRef.current.setMap(googleMapRef.current);
+      } else {
+        userMarkerRef.current = new google.maps.Marker({
+          position: {
+            lat: userLocation.latitude,
+            lng: userLocation.longitude,
+          },
+          map: googleMapRef.current,
+          title: "Your Location",
+          icon: {
+            url: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#3b82f6" stroke="#ffffff" stroke-width="3"/><circle cx="12" cy="12" r="4" fill="#ffffff"/></svg>'),
+          },
+        });
+      }
+
+      // Show radius circle
+      if (circleRef.current) {
+        circleRef.current.setCenter({
+          lat: userLocation.latitude,
+          lng: userLocation.longitude,
+        });
+        circleRef.current.setRadius(radiusKm * 1000);
+        circleRef.current.setMap(googleMapRef.current);
+      } else {
+        circleRef.current = new google.maps.Circle({
+          map: googleMapRef.current,
+          center: {
+            lat: userLocation.latitude,
+            lng: userLocation.longitude,
+          },
+          radius: radiusKm * 1000,
+          strokeColor: "#3b82f6",
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: "#3b82f6",
+          fillOpacity: 0.1,
+        });
+      }
+    } else {
+      // No location - hide user marker and circle, fit to all listings
+      userMarkerRef.current?.setMap(null);
+      circleRef.current?.setMap(null);
+      fitMapToListings();
+    }
+  }, [userLocation, radiusKm, isLoaded, fitMapToListings]);
+
+  // Update radius circle when radius changes
+  useEffect(() => {
+    if (circleRef.current && userLocation) {
+      circleRef.current.setRadius(radiusKm * 1000);
+    }
+  }, [radiusKm, userLocation]);
+
+  // Update listing markers
+  const updateMarkers = useCallback(() => {
+    if (!googleMapRef.current) return;
+
+    // Clear existing markers
+    markersRef.current.forEach((marker) => marker.setMap(null));
+    markersRef.current = [];
+
+    // Add new markers
+    displayListings.forEach((listing) => {
+      if (!listing.coordinates) return;
+
+      const marker = new google.maps.Marker({
+        position: {
+          lat: listing.coordinates.latitude,
+          lng: listing.coordinates.longitude,
+        },
+        map: googleMapRef.current,
+      });
+
+      marker.addListener("click", () => {
+        if (!infoWindowRef.current || !googleMapRef.current) return;
+
+        const container = document.createElement("div");
+        const root = createRoot(container);
+        root.render(
+          <ListingMapCard
+            listing={listing}
+            onViewDetails={() => navigate(`/marketplace/${listing.id}`)}
+          />
+        );
+
+        infoWindowRef.current.setContent(container);
+        infoWindowRef.current.open(googleMapRef.current, marker);
+      });
+
+      markersRef.current.push(marker);
+    });
+  }, [displayListings, navigate]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      updateMarkers();
+    }
+  }, [updateMarkers, isLoaded]);
 
   // Request location on mount
   useEffect(() => {
@@ -124,9 +262,6 @@ export default function MarketplaceMap({
       const hasPermission = await requestPermission();
       if (hasPermission) {
         await getCurrentPosition();
-      } else {
-        // If permission denied, use default location
-        setUseDefaultLocation(true);
       }
     };
 
@@ -135,227 +270,135 @@ export default function MarketplaceMap({
 
   const handleGetLocation = async () => {
     clearError();
-    setUseDefaultLocation(false);
     const hasPermission = await requestPermission();
     if (hasPermission) {
       await getCurrentPosition();
-    } else {
-      setUseDefaultLocation(true);
     }
   };
 
-  const handleUseDefaultLocation = () => {
-    clearError();
-    setUseDefaultLocation(true);
-  };
-
-  const handleViewDetails = (listingId: number) => {
-    navigate(`/marketplace/${listingId}`);
-  };
+  if (loadError) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Card className="p-6 text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-2" />
+          <p className="text-foreground font-medium">Failed to load Google Maps</p>
+          <p className="text-sm text-muted-foreground mt-1">{loadError}</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
       {/* Header Controls */}
       <Card className="p-4 mb-4 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="flex-1 max-w-xs">
-              <Label htmlFor="radius" className="text-sm">
-                Radius: {radiusKm} km
+        {/* Radius slider - only show when location is available */}
+        {userLocation && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="radius" className="text-sm font-medium">
+                Search Radius
               </Label>
-              <Input
-                id="radius"
-                type="range"
-                min="1"
-                max="20"
-                step="1"
-                value={radiusKm}
-                onChange={(e) => setRadiusKm(Number(e.target.value))}
-                className="w-full"
-              />
+              <span className="text-sm font-semibold text-primary">{radiusKm} km</span>
             </div>
-
-            <Button
-              onClick={handleGetLocation}
-              variant="outline"
-              size="sm"
-              disabled={geoLoading}
-            >
-              {geoLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Getting location...
-                </>
-              ) : (
-                <>
-                  <MapPin className="h-4 w-4 mr-2" />
-                  My Location
-                </>
-              )}
-            </Button>
+            <input
+              id="radius"
+              type="range"
+              min="1"
+              max="20"
+              step="1"
+              value={radiusKm}
+              onChange={(e) => setRadiusKm(Number(e.target.value))}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>1 km</span>
+              <span>20 km</span>
+            </div>
           </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            onClick={handleGetLocation}
+            variant={userLocation ? "outline" : "default"}
+            size="sm"
+            disabled={geoLoading}
+            className="flex-1 sm:flex-none"
+          >
+            {geoLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <span className="hidden sm:inline">Getting location...</span>
+                <span className="sm:hidden">Loading...</span>
+              </>
+            ) : (
+              <>
+                <MapPin className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">{userLocation ? "Update Location" : "Enable Location"}</span>
+                <span className="sm:hidden">Location</span>
+              </>
+            )}
+          </Button>
 
           {onToggleView && (
-            <Button onClick={onToggleView} variant="outline" size="sm">
+            <Button onClick={onToggleView} variant="outline" size="sm" className="flex-1 sm:flex-none">
               <List className="h-4 w-4 mr-2" />
-              List View
+              <span className="hidden sm:inline">List View</span>
+              <span className="sm:hidden">List</span>
             </Button>
           )}
         </div>
 
-        {/* Location Error */}
-        {geoError && !useDefaultLocation && (
-          <div className="flex items-center justify-between gap-2 text-sm text-orange-600 bg-orange-50 p-3 rounded">
+        {/* Location Error - simplified */}
+        {geoError && (
+          <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded-xl">
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              <span>{geoError}</span>
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <p>Location unavailable - showing all listings</p>
             </div>
-            <Button
-              onClick={handleUseDefaultLocation}
-              variant="outline"
-              size="sm"
-              className="text-xs"
-            >
-              Use Default Location (169648)
-            </Button>
-          </div>
-        )}
-
-        {/* Using Default Location Info */}
-        {useDefaultLocation && (
-          <div className="flex items-center justify-between gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              <span>Using default location: Queenstown, Singapore 169648</span>
-            </div>
-            <Button
-              onClick={handleGetLocation}
-              variant="outline"
-              size="sm"
-              className="text-xs"
-            >
-              Use My Location
-            </Button>
           </div>
         )}
 
         {/* Listings Count */}
-        <div className="text-sm text-gray-600">
-          Showing {filteredListings.length} listing
-          {filteredListings.length !== 1 ? "s" : ""}{" "}
-          {effectiveUserLocation && `within ${radiusKm}km`}
+        <div className="text-sm text-muted-foreground">
+          {userLocation ? (
+            <>
+              Showing {displayListings.length} listing{displayListings.length !== 1 ? "s" : ""} within {radiusKm}km
+            </>
+          ) : (
+            <>
+              Showing all {displayListings.length} listing{displayListings.length !== 1 ? "s" : ""}
+            </>
+          )}
         </div>
       </Card>
 
       {/* Map */}
       <div className="flex-1 relative rounded-lg overflow-hidden border">
-        {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+        {(loading || !isLoaded) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-              <p className="text-sm text-gray-600">Loading map...</p>
+              <p className="text-sm text-muted-foreground">Loading map...</p>
             </div>
           </div>
-        ) : (
-          <MapContainer
-            center={mapCenter}
-            zoom={13}
-            scrollWheelZoom={true}
-            className="h-full w-full"
-            style={{ height: "100%", minHeight: "500px" }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-
-            <RecenterMap center={mapCenter} />
-
-            {/* User Location Marker */}
-            {effectiveUserLocation && (
-              <>
-                <Marker
-                  position={[
-                    effectiveUserLocation.latitude,
-                    effectiveUserLocation.longitude,
-                  ]}
-                  icon={UserLocationIcon}
-                >
-                  <Popup>
-                    <div className="text-center">
-                      <p className="font-semibold">
-                        {useDefaultLocation
-                          ? "Default Location (169648)"
-                          : "Your Location"}
-                      </p>
-                      {useDefaultLocation && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Queenstown, Singapore
-                        </p>
-                      )}
-                    </div>
-                  </Popup>
-                </Marker>
-
-                {/* Radius Circle */}
-                <Circle
-                  center={[
-                    effectiveUserLocation.latitude,
-                    effectiveUserLocation.longitude,
-                  ]}
-                  radius={radiusKm * 1000} // Convert km to meters
-                  pathOptions={{
-                    color: "#3b82f6",
-                    fillColor: "#3b82f6",
-                    fillOpacity: 0.1,
-                    weight: 2,
-                  }}
-                />
-              </>
-            )}
-
-            {/* Listing Markers with Clustering */}
-            <MarkerClusterGroup
-              chunkedLoading
-              maxClusterRadius={50}
-              spiderfyOnMaxZoom={true}
-              showCoverageOnHover={false}
-            >
-              {filteredListings.map((listing) => {
-                if (!listing.coordinates) return null;
-
-                return (
-                  <Marker
-                    key={listing.id}
-                    position={[
-                      listing.coordinates.latitude,
-                      listing.coordinates.longitude,
-                    ]}
-                    icon={DefaultIcon}
-                  >
-                    <Popup>
-                      <ListingMapCard
-                        listing={listing}
-                        onViewDetails={() => handleViewDetails(listing.id)}
-                      />
-                    </Popup>
-                  </Marker>
-                );
-              })}
-            </MarkerClusterGroup>
-          </MapContainer>
         )}
+        <div ref={mapRef} className="w-full h-full" style={{ minHeight: "500px" }} />
       </div>
 
       {/* No listings message */}
-      {!loading && filteredListings.length === 0 && (
+      {!loading && isLoaded && displayListings.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <Card className="p-6 text-center pointer-events-auto">
-            <MapIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-            <p className="text-gray-600">No listings found in this area</p>
-            <p className="text-sm text-gray-500 mt-1">
-              Try increasing the radius
-            </p>
+            <MapIcon className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+            <p className="text-foreground">No listings found</p>
+            {userLocation && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Try increasing the radius
+              </p>
+            )}
           </Card>
         </div>
       )}

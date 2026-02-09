@@ -1,0 +1,7 @@
+FROM nginx:alpine
+
+# No third-party modules needed — using only built-in nginx directives
+# server_tokens off + proxy_hide_header handle Server header
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1

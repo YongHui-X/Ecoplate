@@ -13,6 +13,7 @@ describe('ListingMapCard', () => {
     description: 'Organic apples from local farm',
     category: 'produce',
     quantity: 5,
+    unit: 'pieces',
     price: 10,
     originalPrice: 15,
     expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
@@ -21,6 +22,8 @@ describe('ListingMapCard', () => {
     status: 'active',
     createdAt: new Date().toISOString(),
     completedAt: null,
+    images: null,
+    co2Saved: 2.25,
     distance: 2.5,
   };
 
@@ -33,7 +36,7 @@ describe('ListingMapCard', () => {
     expect(screen.getByText('produce')).toBeInTheDocument();
     expect(screen.getByText('$10.00')).toBeInTheDocument();
     expect(screen.getByText('$15.00')).toBeInTheDocument(); // Original price
-    expect(screen.getByText('Quantity: 5')).toBeInTheDocument();
+    expect(screen.getByText('Quantity: 5 pieces')).toBeInTheDocument();
   });
 
   it('should display FREE badge when price is null', () => {

@@ -1,42 +1,161 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { api } from "../services/api";
 import { marketplaceService } from "../services/marketplace";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { ArrowLeft, Plus } from "lucide-react";
-import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
+import { ArrowLeft, ImagePlus, X, Leaf, Sparkles, TrendingDown } from "lucide-react";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
+import { calculateCo2Preview } from "../components/common/Co2Badge";
+import { PRODUCT_UNITS } from "../constants/units";
+
+interface PriceRecommendation {
+  recommended_price: number;
+  min_price: number;
+  max_price: number;
+  original_price: number;
+  discount_percentage: number;
+  days_until_expiry: number;
+  category: string;
+  urgency_label: string;
+  reasoning: string;
+}
+
+interface Product {
+  id: number;
+  productName: string;
+  category: string | null;
+  quantity: number;
+  unitPrice: number | null;
+  purchaseDate: string | null;
+  description: string | null;
+  co2Emission: number | null;
+}
 
 export default function CreateListingPage() {
+  const location = useLocation();
+  const product = (location.state as { product?: Product })?.product;
+
+  const [title, setTitle] = useState(product?.productName || "");
+  const [description, setDescription] = useState(product?.description || "");
+  const [category, setCategory] = useState(product?.category || "");
+  const [quantity, setQuantity] = useState(product?.quantity || 1);
+  const [unit, setUnit] = useState("pcs");
+  const [price, setPrice] = useState<string>("");
+  const [originalPrice, setOriginalPrice] = useState<string>(
+    product?.unitPrice ? product.unitPrice.toString() : ""
+  );
+  const [expiryDate, setExpiryDate] = useState("");
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | undefined>();
+  const [pickupInstructions, setPickupInstructions] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [priceRecommendation, setPriceRecommendation] = useState<PriceRecommendation | null>(null);
+  const [loadingRecommendation, setLoadingRecommendation] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    category: "",
-    quantity: "1",
-    price: "",
-    originalPrice: "",
-    expiryDate: "",
-    pickupLocation: "",
-  });
+  // Fetch price recommendation when relevant fields change
+  const fetchPriceRecommendation = useCallback(async () => {
+    const origPrice = parseFloat(originalPrice);
+    if (!origPrice || origPrice <= 0) {
+      setPriceRecommendation(null);
+      return;
+    }
 
-  const [coordinates, setCoordinates] = useState<
-    { latitude: number; longitude: number } | undefined
-  >();
+    setLoadingRecommendation(true);
+    try {
+      const recommendation = await marketplaceService.getPriceRecommendation({
+        originalPrice: origPrice,
+        expiryDate: expiryDate || undefined,
+        category: category || undefined,
+      });
+      setPriceRecommendation(recommendation);
+    } catch (error) {
+      console.error("Failed to get price recommendation:", error);
+      setPriceRecommendation(null);
+    } finally {
+      setLoadingRecommendation(false);
+    }
+  }, [originalPrice, expiryDate, category]);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  // Debounce the recommendation fetch
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchPriceRecommendation();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fetchPriceRecommendation]);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + selectedImages.length > 5) {
+      addToast("Maximum 5 images allowed", "error");
+      return;
+    }
+
+    const validFiles = files.filter(file => {
+      if (!file.type.startsWith("image/")) {
+        addToast(`${file.name} is not an image`, "error");
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        addToast(`${file.name} is too large (max 5MB)`, "error");
+        return false;
+      }
+      return true;
+    });
+
+    setSelectedImages(prev => [...prev, ...validFiles]);
+
+    // Create previews
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreviews(prev => [...prev, e.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (selectedImages.length === 0) return [];
+
+    setUploadingImages(true);
+    try {
+      const formData = new FormData();
+      selectedImages.forEach(file => formData.append("images", file));
+
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/v1/marketplace/upload", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload images");
+      }
+
+      const data = await response.json();
+      return data.urls;
+    } finally {
+      setUploadingImages(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,40 +163,28 @@ export default function CreateListingPage() {
     setLoading(true);
 
     try {
-      // Validate required fields
-      if (!formData.title.trim()) {
-        addToast("Please enter a title", "error");
-        setLoading(false);
-        return;
-      }
+      // Upload images first
+      const imageUrls = await uploadImages();
 
-      if (!formData.quantity || parseFloat(formData.quantity) <= 0) {
-        addToast("Please enter a valid quantity", "error");
-        setLoading(false);
-        return;
-      }
-
-      // Prepare data
-      const data = {
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        category: formData.category || undefined,
-        quantity: parseFloat(formData.quantity),
-        price: formData.price ? parseFloat(formData.price) : null,
-        originalPrice: formData.originalPrice
-          ? parseFloat(formData.originalPrice)
-          : undefined,
-        expiryDate: formData.expiryDate || undefined,
-        pickupLocation: formData.pickupLocation.trim() || undefined,
+      const listing = await api.post<{ id: number }>("/marketplace/listings", {
+        title,
+        description: description || undefined,
+        category: category || undefined,
+        quantity,
+        unit,
+        price: price === "" ? null : parseFloat(price),
+        originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
+        expiryDate: expiryDate || undefined,
+        pickupLocation: pickupLocation || undefined,
         coordinates: coordinates,
-      };
+        pickupInstructions: pickupInstructions || undefined,
+        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+      });
 
-      const listing = await marketplaceService.createListing(data);
       addToast("Listing created successfully!", "success");
       navigate(`/marketplace/${listing.id}`);
-    } catch (error: any) {
-      console.error("Failed to create listing:", error);
-      addToast(error.message || "Failed to create listing", "error");
+    } catch (error) {
+      addToast("Failed to create listing", "error");
     } finally {
       setLoading(false);
     }
@@ -99,102 +206,160 @@ export default function CreateListingPage() {
           <CardTitle>Create Listing</CardTitle>
         </CardHeader>
         <CardContent>
+          {product && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Pre-filled from MyFridge:</strong> {product.productName}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Review and update the details below, then add photos and pricing information.
+              </p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Title */}
             <div className="space-y-2">
-              <Label htmlFor="title">
-                Title <span className="text-red-500">*</span>
-              </Label>
+              <Label htmlFor="title">Title *</Label>
               <Input
                 id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Fresh Organic Apples"
                 required
               />
             </div>
 
-            {/* Description */}
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <textarea
                 id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe your item..."
-                rows={4}
-                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
             </div>
 
-            {/* Category and Expiry Date */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Product Images (Max 5)</Label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                multiple
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative aspect-square">
+                    <img
+                      src={preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-full object-cover rounded-md border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+
+                {selectedImages.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center hover:border-primary hover:bg-gray-50 transition-colors"
+                  >
+                    <ImagePlus className="h-6 w-6 text-gray-400" />
+                    <span className="text-xs text-gray-500 mt-1">Add</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">
+                Add up to 5 images. First image will be the cover photo.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <select
                   id="category"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="w-full h-10 px-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3"
                 >
-                  <option value="">Select a category</option>
-                  {MARKETPLACE_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </option>
-                  ))}
+                  <option value="">Select...</option>
+                  <option value="produce">Produce</option>
+                  <option value="dairy">Dairy</option>
+                  <option value="meat">Meat</option>
+                  <option value="bakery">Bakery</option>
+                  <option value="frozen">Frozen</option>
+                  <option value="beverages">Beverages</option>
+                  <option value="pantry">Pantry</option>
+                  <option value="other">Other</option>
                 </select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="expiryDate">Expiry Date</Label>
+                <Label htmlFor="expiry">Expiry Date</Label>
                 <Input
-                  id="expiryDate"
-                  name="expiryDate"
+                  id="expiry"
                   type="date"
-                  value={formData.expiryDate}
-                  onChange={handleChange}
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* Quantity */}
-            <div className="space-y-2">
-              <Label htmlFor="quantity">
-                Quantity <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="quantity"
-                name="quantity"
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={formData.quantity}
-                onChange={handleChange}
-                placeholder="e.g., 2.5"
-                required
-              />
-              <p className="text-sm text-gray-500">
-                Enter quantity (e.g., 2 for 2kg, 3 for 3 items)
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseFloat(e.target.value))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unit">Unit</Label>
+                <select
+                  id="unit"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3"
+                >
+                  {PRODUCT_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Prices */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* CO2 Preview */}
+            <Co2PreviewSection category={category} quantity={quantity} unit={unit} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="originalPrice">Original Price ($)</Label>
                 <Input
                   id="originalPrice"
-                  name="originalPrice"
                   type="number"
-                  step="0.01"
                   min="0"
-                  value={formData.originalPrice}
-                  onChange={handleChange}
-                  placeholder="Optional"
+                  step="0.01"
+                  value={originalPrice}
+                  onChange={(e) => setOriginalPrice(e.target.value)}
+                  placeholder="0.00"
                 />
               </div>
 
@@ -202,65 +367,151 @@ export default function CreateListingPage() {
                 <Label htmlFor="price">Selling Price ($)</Label>
                 <Input
                   id="price"
-                  name="price"
                   type="number"
-                  step="0.01"
                   min="0"
-                  value={formData.price}
-                  onChange={handleChange}
-                  placeholder="0 for free"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Leave empty for free"
                 />
-                <p className="text-sm text-gray-500">Leave as 0 for free</p>
+                <p className="text-xs text-muted-foreground">Leave empty to list as free</p>
               </div>
             </div>
 
-            {/* Pickup Location */}
+            {/* Price Recommendation */}
+            {loadingRecommendation && (
+              <div className="p-4 rounded-xl bg-muted/50 border animate-pulse">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Getting price recommendation...</span>
+                </div>
+              </div>
+            )}
+
+            {priceRecommendation && !loadingRecommendation && (
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-medium text-foreground">Suggested Price</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                        {priceRecommendation.urgency_label}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-3 mb-2">
+                      <span className="text-2xl font-bold text-primary">
+                        ${priceRecommendation.recommended_price.toFixed(2)}
+                      </span>
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <TrendingDown className="h-3 w-3" />
+                        {priceRecommendation.discount_percentage}% off
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {priceRecommendation.reasoning}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPrice(priceRecommendation.recommended_price.toFixed(2))}
+                        className="text-xs"
+                      >
+                        Use ${priceRecommendation.recommended_price.toFixed(2)}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Range: ${priceRecommendation.min_price.toFixed(2)} - ${priceRecommendation.max_price.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <LocationAutocomplete
-              value={formData.pickupLocation}
+              value={pickupLocation}
               onChange={(value, coords) => {
-                setFormData((prev) => ({ ...prev, pickupLocation: value }));
+                setPickupLocation(value);
                 setCoordinates(coords);
-                console.log("Location changed:", value, "Coordinates:", coords);
               }}
               label="Pickup Location"
               placeholder="Search for address, postal code, or landmark in Singapore"
             />
-            {/* Coordinates indicator */}
-            {coordinates ? (
-              <p className="text-xs text-green-600 mt-1">
-                Location coordinates captured (will appear on map)
-              </p>
-            ) : formData.pickupLocation.length > 0 ? (
-              <p className="text-xs text-orange-600 mt-1">
-                Please select a location from the dropdown to enable map display
-              </p>
-            ) : null}
 
-            {/* Submit Buttons */}
+            <div className="space-y-2">
+              <Label htmlFor="pickupInstructions">Pickup Instructions</Label>
+              <textarea
+                id="pickupInstructions"
+                value={pickupInstructions}
+                onChange={(e) => setPickupInstructions(e.target.value)}
+                placeholder="e.g., Available evenings after 6pm, call before pickup"
+                className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
             <div className="flex gap-4 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate("/marketplace")}
                 className="flex-1"
-                disabled={loading}
+                disabled={loading || uploadingImages}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? (
-                  "Creating..."
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Listing
-                  </>
-                )}
+              <Button type="submit" disabled={loading || uploadingImages} className="flex-1">
+                {uploadingImages ? "Uploading images..." : loading ? "Creating..." : "Create Listing"}
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * CO2 Preview section component for create listing form
+ */
+function Co2PreviewSection({
+  category,
+  quantity,
+  unit,
+}: {
+  category: string;
+  quantity: number;
+  unit: string;
+}) {
+  const co2Estimate = useMemo(() => {
+    if (!category || !quantity || quantity <= 0) {
+      return null;
+    }
+    return calculateCo2Preview(quantity, unit, category);
+  }, [category, quantity, unit]);
+
+  if (!co2Estimate) {
+    return null;
+  }
+
+  const formattedValue = co2Estimate >= 1 ? co2Estimate.toFixed(1) : co2Estimate.toFixed(2);
+
+  return (
+    <div className="flex items-center gap-3 p-4 rounded-xl bg-success/10 border border-success/20">
+      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-success/20 flex items-center justify-center">
+        <Leaf className="h-5 w-5 text-success" />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-foreground">
+          Estimated CO2 Saved: <span className="text-success">{formattedValue} kg</span>
+        </p>
+        <p className="text-xs text-muted-foreground">
+          By sharing this food, you're helping reduce emissions from food waste
+        </p>
+      </div>
     </div>
   );
 }

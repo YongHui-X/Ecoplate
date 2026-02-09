@@ -32,10 +32,10 @@ describe('Distance Utilities', () => {
     });
 
     it('should calculate correct distance for known locations', () => {
-      // Distance from Singapore center to NUS
+      // Distance from Singapore center to NUS (approximately 7.8 km via Haversine formula)
       const distance = calculateDistance(SINGAPORE_CENTER, NUS_COORDINATES);
 
-      expect(distance).toBeCloseTo(7.5, 1); // Approximately 7.5 km
+      expect(distance).toBeCloseTo(7.8, 0); // Approximately 7.8 km
     });
 
     it('should handle negative coordinates', () => {

@@ -1,11 +1,20 @@
 import * as jose from "jose";
 import { error } from "../utils/router";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "ecoplate-development-secret-change-in-production"
-);
-
 const TOKEN_EXPIRY = "7d"; // 7 days
+
+// Lazy-load JWT_SECRET so importing this module doesn't throw during tests
+let _jwtSecret: Uint8Array | null = null;
+function getJwtSecret(): Uint8Array {
+  if (!_jwtSecret) {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("JWT_SECRET environment variable is required. Set it in your .env file.");
+    }
+    _jwtSecret = new TextEncoder().encode(secret);
+  }
+  return _jwtSecret;
+}
 
 export interface JWTPayload {
   sub: string;
@@ -27,12 +36,12 @@ export async function generateToken(payload: JWTPayload): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(TOKEN_EXPIRY)
-    .sign(JWT_SECRET);
+    .sign(getJwtSecret());
 }
 
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jose.jwtVerify(token, JWT_SECRET);
+    const { payload } = await jose.jwtVerify(token, getJwtSecret());
     return payload as unknown as JWTPayload;
   } catch {
     return null;
@@ -85,4 +94,28 @@ export function getUser(req: Request): { id: number; email: string; name: string
     throw new Error("User not authenticated");
   }
   return user;
+}
+
+/**
+ * Extract Bearer token from Authorization header
+ * @returns token string or null if invalid/missing
+ */
+export function extractBearerToken(req: Request): string | null {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+  return authHeader.slice(7);
+}
+
+/**
+ * Verify request authorization and return user payload
+ * @returns JWTPayload or null if unauthorized
+ */
+export async function verifyRequestAuth(req: Request): Promise<JWTPayload | null> {
+  const token = extractBearerToken(req);
+  if (!token) {
+    return null;
+  }
+  return verifyToken(token);
 }

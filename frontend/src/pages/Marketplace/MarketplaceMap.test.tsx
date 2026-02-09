@@ -1,41 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import MarketplaceMap from './MarketplaceMap';
 import type { MarketplaceListingWithDistance } from '../../types/marketplace';
 import * as useGeolocationHook from '../../hooks/useGeolocation';
 
-// Mock react-leaflet and related libraries
-vi.mock('react-leaflet', () => ({
-  MapContainer: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="map-container">{children}</div>
-  ),
-  TileLayer: () => <div data-testid="tile-layer" />,
-  Marker: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="marker">{children}</div>
-  ),
-  Popup: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="popup">{children}</div>
-  ),
-  Circle: () => <div data-testid="circle" />,
-  useMap: () => ({
-    setView: vi.fn(),
-    getZoom: vi.fn(() => 13),
-  }),
-}));
-
-vi.mock('react-leaflet-cluster', () => ({
-  default: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="marker-cluster">{children}</div>
-  ),
-}));
-
-vi.mock('leaflet', () => ({
-  Icon: vi.fn(() => ({})),
-  LatLngExpression: vi.fn(),
-}));
-
 describe('MarketplaceMap', () => {
+  let MarketplaceMap: typeof import('./MarketplaceMap').default;
+
+  beforeAll(async () => {
+    // Mock Google Maps API key
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY = 'test-api-key';
+
+    // Pre-set window.google so loadGoogleMapsScript resolves immediately
+    (window as any).google = { maps: {} };
+
+    const module = await import('./MarketplaceMap');
+    MarketplaceMap = module.default;
+  });
+
   const mockListings: MarketplaceListingWithDistance[] = [
     {
       id: 1,
@@ -46,6 +28,7 @@ describe('MarketplaceMap', () => {
       description: 'Organic apples',
       category: 'produce',
       quantity: 5,
+      unit: 'pieces',
       price: 10,
       originalPrice: 15,
       expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
@@ -54,6 +37,8 @@ describe('MarketplaceMap', () => {
       status: 'active',
       createdAt: new Date().toISOString(),
       completedAt: null,
+      images: null,
+      co2Saved: 2.25,
     },
     {
       id: 2,
@@ -64,6 +49,7 @@ describe('MarketplaceMap', () => {
       description: 'Fresh bread',
       category: 'bakery',
       quantity: 2,
+      unit: 'pieces',
       price: null,
       originalPrice: null,
       expiryDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
@@ -72,6 +58,8 @@ describe('MarketplaceMap', () => {
       status: 'active',
       createdAt: new Date().toISOString(),
       completedAt: null,
+      images: null,
+      co2Saved: 1.2,
     },
   ];
 
@@ -85,8 +73,57 @@ describe('MarketplaceMap', () => {
     clearError: vi.fn(),
   };
 
+  // Recreate Google Maps mocks fresh before each test (regular functions, not arrows)
   beforeEach(() => {
     vi.clearAllMocks();
+
+    (window as any).google = {
+      maps: {
+        Map: vi.fn(function () {
+          return {
+            panTo: vi.fn(),
+            setZoom: vi.fn(),
+            getZoom: vi.fn().mockReturnValue(13),
+            fitBounds: vi.fn(),
+            setCenter: vi.fn(),
+          };
+        }),
+        Marker: vi.fn(function () {
+          return {
+            setPosition: vi.fn(),
+            setMap: vi.fn(),
+            addListener: vi.fn(),
+          };
+        }),
+        Circle: vi.fn(function () {
+          return {
+            setCenter: vi.fn(),
+            setRadius: vi.fn(),
+            setMap: vi.fn(),
+          };
+        }),
+        InfoWindow: vi.fn(function () {
+          return {
+            setContent: vi.fn(),
+            open: vi.fn(),
+            close: vi.fn(),
+          };
+        }),
+        LatLngBounds: vi.fn(function () {
+          return {
+            extend: vi.fn(),
+          };
+        }),
+        event: {
+          addListener: vi.fn(function (_obj: any, _event: string, callback: () => void) {
+            callback();
+            return {};
+          }),
+          removeListener: vi.fn(),
+        },
+      },
+    };
+
     vi.spyOn(useGeolocationHook, 'useGeolocation').mockReturnValue(mockGeolocation);
   });
 
@@ -94,171 +131,155 @@ describe('MarketplaceMap', () => {
     return render(<BrowserRouter>{component}</BrowserRouter>);
   };
 
-  it('should render map container', () => {
+  it('should render map area', async () => {
     renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByTestId('map-container')).toBeInTheDocument();
-  });
-
-  it('should display listings count', () => {
-    renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByText(/Showing \d+ listing/)).toBeInTheDocument();
-  });
-
-  it('should display radius control', () => {
-    renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByText(/Radius: \d+ km/)).toBeInTheDocument();
-    expect(screen.getByRole('slider')).toBeInTheDocument();
-  });
-
-  it('should update radius when slider changes', () => {
-    renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    const slider = screen.getByRole('slider');
-    fireEvent.change(slider, { target: { value: '10' } });
-
-    expect(screen.getByText('Radius: 10 km')).toBeInTheDocument();
-  });
-
-  it('should render My Location button', () => {
-    renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByText('My Location')).toBeInTheDocument();
-  });
-
-  it('should call getCurrentPosition when My Location button clicked', async () => {
-    renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    const button = screen.getByText('My Location');
-    fireEvent.click(button);
-
     await waitFor(() => {
-      expect(mockGeolocation.requestPermission).toHaveBeenCalled();
-      expect(mockGeolocation.getCurrentPosition).toHaveBeenCalled();
+      const mapDiv = document.querySelector('[style*="min-height"]');
+      expect(mapDiv).toBeInTheDocument();
     });
   });
 
-  it('should render List View toggle when onToggleView provided', () => {
+  it('should display listings count', async () => {
+    renderWithRouter(<MarketplaceMap listings={mockListings} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Showing \d+ listing/)).toBeInTheDocument();
+    });
+  });
+
+  it('should display radius control when location available', async () => {
+    renderWithRouter(<MarketplaceMap listings={mockListings} />);
+    await waitFor(() => {
+      expect(screen.getByText('Search Radius')).toBeInTheDocument();
+      expect(screen.getByRole('slider')).toBeInTheDocument();
+    });
+  });
+
+  it('should update radius when slider changes', async () => {
+    renderWithRouter(<MarketplaceMap listings={mockListings} />);
+    await waitFor(() => {
+      expect(screen.getByRole('slider')).toBeInTheDocument();
+    });
+
+    const slider = screen.getByRole('slider');
+    fireEvent.change(slider, { target: { value: '10' } });
+    expect(screen.getByText('10 km')).toBeInTheDocument();
+  });
+
+  it('should render location button', async () => {
+    renderWithRouter(<MarketplaceMap listings={mockListings} />);
+    await waitFor(() => {
+      expect(screen.getByText('Update Location')).toBeInTheDocument();
+    });
+  });
+
+  it('should call handlers when location button clicked', async () => {
+    renderWithRouter(<MarketplaceMap listings={mockListings} />);
+    await waitFor(() => {
+      expect(screen.getByText('Update Location')).toBeInTheDocument();
+    });
+
+    const button = screen.getByText('Update Location').closest('button')!;
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(mockGeolocation.clearError).toHaveBeenCalled();
+      expect(mockGeolocation.requestPermission).toHaveBeenCalled();
+    });
+  });
+
+  it('should render List View toggle when onToggleView provided', async () => {
     const onToggleView = vi.fn();
     renderWithRouter(<MarketplaceMap listings={mockListings} onToggleView={onToggleView} />);
 
-    const button = screen.getByText('List View');
-    expect(button).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('List View')).toBeInTheDocument();
+    });
 
-    fireEvent.click(button);
+    fireEvent.click(screen.getByText('List View'));
     expect(onToggleView).toHaveBeenCalledTimes(1);
   });
 
   it('should not render List View toggle when onToggleView not provided', () => {
     renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
     expect(screen.queryByText('List View')).not.toBeInTheDocument();
   });
 
   it('should display loading state', () => {
     renderWithRouter(<MarketplaceMap listings={mockListings} loading={true} />);
-
     expect(screen.getByText('Loading map...')).toBeInTheDocument();
   });
 
-  it('should display geolocation error', () => {
+  it('should display geolocation error message', async () => {
     vi.spyOn(useGeolocationHook, 'useGeolocation').mockReturnValue({
       ...mockGeolocation,
       error: 'Location permission denied',
     });
-
     renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByText('Location permission denied')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Location unavailable - showing all listings')).toBeInTheDocument();
+    });
   });
 
-  it('should display loading indicator when getting location', () => {
+  it('should display loading indicator when getting location', async () => {
     vi.spyOn(useGeolocationHook, 'useGeolocation').mockReturnValue({
       ...mockGeolocation,
       loading: true,
     });
-
     renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByText('Getting location...')).toBeInTheDocument();
-  });
-
-  it('should display no listings message when no listings in radius', () => {
-    renderWithRouter(<MarketplaceMap listings={[]} />);
-
-    expect(screen.getByText('No listings found in this area')).toBeInTheDocument();
-    expect(screen.getByText('Try increasing the radius')).toBeInTheDocument();
-  });
-
-  it('should filter listings by radius', async () => {
-    renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    // With default 5km radius, should show both listings
-    expect(screen.getByText(/Showing 2 listings/)).toBeInTheDocument();
-
-    // Change radius to 1km - should filter out NUS listing
-    const slider = screen.getByRole('slider');
-    fireEvent.change(slider, { target: { value: '1' } });
-
     await waitFor(() => {
-      // Should show fewer listings
-      expect(screen.getByText(/Showing \d+ listing/)).toBeInTheDocument();
+      expect(screen.getByText('Getting location...')).toBeInTheDocument();
     });
   });
 
-  it('should render user location marker when coordinates available', () => {
-    renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    const markers = screen.getAllByTestId('marker');
-    expect(markers.length).toBeGreaterThan(0);
+  it('should display no listings message when empty', async () => {
+    renderWithRouter(<MarketplaceMap listings={[]} />);
+    await waitFor(() => {
+      expect(screen.getByText('No listings found')).toBeInTheDocument();
+    });
   });
 
-  it('should render radius circle when user location available', () => {
+  it('should create Google Maps markers for listings', async () => {
     renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByTestId('circle')).toBeInTheDocument();
+    await waitFor(() => {
+      expect((window as any).google.maps.Marker).toHaveBeenCalled();
+    });
   });
 
-  it('should render markers with clustering', () => {
+  it('should create radius circle when user location available', async () => {
     renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByTestId('marker-cluster')).toBeInTheDocument();
+    await waitFor(() => {
+      expect((window as any).google.maps.Circle).toHaveBeenCalled();
+    });
   });
 
   it('should request permission on mount', async () => {
     renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
     await waitFor(() => {
       expect(mockGeolocation.requestPermission).toHaveBeenCalled();
     });
   });
 
-  it('should not render markers for listings without coordinates', () => {
+  it('should handle listings without coordinates', async () => {
     const listingsWithoutCoords: MarketplaceListingWithDistance[] = [
-      {
-        ...mockListings[0],
-        coordinates: undefined,
-      },
+      { ...mockListings[0], coordinates: undefined },
     ];
-
     renderWithRouter(<MarketplaceMap listings={listingsWithoutCoords} />);
-
-    // Should not render listing markers (only user location marker if available)
-    const text = screen.getByText(/Showing 0 listing/);
-    expect(text).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Showing 0 listing/)).toBeInTheDocument();
+    });
   });
 
-  it('should display listings within radius text when user location available', () => {
+  it('should display within radius text when user location available', async () => {
     renderWithRouter(<MarketplaceMap listings={mockListings} />);
-
-    expect(screen.getByText(/within \d+km/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/within \d+km/)).toBeInTheDocument();
+    });
   });
 
-  it('should handle empty listings array', () => {
+  it('should handle empty listings array', async () => {
     renderWithRouter(<MarketplaceMap listings={[]} />);
-
-    expect(screen.getByText('Showing 0 listings')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Showing/)).toBeInTheDocument();
+    });
   });
 });

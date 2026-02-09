@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EcoPlate Security Remediation Report</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+    @bottom-center {
+      content: "EcoPlate Security Remediation Report — Page " counter(page) " of " counter(pages);
+      font-size: 8pt;
+      color: #94a3b8;
+    }
+  }
+  :root {
+    --primary: #1e3a5f;
+    --accent: #2563eb;
+    --bg: #ffffff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --critical: #dc2626;
+    --high: #ea580c;
+    --medium: #ca8a04;
+    --low: #2563eb;
+    --pass: #16a34a;
+    --fail: #dc2626;
+    --warn: #ca8a04;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    font-size: 10pt;
+    line-height: 1.5;
+  }
+
+  /* ── Cover Page ── */
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    text-align: center;
+    background: linear-gradient(160deg, #0f172a 0%, #1e3a5f 40%, #2563eb 100%);
+    color: #fff;
+    margin: -20mm -18mm;
+    padding: 40mm 30mm;
+  }
+  .cover h1 {
+    font-size: 32pt;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 8pt;
+  }
+  .cover .subtitle {
+    font-size: 16pt;
+    font-weight: 300;
+    opacity: 0.9;
+    margin-bottom: 40pt;
+  }
+  .cover .meta-box {
+    background: rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 20pt 36pt;
+    display: inline-block;
+    text-align: left;
+    font-size: 11pt;
+    line-height: 2;
+    backdrop-filter: blur(4px);
+  }
+  .cover .meta-box strong { color: #93c5fd; }
+  .cover .result-badge {
+    margin-top: 36pt;
+    display: inline-block;
+    padding: 10pt 40pt;
+    border-radius: 9999px;
+    font-size: 18pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .badge-pass { background: var(--pass); color: #fff; }
+  .badge-fail { background: var(--fail); color: #fff; }
+
+  /* ── TOC ── */
+  .toc {
+    page-break-after: always;
+    padding-top: 10pt;
+  }
+  .toc h2 {
+    font-size: 18pt;
+    color: var(--primary);
+    margin-bottom: 16pt;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 6pt;
+  }
+  .toc ul { list-style: none; }
+  .toc li {
+    padding: 6pt 0;
+    border-bottom: 1px dotted var(--border);
+    font-size: 11pt;
+  }
+  .toc li span.num { color: var(--accent); font-weight: 700; margin-right: 8pt; }
+
+  /* ── Section Headers ── */
+  h2.section-title {
+    font-size: 16pt;
+    color: var(--primary);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 4pt;
+    margin: 24pt 0 12pt 0;
+  }
+  h3.sub-title {
+    font-size: 12pt;
+    color: var(--primary);
+    margin: 14pt 0 8pt 0;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8pt 0 14pt 0;
+    font-size: 9pt;
+  }
+  th {
+    background: #f1f5f9;
+    text-align: left;
+    padding: 6pt 8pt;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+    color: var(--primary);
+  }
+  td {
+    padding: 5pt 8pt;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) { background: #fafbfc; }
+
+  /* ── Severity Badges ── */
+  .sev {
+    display: inline-block;
+    padding: 1pt 6pt;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .sev-critical { background: var(--critical); }
+  .sev-high { background: var(--high); }
+  .sev-medium { background: var(--medium); }
+  .sev-low { background: var(--low); }
+  .sev-info { background: #6b7280; }
+
+  .status-badge {
+    display: inline-block;
+    padding: 1pt 8pt;
+    border-radius: 9999px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+  }
+  .status-pass { background: var(--pass); }
+  .status-fail { background: var(--fail); }
+  .status-warn { background: var(--warn); }
+  .status-skip { background: #9ca3b8; }
+
+  /* ── Summary Cards ── */
+  .summary-cards {
+    display: flex;
+    gap: 10pt;
+    margin: 12pt 0 18pt 0;
+  }
+  .s-card {
+    flex: 1;
+    border-radius: 8px;
+    padding: 12pt 10pt;
+    text-align: center;
+    border-left: 4px solid var(--border);
+  }
+  .s-card .num {
+    font-size: 22pt;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+  .s-card .lbl {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-top: 2pt;
+  }
+
+  /* ── Comparison ── */
+  .compare-row {
+    display: flex;
+    align-items: center;
+    gap: 12pt;
+    margin: 16pt 0;
+  }
+  .compare-box {
+    flex: 1;
+    border-radius: 10px;
+    padding: 14pt;
+    text-align: center;
+  }
+  .compare-box.before {
+    background: #fef2f2;
+    border: 1.5px solid #fecaca;
+  }
+  .compare-box.after {
+    background: #f0fdf4;
+    border: 1.5px solid #bbf7d0;
+  }
+  .compare-box .big-num {
+    font-size: 36pt;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .compare-box .tag {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-top: 4pt;
+  }
+  .arrow-col {
+    font-size: 28pt;
+    color: var(--pass);
+    font-weight: 700;
+  }
+
+  /* ── Info Box ── */
+  .info-box {
+    background: #eff6ff;
+    border-left: 4px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 10pt 14pt;
+    margin: 10pt 0;
+    font-size: 9pt;
+    color: #1e40af;
+  }
+  .warn-box {
+    background: #fffbeb;
+    border-left: 4px solid var(--medium);
+    border-radius: 0 8px 8px 0;
+    padding: 10pt 14pt;
+    margin: 10pt 0;
+    font-size: 9pt;
+    color: #92400e;
+  }
+  .success-box {
+    background: #f0fdf4;
+    border-left: 4px solid var(--pass);
+    border-radius: 0 8px 8px 0;
+    padding: 10pt 14pt;
+    margin: 10pt 0;
+    font-size: 9pt;
+    color: #166534;
+  }
+
+  /* ── Progress Bar ── */
+  .progress-bar-bg {
+    background: #e2e8f0;
+    border-radius: 6px;
+    height: 18pt;
+    width: 100%;
+    margin: 6pt 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8pt;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  /* ── Misc ── */
+  .page-break { page-break-before: always; }
+  p { margin-bottom: 6pt; }
+  code {
+    background: #f1f5f9;
+    padding: 1pt 4pt;
+    border-radius: 3px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 8.5pt;
+  }
+  ul, ol { margin-left: 16pt; margin-bottom: 8pt; }
+  li { margin-bottom: 3pt; }
+  .text-center { text-align: center; }
+  .text-muted { color: var(--muted); font-size: 9pt; }
+  .mt-1 { margin-top: 8pt; }
+  .mb-1 { margin-bottom: 8pt; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- COVER PAGE                                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <h1>Security Remediation Report</h1>
+  <div class="subtitle">EcoPlate DevSecOps Pipeline</div>
+  <div class="meta-box">
+    Project: <strong>EcoPlate</strong> &mdash; GDIPSA-Team2/ecoplate<br>
+    Date: <strong>2026-02-08</strong><br>
+    Scope: <strong>5 Rounds</strong> of Security Scanning &amp; Remediation<br>
+    Initial Commit: <strong>eacf4fd1</strong> (main) &nbsp;|&nbsp; Final Commit: <strong>1539f9f</strong> (dev)<br>
+    Tools: <strong>13 scanners</strong> (SAST, SCA, Secrets, IaC, Container, DAST, SBOM, License)
+  </div>
+  <div>
+    <span class="result-badge badge-fail">Before: FAIL</span>
+    &nbsp;&nbsp;&rarr;&nbsp;&nbsp;
+    <span class="result-badge badge-pass">After: PASS</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- TABLE OF CONTENTS                                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><span class="num">1</span> Executive Summary</li>
+    <li><span class="num">2</span> Before vs After &mdash; At a Glance</li>
+    <li><span class="num">3</span> Initial Scan Results (Before Fix)</li>
+    <li><span class="num">4</span> Remediation Steps &mdash; All 5 Rounds</li>
+    <li style="padding-left: 20pt;"><span class="num">4.1</span> Container Image Vulnerabilities (Trivy)</li>
+    <li style="padding-left: 20pt;"><span class="num">4.2</span> Secret Detection (Trufflehog)</li>
+    <li style="padding-left: 20pt;"><span class="num">4.3</span> JavaScript Dependencies (npm audit)</li>
+    <li style="padding-left: 20pt;"><span class="num">4.4</span> Content Security Policy (ZAP DAST)</li>
+    <li style="padding-left: 20pt;"><span class="num">4.5</span> Server Information Leak (ZAP DAST)</li>
+    <li style="padding-left: 20pt;"><span class="num">4.6</span> API Error Handling (ZAP DAST)</li>
+    <li style="padding-left: 20pt;"><span class="num">4.7</span> Nginx Infrastructure</li>
+    <li style="padding-left: 20pt;"><span class="num">4.8</span> ZAP False Positives &amp; Report Generator Bugs</li>
+    <li style="padding-left: 20pt;"><span class="num">4.9</span> CI/CD Pipeline Improvements</li>
+    <li><span class="num">5</span> Final Scan Results (After Fix)</li>
+    <li><span class="num">6</span> Progress Across All Rounds</li>
+    <li><span class="num">7</span> Remaining Findings &amp; Accepted Risks</li>
+    <li><span class="num">8</span> Files Modified</li>
+    <li><span class="num">9</span> Key Lessons Learned</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 1. EXECUTIVE SUMMARY                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2 class="section-title">1. Executive Summary</h2>
+
+<p>Over <strong>5 iterative scan-fix-verify cycles</strong>, the EcoPlate project's security posture was significantly hardened. A total of <strong>34 individual fixes</strong> were applied across <strong>15 files</strong>, reducing findings from <strong>92 to 21</strong> and eliminating <strong>all Critical and High severity issues</strong>.</p>
+
+<div class="compare-row">
+  <div class="compare-box before">
+    <div class="big-num" style="color:var(--critical)">92</div>
+    <div class="tag">Total Findings (Before)</div>
+    <div style="margin-top:6pt; font-size:9pt;">
+      <span class="sev sev-critical">5 Critical</span>
+      <span class="sev sev-high">20 High</span>
+      <span class="sev sev-medium">66 Medium</span>
+      <span class="sev sev-low">1 Low</span>
+    </div>
+  </div>
+  <div class="arrow-col">&rarr;</div>
+  <div class="compare-box after">
+    <div class="big-num" style="color:var(--pass)">21</div>
+    <div class="tag">Total Findings (After)</div>
+    <div style="margin-top:6pt; font-size:9pt;">
+      <span class="sev sev-critical">0 Critical</span>
+      <span class="sev sev-high">0 High</span>
+      <span class="sev sev-medium">17 Medium</span>
+      <span class="sev sev-low">4 Low</span>
+    </div>
+  </div>
+</div>
+
+<div class="summary-cards">
+  <div class="s-card" style="border-left-color:var(--pass); background:#f0fdf4;">
+    <div class="num" style="color:var(--pass)">77%</div>
+    <div class="lbl">Total Reduction</div>
+  </div>
+  <div class="s-card" style="border-left-color:var(--critical); background:#fef2f2;">
+    <div class="num" style="color:var(--pass)">100%</div>
+    <div class="lbl">Critical Eliminated</div>
+  </div>
+  <div class="s-card" style="border-left-color:var(--high); background:#fff7ed;">
+    <div class="num" style="color:var(--pass)">100%</div>
+    <div class="lbl">High Eliminated</div>
+  </div>
+  <div class="s-card" style="border-left-color:var(--accent); background:#eff6ff;">
+    <div class="num" style="color:var(--accent)">34</div>
+    <div class="lbl">Fixes Applied</div>
+  </div>
+  <div class="s-card" style="border-left-color:var(--muted); background:#f8fafc;">
+    <div class="num" style="color:var(--text)">15</div>
+    <div class="lbl">Files Modified</div>
+  </div>
+</div>
+
+<div class="success-box">
+  <strong>Result:</strong> Overall status changed from <strong style="color:var(--fail)">FAIL</strong> to <strong style="color:var(--pass)">WARN (PASS for Critical/High)</strong>. All remaining 21 findings are Medium or Low severity with accepted risk justifications. No Critical or High vulnerabilities remain.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 2. BEFORE vs AFTER                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2 class="section-title">2. Before vs After &mdash; At a Glance</h2>
+
+<table>
+  <thead>
+    <tr><th>Metric</th><th style="text-align:center">Before (Round 1)</th><th style="text-align:center">After (Round 5)</th><th style="text-align:center">Change</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Overall Status</strong></td><td style="text-align:center"><span class="status-badge status-fail">FAIL</span></td><td style="text-align:center"><span class="status-badge status-warn">WARN</span></td><td style="text-align:center; color:var(--pass); font-weight:700;">Improved</td></tr>
+    <tr><td><strong>Total Findings</strong></td><td style="text-align:center">92</td><td style="text-align:center">21</td><td style="text-align:center; color:var(--pass); font-weight:700;">&darr; 77%</td></tr>
+    <tr><td>Critical</td><td style="text-align:center; color:var(--critical); font-weight:700;">5</td><td style="text-align:center; color:var(--pass); font-weight:700;">0</td><td style="text-align:center; color:var(--pass);">&darr; 100%</td></tr>
+    <tr><td>High</td><td style="text-align:center; color:var(--high); font-weight:700;">20</td><td style="text-align:center; color:var(--pass); font-weight:700;">0</td><td style="text-align:center; color:var(--pass);">&darr; 100%</td></tr>
+    <tr><td>Medium</td><td style="text-align:center; color:var(--medium);">66</td><td style="text-align:center; color:var(--medium);">17</td><td style="text-align:center; color:var(--pass);">&darr; 74%</td></tr>
+    <tr><td>Low</td><td style="text-align:center; color:var(--low);">1</td><td style="text-align:center; color:var(--low);">4</td><td style="text-align:center; color:var(--muted);">&uarr; 3 (reclassified)</td></tr>
+  </tbody>
+</table>
+
+<h3 class="sub-title">Reduction Progress Bar</h3>
+
+<div style="display:flex; gap:8pt; align-items:center; margin:4pt 0;">
+  <span style="font-size:8pt; width:50pt; color:var(--critical); font-weight:600;">Critical</span>
+  <div class="progress-bar-bg" style="flex:1;">
+    <div class="progress-bar-fill" style="width:100%; background: var(--pass);">5 &rarr; 0 (100%)</div>
+  </div>
+</div>
+<div style="display:flex; gap:8pt; align-items:center; margin:4pt 0;">
+  <span style="font-size:8pt; width:50pt; color:var(--high); font-weight:600;">High</span>
+  <div class="progress-bar-bg" style="flex:1;">
+    <div class="progress-bar-fill" style="width:100%; background: var(--pass);">20 &rarr; 0 (100%)</div>
+  </div>
+</div>
+<div style="display:flex; gap:8pt; align-items:center; margin:4pt 0;">
+  <span style="font-size:8pt; width:50pt; color:var(--medium); font-weight:600;">Medium</span>
+  <div class="progress-bar-bg" style="flex:1;">
+    <div class="progress-bar-fill" style="width:74%; background: var(--medium);">66 &rarr; 17 (74%)</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 3. INITIAL SCAN (BEFORE FIX)                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2 class="section-title">3. Initial Scan Results (Before Fix)</h2>
+
+<p class="text-muted">Branch: <code>main</code> | Commit: <code>eacf4fd1</code> | Date: 2026-02-08 03:17 UTC</p>
+
+<table>
+  <thead>
+    <tr><th>Tool</th><th>Category</th><th style="text-align:center">Status</th><th style="text-align:center">Critical</th><th style="text-align:center">High</th><th style="text-align:center">Medium</th><th style="text-align:center">Low</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Semgrep</td><td>SAST</td><td style="text-align:center"><span class="status-badge status-warn">WARN</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center; font-weight:700;">12</td><td style="text-align:center">-</td></tr>
+    <tr><td>Bandit</td><td>SAST</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Trufflehog</td><td>Secrets</td><td style="text-align:center"><span class="status-badge status-fail">FAIL</span></td><td style="text-align:center; color:var(--critical); font-weight:700;">3</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>pip-audit</td><td>SCA</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>npm audit</td><td>SCA</td><td style="text-align:center"><span class="status-badge status-fail">FAIL</span></td><td style="text-align:center">-</td><td style="text-align:center; color:var(--high); font-weight:700;">2</td><td style="text-align:center">2</td><td style="text-align:center">-</td></tr>
+    <tr><td>Checkov</td><td>IaC</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>pip-licenses</td><td>License</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Syft (Source)</td><td>SBOM</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Trivy (App Image)</td><td>Container</td><td style="text-align:center"><span class="status-badge status-fail">FAIL</span></td><td style="text-align:center; color:var(--critical); font-weight:700;">2</td><td style="text-align:center; color:var(--high); font-weight:700;">2</td><td style="text-align:center; font-weight:700;">46</td><td style="text-align:center">-</td></tr>
+    <tr><td>Trivy (Rec Image)</td><td>Container</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Syft (Container)</td><td>SBOM</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>ZAP Baseline</td><td>DAST</td><td style="text-align:center"><span class="status-badge status-fail">FAIL</span></td><td style="text-align:center">-</td><td style="text-align:center; color:var(--high); font-weight:700;">9</td><td style="text-align:center">5</td><td style="text-align:center">1</td></tr>
+    <tr><td>ZAP API Scan</td><td>DAST</td><td style="text-align:center"><span class="status-badge status-fail">FAIL</span></td><td style="text-align:center">-</td><td style="text-align:center; color:var(--high); font-weight:700;">7</td><td style="text-align:center">1</td><td style="text-align:center">-</td></tr>
+  </tbody>
+  <tfoot>
+    <tr style="font-weight:700; background:#fef2f2;">
+      <td colspan="3">Total</td>
+      <td style="text-align:center; color:var(--critical);">5</td>
+      <td style="text-align:center; color:var(--high);">20</td>
+      <td style="text-align:center; color:var(--medium);">66</td>
+      <td style="text-align:center; color:var(--low);">1</td>
+    </tr>
+  </tfoot>
+</table>
+
+<h3 class="sub-title">Key Vulnerabilities Identified</h3>
+
+<table>
+  <thead><tr><th>Severity</th><th>Category</th><th>Description</th><th>Count</th></tr></thead>
+  <tbody>
+    <tr><td><span class="sev sev-critical">CRITICAL</span></td><td>Container (Trivy)</td><td>Go stdlib CVEs (CVE-2023-24538) in esbuild binaries cached inside Docker image</td><td>2</td></tr>
+    <tr><td><span class="sev sev-critical">CRITICAL</span></td><td>Secrets (Trufflehog)</td><td>Report generator misinterpreted log lines as verified secrets (false positive)</td><td>3</td></tr>
+    <tr><td><span class="sev sev-high">HIGH</span></td><td>Container (Trivy)</td><td>Go stdlib CVEs (CVE-2022-41720) in esbuild Go binaries</td><td>2</td></tr>
+    <tr><td><span class="sev sev-high">HIGH</span></td><td>SCA (npm audit)</td><td>@capacitor/cli and tar dependency vulnerabilities</td><td>2</td></tr>
+    <tr><td><span class="sev sev-high">HIGH</span></td><td>DAST (ZAP)</td><td>Sec-Fetch-* header missing alerts (scanner false positives)</td><td>8</td></tr>
+    <tr><td><span class="sev sev-high">HIGH</span></td><td>DAST (ZAP)</td><td>CSP missing directives, wildcards, unsafe-inline</td><td>4</td></tr>
+    <tr><td><span class="sev sev-high">HIGH</span></td><td>DAST (ZAP)</td><td>Server header leaks Bun version information</td><td>2</td></tr>
+    <tr><td><span class="sev sev-high">HIGH</span></td><td>DAST (ZAP)</td><td>API 404 returns HTML instead of JSON, Client Error codes</td><td>2</td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 4. REMEDIATION STEPS                                                  -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2 class="section-title">4. Remediation Steps &mdash; All 5 Rounds</h2>
+
+<p>A total of <strong>34 fixes</strong> were applied across 5 scan-fix-verify cycles. Each fix is documented with its severity impact, the round in which it was applied, and the files changed.</p>
+
+<!-- 4.1 Container Image -->
+<h3 class="sub-title">4.1 Container Image Vulnerabilities (Trivy)</h3>
+<p><span class="sev sev-critical">CRITICAL</span> <span class="sev sev-high">HIGH</span> Initial: 2C + 2H + 46M &rarr; Final: 0C + 0H + 0M</p>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Resolved</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Changed Dockerfile from <code>COPY node_modules</code> to <code>bun install --production</code>, excluding devDependencies (drizzle-kit/esbuild) from production image</td><td><span class="sev sev-critical">2C</span> <span class="sev sev-high">2H</span></td><td>R1</td><td><code>Dockerfile</code></td></tr>
+    <tr><td>2</td><td>Removed <code>--frozen-lockfile</code> flag which forced bun to resolve esbuild from stale lockfile</td><td><span class="sev sev-critical">1C</span> <span class="sev sev-high">1H</span></td><td>R2</td><td><code>Dockerfile</code></td></tr>
+    <tr><td>3</td><td>Added explicit cleanup: <code>rm -rf node_modules/@esbuild node_modules/esbuild node_modules/drizzle-kit</code></td><td>Preventive</td><td>R2</td><td><code>Dockerfile</code></td></tr>
+    <tr><td>4</td><td>Pinned base image from floating <code>oven/bun:1.2-alpine</code> to <code>oven/bun:1.2.5-alpine</code> for reproducible builds</td><td>Prevents new CVEs</td><td>R3</td><td><code>Dockerfile</code></td></tr>
+    <tr><td>5</td><td>Added Go binary cleanup: <code>grep -rl "Go BuildID"</code> across <code>node_modules/</code>, <code>/usr/local/bin/</code>, <code>/app/</code></td><td><span class="sev sev-critical">1C</span> <span class="sev sev-high">2H</span> 12M</td><td>R4</td><td><code>Dockerfile</code></td></tr>
+    <tr><td>6</td><td>Extended cleanup to <code>/root/.bun/install/cache/</code> &mdash; Bun's global cache contained esbuild Go binaries</td><td><span class="sev sev-critical">1C</span> <span class="sev sev-high">2H</span> 12M</td><td>R5</td><td><code>Dockerfile</code></td></tr>
+  </tbody>
+</table>
+
+<div class="info-box">
+  <strong>Root Cause:</strong> esbuild is a Go binary pulled as a transitive dependency of drizzle-kit (devDependency). Even with <code>--production</code> install, Bun cached it globally at <code>/root/.bun/install/cache/</code>. The floating Docker tag also caused different Go binary versions between builds, introducing new CVEs each time.
+</div>
+
+<!-- 4.2 Secret Detection -->
+<h3 class="sub-title">4.2 Secret Detection (Trufflehog)</h3>
+<p><span class="sev sev-critical">CRITICAL</span> Initial: 3C &rarr; Final: 0C</p>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Resolved</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>7</td><td>Fixed report generator: Trufflehog parser was treating log/status JSON lines (<code>{"level":"info","msg":"..."}</code>) as secret findings. Added filter to only parse lines with <code>SourceMetadata</code>/<code>DetectorName</code> fields</td><td><span class="sev sev-critical">3C</span> (false positives)</td><td>R5</td><td><code>.github/scripts/generate-security-report.py</code></td></tr>
+  </tbody>
+</table>
+
+<div class="warn-box">
+  <strong>Note:</strong> The actual Trufflehog scan found <strong>0 verified secrets</strong>. The 3 CRITICAL shown in previous reports were caused by the report generator bug misinterpreting trufflehog's log output as secret findings.
+</div>
+
+<!-- 4.3 npm audit -->
+<h3 class="sub-title">4.3 JavaScript Dependency Vulnerabilities (npm audit)</h3>
+<p><span class="sev sev-high">HIGH</span> Initial: 2H + 2M &rarr; Final: 0H + 1M</p>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Resolved</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>8</td><td>Upgraded <code>@capacitor/cli</code> from ^6.x to ^7.0.0 in frontend</td><td><span class="sev sev-high">2H</span></td><td>R1</td><td><code>frontend/package.json</code></td></tr>
+    <tr><td>9</td><td>Ran <code>bun install</code> to regenerate lockfile (Round 1 only updated package.json, not lockfile)</td><td>Lockfile sync</td><td>R2</td><td><code>frontend/bun.lockb</code></td></tr>
+    <tr><td>10</td><td>Upgraded <code>drizzle-kit</code> from ^0.12.8 to ^0.31.0 in backend</td><td>2M</td><td>R2</td><td><code>backend/package.json</code></td></tr>
+    <tr><td>11</td><td>Added <code>--omit=dev</code> to npm audit commands in CI &mdash; devDependencies never reach production</td><td>4M + 2H (false positives)</td><td>R4</td><td><code>.github/workflows/ci.yml</code></td></tr>
+  </tbody>
+</table>
+
+<!-- 4.4 CSP -->
+<h3 class="sub-title">4.4 Content Security Policy (ZAP DAST)</h3>
+<p><span class="sev sev-high">HIGH</span> Initial: 4H &rarr; Final: 2M (accepted risk)</p>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Resolved</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>12</td><td>Added missing CSP directives: <code>form-action</code>, <code>base-uri</code>, <code>object-src</code>, <code>worker-src</code>, <code>manifest-src</code> for both API and SPA routes</td><td><span class="sev sev-high">1H</span></td><td>R1</td><td><code>backend/src/index.ts</code></td></tr>
+    <tr><td>13</td><td>Replaced CSP <code>https:</code> wildcards with explicit domains in <code>img-src</code> and <code>connect-src</code></td><td><span class="sev sev-high">1H</span></td><td>R1</td><td><code>backend/src/index.ts</code></td></tr>
+    <tr><td>14</td><td>Removed <code>wss:</code> protocol wildcard from <code>connect-src</code> &mdash; <code>'self'</code> already covers same-origin WebSocket</td><td><span class="sev sev-high">1H</span></td><td>R2</td><td><code>backend/src/index.ts</code></td></tr>
+    <tr><td>15</td><td>Removed duplicate CSP header from nginx (backend handles context-aware CSP for API vs SPA)</td><td>Prevents conflicts</td><td>R1</td><td><code>deploy/nginx.conf</code></td></tr>
+  </tbody>
+</table>
+
+<div class="warn-box">
+  <strong>Accepted Risk:</strong> <code>'unsafe-inline'</code> in <code>script-src</code> and <code>style-src</code> remains &mdash; required by Vite framework for development/build output. Removal would require nonce-based CSP with server-side rendering.
+</div>
+
+<!-- 4.5 Server Info Leak -->
+<div class="page-break"></div>
+<h3 class="sub-title">4.5 Server Information Leak (ZAP DAST)</h3>
+<p><span class="sev sev-high">HIGH</span> Initial: 2H &rarr; Final: 0H</p>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Resolved</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>16</td><td>Added <code>headers.delete("Server")</code> in backend <code>addSecurityHeaders()</code></td><td>Attempted</td><td>R1</td><td><code>backend/src/index.ts</code></td></tr>
+    <tr><td>17</td><td>Changed to <code>headers.set("Server", "")</code> &mdash; Bun re-adds the header after <code>delete()</code></td><td>Backend fix</td><td>R2</td><td><code>backend/src/index.ts</code></td></tr>
+    <tr><td>18</td><td>Added <code>proxy_hide_header Server</code> and <code>proxy_hide_header X-Powered-By</code> to nginx</td><td><span class="sev sev-high">2H</span></td><td>R1</td><td><code>deploy/nginx.conf</code></td></tr>
+    <tr><td>19</td><td>Added <code>server_tokens off</code> to nginx to suppress version numbers</td><td>Nginx fix</td><td>R1</td><td><code>deploy/nginx.conf</code></td></tr>
+  </tbody>
+</table>
+
+<div class="info-box">
+  <strong>Root Cause Chain:</strong> Three separate issues: (1) Bun ignores <code>headers.delete()</code> for Server header, (2) <code>deploy.sh</code> didn't copy nginx.conf to server, (3) host nginx lacked <code>headers-more</code> module. All resolved across Rounds 1-4.
+</div>
+
+<!-- 4.6 API Error Handling -->
+<h3 class="sub-title">4.6 API Error Handling (ZAP DAST)</h3>
+<p><span class="sev sev-high">HIGH</span> Initial: 1H &rarr; Final: 0H</p>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Resolved</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>20</td><td>Added <code>proxy_intercept_errors on</code> in nginx API location block</td><td><span class="sev sev-high">1H</span></td><td>R2</td><td><code>deploy/nginx.conf</code></td></tr>
+    <tr><td>21</td><td>Added JSON error handlers: <code>@api_404</code> returns <code>{"error":"Not found"}</code>, <code>@api_error</code> returns <code>{"error":"Service unavailable"}</code></td><td><span class="sev sev-high">1H</span></td><td>R2</td><td><code>deploy/nginx.conf</code></td></tr>
+  </tbody>
+</table>
+
+<!-- 4.7 Nginx Infrastructure -->
+<h3 class="sub-title">4.7 Nginx Infrastructure</h3>
+<p><span class="sev sev-high">HIGH</span> <span class="sev sev-medium">MEDIUM</span> Critical infrastructure change in Round 4</p>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Resolved</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>22</td><td>Added H2C smuggling prevention: validate WebSocket <code>Upgrade</code> header in <code>/ws</code> location</td><td>1M</td><td>R1</td><td><code>deploy/nginx.conf</code></td></tr>
+    <tr><td>23</td><td>Fixed header-redefinition: added <code>always</code> flag to location-level <code>add_header</code> directives</td><td>1M</td><td>R1</td><td><code>deploy/nginx.conf</code></td></tr>
+    <tr><td>24</td><td>Added <code>Cross-Origin-Resource-Policy: same-origin</code> to mitigate Spectre side-channel</td><td>1M</td><td>R1</td><td><code>deploy/nginx.conf</code>, <code>backend/src/index.ts</code></td></tr>
+    <tr><td>25</td><td><strong>Switched to containerized nginx</strong> &mdash; host nginx lacked <code>headers-more</code> module, causing ALL nginx config changes to silently fail for Rounds 1-4</td><td><span class="sev sev-high">3H</span></td><td>R4</td><td><code>deploy/docker-compose.prod.yml</code>, <code>deploy/Dockerfile.nginx</code>, <code>deploy/deploy.sh</code>, <code>deploy/nginx-upstream.conf</code></td></tr>
+    <tr><td>26</td><td>Replaced <code>more_clear_headers Server</code> (requires headers-more module) with built-in <code>proxy_hide_header Server</code></td><td>Compatibility</td><td>R5</td><td><code>deploy/nginx.conf</code></td></tr>
+  </tbody>
+</table>
+
+<div class="info-box">
+  <strong>Root Cause (Round 4 Discovery):</strong> <code>apt-get install libnginx-mod-http-headers-more-filter</code> failed silently on EC2. The <code>more_clear_headers</code> directive caused <code>nginx -t</code> to fail, preventing <code>nginx -s reload</code>. <strong>Every nginx change from Rounds 1-3 was never applied.</strong> Fixed by containerizing nginx with known-good configuration.
+</div>
+
+<!-- 4.8 Report Generator & False Positives -->
+<h3 class="sub-title">4.8 ZAP False Positives &amp; Report Generator Bugs</h3>
+<p><span class="sev sev-high">HIGH</span> <span class="sev sev-critical">CRITICAL</span> Report inflated severity counts by ~27 findings</p>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Impact</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>27</td><td>Added <code>ZAP_SUPPRESSED_ALERTS</code> set to skip known scanner noise: Sec-Fetch-Dest/Mode/Site/User and Modern Web Application alerts</td><td><span class="sev sev-high">8H</span> (false pos.)</td><td>R5</td><td><code>.github/scripts/generate-security-report.py</code></td></tr>
+    <tr><td>28</td><td><strong>ZAP severity mapping:</strong> Changed from <code>riskdesc</code> text parsing to <code>riskcode</code> numeric mapping. Format is <code>"Risk (Confidence)"</code> &mdash; parser confused confidence "High" with severity "HIGH"</td><td><span class="sev sev-high">12H</span> (false inflation)</td><td>R5</td><td><code>.github/scripts/generate-security-report.py</code></td></tr>
+    <tr><td>29</td><td><strong>Trufflehog parser:</strong> Added filter to skip log/status lines with <code>level</code>/<code>msg</code> fields. Only lines with <code>SourceMetadata</code>/<code>DetectorName</code> are secret findings</td><td><span class="sev sev-critical">3C</span> (false inflation)</td><td>R5</td><td><code>.github/scripts/generate-security-report.py</code></td></tr>
+    <tr><td>30</td><td><strong>Branch resolution:</strong> Fixed double <code>workflow_run</code> chain losing original branch info. CD now uploads <code>pipeline-metadata.json</code></td><td>Bug fix</td><td>R4</td><td><code>.github/workflows/cd.yml</code>, <code>.github/workflows/security-report.yml</code></td></tr>
+  </tbody>
+</table>
+
+<!-- 4.9 CI/CD -->
+<h3 class="sub-title">4.9 CI/CD Pipeline Improvements</h3>
+
+<table>
+  <thead><tr><th style="width:20pt">#</th><th>Fix Description</th><th style="width:70pt">Impact</th><th style="width:40pt">Round</th><th style="width:100pt">File</th></tr></thead>
+  <tbody>
+    <tr><td>31</td><td>Added <code>HEALTHCHECK</code> instruction to <code>deploy/Dockerfile.nginx</code></td><td>Checkov compliance</td><td>R4</td><td><code>deploy/Dockerfile.nginx</code></td></tr>
+    <tr><td>32</td><td>Updated <code>deploy.sh</code> to stop host nginx, use containerized nginx with <code>--build</code> flag</td><td>Deployment reliability</td><td>R4</td><td><code>deploy/deploy.sh</code></td></tr>
+    <tr><td>33</td><td>Changed <code>ecoplate-app</code> from <code>ports: "3000:3000"</code> to <code>expose: "3000"</code> (internal only behind nginx)</td><td>Reduced attack surface</td><td>R4</td><td><code>deploy/docker-compose.prod.yml</code></td></tr>
+    <tr><td>34</td><td>Upgraded <code>zaproxy/action-baseline</code> from <code>v0.14.0</code> to <code>v0.15.0</code> to fix <code>exit code 3</code> Docker error</td><td>ZAP scan reliability</td><td>R5</td><td><code>.github/workflows/cd.yml</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 5. FINAL SCAN RESULTS                                                 -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2 class="section-title">5. Final Scan Results (After Fix)</h2>
+
+<p class="text-muted">Branch: <code>main</code> | Commit: <code>1539f9f</code> | Date: 2026-02-08 07:39 UTC</p>
+
+<table>
+  <thead>
+    <tr><th>Tool</th><th>Category</th><th style="text-align:center">Status</th><th style="text-align:center">Critical</th><th style="text-align:center">High</th><th style="text-align:center">Medium</th><th style="text-align:center">Low</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Semgrep</td><td>SAST</td><td style="text-align:center"><span class="status-badge status-warn">WARN</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">13</td><td style="text-align:center">1</td></tr>
+    <tr><td>Bandit</td><td>SAST</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Trufflehog</td><td>Secrets</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>pip-audit</td><td>SCA</td><td style="text-align:center"><span class="status-badge status-skip">SKIPPED</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>npm audit</td><td>SCA</td><td style="text-align:center"><span class="status-badge status-warn">WARN</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">1</td><td style="text-align:center">-</td></tr>
+    <tr><td>Checkov</td><td>IaC</td><td style="text-align:center"><span class="status-badge status-warn">WARN</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">1</td><td style="text-align:center">-</td></tr>
+    <tr><td>pip-licenses</td><td>License</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Syft (Source)</td><td>SBOM</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Trivy (App Image)</td><td>Container</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Trivy (Rec Image)</td><td>Container</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>Syft (Container)</td><td>SBOM</td><td style="text-align:center"><span class="status-badge status-pass">PASS</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td></tr>
+    <tr><td>ZAP Baseline</td><td>DAST</td><td style="text-align:center"><span class="status-badge status-warn">WARN</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">2</td><td style="text-align:center">2</td></tr>
+    <tr><td>ZAP API Scan</td><td>DAST</td><td style="text-align:center"><span class="status-badge status-warn">WARN</span></td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td style="text-align:center">1</td></tr>
+  </tbody>
+  <tfoot>
+    <tr style="font-weight:700; background:#f0fdf4;">
+      <td colspan="3">Total</td>
+      <td style="text-align:center; color:var(--pass);">0</td>
+      <td style="text-align:center; color:var(--pass);">0</td>
+      <td style="text-align:center; color:var(--medium);">17</td>
+      <td style="text-align:center; color:var(--low);">4</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="success-box">
+  <strong>All Critical and High severity vulnerabilities have been eliminated.</strong> The remaining 21 findings (17 Medium + 4 Low) are either accepted risks with documented justifications or informational alerts that do not represent exploitable vulnerabilities.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 6. PROGRESS ACROSS ROUNDS                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2 class="section-title">6. Progress Across All Rounds</h2>
+
+<table>
+  <thead>
+    <tr><th>Round</th><th>Commit</th><th style="text-align:center">Critical</th><th style="text-align:center">High</th><th style="text-align:center">Medium</th><th style="text-align:center">Low</th><th style="text-align:center">Total</th><th>Key Action</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>R1 (Initial)</strong></td><td><code>eacf4fd1</code></td><td style="text-align:center; color:var(--critical);">5</td><td style="text-align:center; color:var(--high);">20</td><td style="text-align:center;">66</td><td style="text-align:center;">1</td><td style="text-align:center; font-weight:700;">92</td><td>Baseline scan</td></tr>
+    <tr><td><strong>R2</strong></td><td><code>eacf4fd1</code></td><td style="text-align:center; color:var(--critical);">4</td><td style="text-align:center; color:var(--high);">18</td><td style="text-align:center;">43</td><td style="text-align:center;">1</td><td style="text-align:center; font-weight:700;">66</td><td>First round fixes applied</td></tr>
+    <tr><td><strong>R3</strong></td><td><code>eacf4fd1</code></td><td style="text-align:center; color:var(--critical);">4</td><td style="text-align:center; color:var(--high);">18</td><td style="text-align:center;">32</td><td style="text-align:center;">1</td><td style="text-align:center; font-weight:700;">55</td><td>Fixes on dev, not merged</td></tr>
+    <tr><td><strong>R4</strong></td><td><code>ff5bd03b</code></td><td style="text-align:center; color:var(--critical);">4</td><td style="text-align:center; color:var(--high);">18</td><td style="text-align:center;">37</td><td style="text-align:center;">2</td><td style="text-align:center; font-weight:700;">61</td><td>Merged dev, new Trivy CVEs</td></tr>
+    <tr style="background:#f0fdf4;"><td><strong>R5 (Final)</strong></td><td><code>1539f9f</code></td><td style="text-align:center; color:var(--pass); font-weight:700;">0</td><td style="text-align:center; color:var(--pass); font-weight:700;">0</td><td style="text-align:center;">17</td><td style="text-align:center;">4</td><td style="text-align:center; font-weight:700; color:var(--pass);">21</td><td>All fixes + report generator fixed</td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 7. REMAINING FINDINGS                                                 -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2 class="section-title">7. Remaining Findings &amp; Accepted Risks</h2>
+
+<p>All 21 remaining findings are Medium or Low severity. Each has a documented justification for acceptance.</p>
+
+<table>
+  <thead><tr><th>Scanner</th><th>Sev.</th><th style="text-align:center">Count</th><th>Finding</th><th>Justification</th></tr></thead>
+  <tbody>
+    <tr><td>Semgrep</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">4</td><td><code>workflow_run</code> + <code>checkout</code> pattern</td><td>Required for <code>workflow_run</code> pipelines</td></tr>
+    <tr><td>Semgrep</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">2</td><td>Path traversal in <code>path.join</code></td><td>Input validated before path operations</td></tr>
+    <tr><td>Semgrep</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">1</td><td>X-Frame-Options via user input</td><td>Hardcoded value, not user-controlled</td></tr>
+    <tr><td>Semgrep</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">1</td><td>Non-literal RegExp in router</td><td>Route patterns are developer-defined</td></tr>
+    <tr><td>Semgrep</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">2</td><td>Nginx header-redefinition</td><td><code>always</code> flag applied; inherent to nginx</td></tr>
+    <tr><td>Semgrep</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">1</td><td>Nginx H2C smuggling pattern</td><td>WebSocket Upgrade validation in place</td></tr>
+    <tr><td>Semgrep</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">1</td><td>Flask <code>host=0.0.0.0</code></td><td>Runs inside Docker, not exposed directly</td></tr>
+    <tr><td>Semgrep</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">1</td><td>Hardcoded <code>TESTING=True</code></td><td>Test file only, not production code</td></tr>
+    <tr><td>Semgrep</td><td><span class="sev sev-low">L</span></td><td style="text-align:center">1</td><td>Unsafe format string</td><td>Internal logging, not user-facing</td></tr>
+    <tr><td>npm audit</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">1</td><td>esbuild (backend)</td><td>DevDependency, excluded from production</td></tr>
+    <tr><td>Checkov</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">1</td><td>Dockerfile.nginx missing <code>USER</code></td><td>nginx requires root for port 80 binding</td></tr>
+    <tr><td>ZAP Baseline</td><td><span class="sev sev-medium">M</span></td><td style="text-align:center">2</td><td>CSP <code>unsafe-inline</code></td><td>Vite framework requirement</td></tr>
+    <tr><td>ZAP Baseline</td><td><span class="sev sev-low">L</span></td><td style="text-align:center">1</td><td>Insufficient Site Isolation</td><td>Would break Google Maps cross-origin</td></tr>
+    <tr><td>ZAP Baseline</td><td><span class="sev sev-low">L</span></td><td style="text-align:center">1</td><td>Private IP Disclosure</td><td>Android emulator default, no prod impact</td></tr>
+    <tr><td>ZAP API</td><td><span class="sev sev-low">L</span></td><td style="text-align:center">1</td><td>Unexpected Content-Type</td><td>SPA serves HTML for non-API routes</td></tr>
+  </tbody>
+  <tfoot>
+    <tr style="font-weight:700; background:#f8fafc;">
+      <td colspan="2">Total</td>
+      <td style="text-align:center">21</td>
+      <td colspan="2"></td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 8. FILES MODIFIED                                                     -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2 class="section-title">8. Files Modified</h2>
+
+<table>
+  <thead><tr><th>File</th><th>Rounds</th><th>Summary of Changes</th></tr></thead>
+  <tbody>
+    <tr><td><code>Dockerfile</code></td><td>R1-R5</td><td>Production-only install, pinned base image, Go binary cleanup across all paths including Bun cache</td></tr>
+    <tr><td><code>backend/src/index.ts</code></td><td>R1, R2</td><td>Enhanced CSP, Server header override, CORP header</td></tr>
+    <tr><td><code>deploy/nginx.conf</code></td><td>R1, R2, R4, R5</td><td>Security headers, CSP delegation, H2C protection, JSON error pages, proxy_hide_header</td></tr>
+    <tr><td><code>deploy/docker-compose.prod.yml</code></td><td>R4</td><td>Added containerized nginx service, app expose-only</td></tr>
+    <tr><td><code>deploy/Dockerfile.nginx</code></td><td>R4, R5</td><td>Created for containerized nginx, added HEALTHCHECK</td></tr>
+    <tr><td><code>deploy/deploy.sh</code></td><td>R2, R4</td><td>Stop host nginx, containerized nginx deployment</td></tr>
+    <tr><td><code>deploy/nginx-upstream.conf</code></td><td>R4</td><td>Changed from <code>127.0.0.1:3000</code> to <code>ecoplate-app:3000</code> (Docker DNS)</td></tr>
+    <tr><td><code>frontend/package.json</code></td><td>R1</td><td>@capacitor packages ^6.x &rarr; ^7.0.0</td></tr>
+    <tr><td><code>frontend/bun.lockb</code></td><td>R2</td><td>Regenerated with updated @capacitor/cli</td></tr>
+    <tr><td><code>backend/package.json</code></td><td>R2</td><td>drizzle-kit ^0.12.8 &rarr; ^0.31.0</td></tr>
+    <tr><td><code>backend/bun.lockb</code></td><td>R2</td><td>Regenerated with updated drizzle-kit</td></tr>
+    <tr><td><code>.github/workflows/ci.yml</code></td><td>R4</td><td>npm audit <code>--omit=dev</code></td></tr>
+    <tr><td><code>.github/workflows/cd.yml</code></td><td>R4, R5</td><td>Pipeline metadata artifact, ZAP action upgrade</td></tr>
+    <tr><td><code>.github/workflows/security-report.yml</code></td><td>R4</td><td>Metadata-based branch resolution</td></tr>
+    <tr><td><code>.github/scripts/generate-security-report.py</code></td><td>R5</td><td>Fixed ZAP severity mapping, Trufflehog parser, alert suppression</td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 9. LESSONS LEARNED                                                    -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<h2 class="section-title">9. Key Lessons Learned</h2>
+
+<div style="margin-top:8pt;">
+
+<div class="info-box" style="margin-bottom:10pt;">
+  <strong>1. Floating Docker tags cause non-deterministic builds.</strong><br>
+  <code>oven/bun:1.2-alpine</code> resolved to different images between builds, introducing new CVEs. Always pin to specific versions (e.g., <code>oven/bun:1.2.5-alpine</code>).
+</div>
+
+<div class="info-box" style="margin-bottom:10pt;">
+  <strong>2. Nginx config changes require end-to-end deployment verification.</strong><br>
+  Four rounds of nginx fixes were silently dropped because the host nginx lacked a required module. Containerizing nginx eliminated this class of deployment failures.
+</div>
+
+<div class="info-box" style="margin-bottom:10pt;">
+  <strong>3. Security report generators can inflate severity counts.</strong><br>
+  The ZAP <code>riskdesc</code> field contains both risk and confidence levels (<code>"Informational (High)"</code>). Parsing this as a string and matching "high" led to 12 false HIGH findings. Using numeric <code>riskcode</code> is the correct approach.
+</div>
+
+<div class="info-box" style="margin-bottom:10pt;">
+  <strong>4. Lockfile synchronization matters.</strong><br>
+  Updating <code>package.json</code> without running <code>bun install</code> leaves the lockfile stale. <code>npm audit</code> reads the lockfile, not package.json, so vulnerabilities persist until the lockfile is regenerated.
+</div>
+
+<div class="info-box" style="margin-bottom:10pt;">
+  <strong>5. <code>workflow_run</code> chains lose context.</strong><br>
+  A double <code>workflow_run</code> chain (CI &rarr; CD &rarr; Security Report) always reports the default branch, not the triggering branch. Solved by passing metadata through GitHub Actions artifacts.
+</div>
+
+</div>
+
+<div style="margin-top:24pt; padding-top:12pt; border-top:2px solid var(--border); text-align:center; color:var(--muted); font-size:8.5pt;">
+  EcoPlate Security Remediation Report &mdash; Generated 2026-02-08 &mdash; GDIPSA-Team2/ecoplate
+</div>
+
+</body>
+</html>
