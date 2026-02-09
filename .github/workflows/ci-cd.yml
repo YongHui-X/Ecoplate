@@ -251,28 +251,10 @@ jobs:
           RE_FUNCS=$(extract_lcov_metric recommendation-cov/coverage.lcov "functions")
           RE_BRANCH=$(extract_lcov_metric recommendation-cov/coverage.lcov "branches")
 
-          # Calculate averages, filtering out non-numeric values
-          AVG_LINES=$(python3 -c "
-def safe_float(v):
-    try: return float(v)
-    except: return None
-vals=[x for x in [safe_float(v) for v in ['${BE_LINES}','${FE_LINES}','${RE_LINES}']] if x is not None]
-print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')
-")
-          AVG_FUNCS=$(python3 -c "
-def safe_float(v):
-    try: return float(v)
-    except: return None
-vals=[x for x in [safe_float(v) for v in ['${BE_FUNCS}','${FE_FUNCS}','${RE_FUNCS}']] if x is not None]
-print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')
-")
-          AVG_BRANCH=$(python3 -c "
-def safe_float(v):
-    try: return float(v)
-    except: return None
-vals=[x for x in [safe_float(v) for v in ['${BE_BRANCH}','${FE_BRANCH}','${RE_BRANCH}']] if x is not None]
-print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')
-")
+          # Calculate averages, filtering out non-numeric values (safe_float handles N/A, "no", empty, etc.)
+          AVG_LINES=$(python3 -c "vals=[float(v) for v in '${BE_LINES},${FE_LINES},${RE_LINES}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
+          AVG_FUNCS=$(python3 -c "vals=[float(v) for v in '${BE_FUNCS},${FE_FUNCS},${RE_FUNCS}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
+          AVG_BRANCH=$(python3 -c "vals=[float(v) for v in '${BE_BRANCH},${FE_BRANCH},${RE_BRANCH}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
 
           echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
