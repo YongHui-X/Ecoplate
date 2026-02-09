@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ToastProvider } from "./contexts/ToastContext";
+import { PointsProvider } from "./contexts/PointsContext";
 import { UnreadCountProvider } from "./contexts/UnreadCountContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { initializeCapacitor } from "./services/capacitor";
@@ -17,11 +18,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <UnreadCountProvider>
-            <NotificationProvider>
-              <App />
-            </NotificationProvider>
-          </UnreadCountProvider>
+          <PointsProvider>
+            <UnreadCountProvider>
+              <NotificationProvider>
+                <App />
+              </NotificationProvider>
+            </UnreadCountProvider>
+          </PointsProvider>
         </AuthProvider>
       </ToastProvider>
     </BrowserRouter>

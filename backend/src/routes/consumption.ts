@@ -481,7 +481,12 @@ Provide a brief overallObservation describing the waste level (e.g., "Minimal wa
         interactionIds.push(interaction.id);
 
         // 2. Award points with normalized quantity (skip metric recording since we already recorded above)
-        await awardPoints(user.id, "consumed", ing.productId, quantityInKg, true);
+        try {
+          await awardPoints(user.id, "consumed", ing.productId, quantityInKg, true);
+        } catch (pointsError) {
+          console.error(`[Points] Failed to award points for user ${user.id} on product ${ing.productId}:`, pointsError);
+          // Don't fail the entire request, just log the error
+        }
 
         // 3. Deduct from product quantity (keep raw unit — this is inventory, not points)
         if (product) {
@@ -550,7 +555,12 @@ Provide a brief overallObservation describing the waste level (e.g., "Minimal wa
           });
 
           // Penalize points for waste (skip metric recording since we already recorded above)
-          await awardPoints(user.id, "wasted", ing.productId, wastedInKg, true);
+          try {
+            await awardPoints(user.id, "wasted", ing.productId, wastedInKg, true);
+          } catch (pointsError) {
+            console.error(`[Points] Failed to penalize points for user ${user.id} on product ${ing.productId}:`, pointsError);
+            // Don't fail the entire request, just log the error
+          }
         }
       }
 

@@ -59,9 +59,14 @@ export async function awardPoints(
   const scaled = Math.round(baseValue * (quantity ?? 1));
   // Ensure at least ±1 point (so tiny quantities don't round to zero)
   const amount = scaled === 0 ? Math.sign(baseValue) : scaled;
+
+  console.log(`[Points] Awarding ${amount} points to user ${userId} for action '${action}' (quantity: ${quantity}, baseValue: ${baseValue})`);
+
   const userPoints = await getOrCreateUserPoints(userId);
 
   const newTotal = Math.max(0, userPoints.totalPoints + amount);
+
+  console.log(`[Points] User ${userId} points: ${userPoints.totalPoints} -> ${newTotal}`);
 
   await db
     .update(schema.userPoints)

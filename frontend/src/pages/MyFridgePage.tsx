@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 import { api } from "../services/api";
 import { useToast } from "../contexts/ToastContext";
+import { usePoints } from "../contexts/PointsContext";
 import { useCamera } from "../hooks/useCamera";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -29,6 +30,7 @@ import {
   TrendingUp,
   Calendar,
   Receipt,
+  Trophy,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { formatCO2, getCO2ColorClass, calculateTotalCO2 } from "../utils/co2Utils";
@@ -180,12 +182,22 @@ export default function MyFridgePage() {
     );
   }
 
+  const { points } = usePoints();
+
   return (
     <div className="space-y-6">
       <div className="space-y-4 mb-6">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">MyFridge</h1>
-          <p className="text-sm text-muted-foreground">Manage your food inventory</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold text-foreground">MyFridge</h1>
+            <p className="text-sm text-muted-foreground">Manage your food inventory</p>
+          </div>
+          {points && (
+            <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-200">
+              <Trophy className="h-5 w-5 text-yellow-600" />
+              <span className="font-semibold text-yellow-900">{points.totalPoints} pts</span>
+            </div>
+          )}
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
@@ -1590,6 +1602,7 @@ function TrackConsumptionModal({
 }) {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { refreshPoints } = usePoints();
   const camera = useCamera();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -2215,6 +2228,14 @@ function TrackConsumptionModal({
         interactionId: response.interactionIds[i]
       })));
 
+      // Refresh points after confirming ingredients
+      try {
+        await refreshPoints();
+      } catch (error) {
+        console.error("Failed to refresh points:", error);
+      }
+      addToast("Ingredients confirmed! Eco points awarded.", "success");
+
       if (fileInputRef.current) fileInputRef.current.value = "";
       setStep("waste-input");
     } catch (error) {
@@ -2575,6 +2596,14 @@ function TrackConsumptionModal({
       });
 
       setWasteMetrics(response.metrics);
+
+      // Refresh points after confirming waste
+      try {
+        await refreshPoints();
+      } catch (error) {
+        console.error("Failed to refresh points after waste:", error);
+      }
+
       setStep("metrics");
     } catch (error) {
       console.error("Failed to confirm waste:", error);
@@ -2773,6 +2802,36 @@ function TrackConsumptionModal({
                   Your consumption and waste have been recorded.
                 </p>
               </div>
+
+              {/* Points Earned Card */}
+              {(() => {
+                const pointsEarned = ingredients.reduce((sum, ing) =>
+                  sum + Math.max(1, Math.round(ing.estimatedQuantity * 5)), 0
+                );
+                const pointsPenalty = editableWasteItems.reduce((sum, waste) =>
+                  sum + Math.max(1, Math.round(waste.quantity * 3)), 0
+                ) || 0;
+                const netPoints = pointsEarned - pointsPenalty;
+
+                return (
+                  <Card className="bg-yellow-50 border border-yellow-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Trophy className="h-5 w-5 text-yellow-600" />
+                          <div>
+                            <p className="text-sm text-yellow-900 font-medium">Eco Points Earned</p>
+                            <p className="text-xs text-yellow-700">+{pointsEarned} consumed {pointsPenalty > 0 ? `-${pointsPenalty} wasted` : ''}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-yellow-700">+{netPoints}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Waste Metrics Summary Card */}
               {wasteMetrics && (

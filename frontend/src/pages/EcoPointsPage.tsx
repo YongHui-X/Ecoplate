@@ -86,6 +86,16 @@ export default function EcoBoardPage() {
     loadData();
   }, []);
 
+  // Listen for points:updated event from other components
+  useEffect(() => {
+    const handlePointsUpdated = () => {
+      loadData();
+    };
+
+    window.addEventListener("points:updated", handlePointsUpdated);
+    return () => window.removeEventListener("points:updated", handlePointsUpdated);
+  }, []);
+
   const loadData = async () => {
     try {
       const [points, leaderboardData] = await Promise.all([
