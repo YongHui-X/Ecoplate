@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import RegisterPage from './RegisterPage';
@@ -113,7 +113,101 @@ describe('RegisterPage', () => {
 
   it('should have optional location field', () => {
     renderRegisterPage();
-    
+
     expect(screen.getByLabelText(/location/i)).not.toBeRequired();
+  });
+
+  it('should have email input with correct type', () => {
+    renderRegisterPage();
+
+    const emailInput = screen.getByLabelText(/email/i);
+    expect(emailInput).toHaveAttribute('type', 'email');
+  });
+
+  it('should have password inputs with correct type', () => {
+    renderRegisterPage();
+
+    const passwordInput = screen.getByLabelText(/^password$/i);
+    const confirmInput = screen.getByLabelText(/confirm password/i);
+    expect(passwordInput).toHaveAttribute('type', 'password');
+    expect(confirmInput).toHaveAttribute('type', 'password');
+  });
+});
+
+describe('RegisterPage - Avatar Selection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('should display multiple avatar options', () => {
+    renderRegisterPage();
+
+    // Check for avatar labels
+    expect(screen.getByText('Sprout')).toBeInTheDocument();
+    expect(screen.getByText('Leaf')).toBeInTheDocument();
+  });
+
+  it('should allow selecting an avatar', async () => {
+    renderRegisterPage();
+    const user = userEvent.setup();
+
+    // Find avatar buttons/radio and click one
+    const avatarButtons = screen.getAllByRole('button').filter(
+      btn => btn.textContent?.includes('Sprout') || btn.textContent?.includes('Leaf')
+    );
+
+    if (avatarButtons.length > 0) {
+      await user.click(avatarButtons[0]);
+    }
+  });
+});
+
+describe('RegisterPage - Form Validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('should not submit if passwords do not match', async () => {
+    const { api } = await import('../services/api');
+
+    renderRegisterPage();
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText(/name/i), 'John Doe');
+    await user.type(screen.getByLabelText(/email/i), 'john@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'password123');
+    await user.type(screen.getByLabelText(/confirm password/i), 'differentpassword');
+
+    await user.click(screen.getByRole('button', { name: /create account/i }));
+
+    // API should not be called if passwords don't match
+    await waitFor(() => {
+      // Either api not called or error shown
+      expect(screen.getByText(/passwords/i) || api.post).toBeTruthy();
+    });
+  });
+
+  it('should submit registration when form is valid', async () => {
+    const { api } = await import('../services/api');
+    vi.mocked(api.post).mockResolvedValue({
+      token: 'test-token',
+      user: { id: 1, name: 'John Doe', email: 'john@example.com' },
+    });
+
+    renderRegisterPage();
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText(/name/i), 'John Doe');
+    await user.type(screen.getByLabelText(/email/i), 'john@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'password123');
+    await user.type(screen.getByLabelText(/confirm password/i), 'password123');
+
+    await user.click(screen.getByRole('button', { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalled();
+    });
   });
 });

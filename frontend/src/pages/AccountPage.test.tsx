@@ -232,3 +232,161 @@ describe("AccountPage", () => {
   });
 });
 
+describe("AccountPage - Profile Update", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should display name input field", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Name")).toBeInTheDocument();
+    });
+
+    const nameInput = screen.getByLabelText("Name");
+    expect(nameInput).toBeInTheDocument();
+  });
+
+  it("should display location input field", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Location")).toBeInTheDocument();
+    });
+
+    const locationInput = screen.getByLabelText("Location");
+    expect(locationInput).toBeInTheDocument();
+  });
+
+  it("should disable email input", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    });
+
+    const emailInput = screen.getByLabelText("Email");
+    expect(emailInput).toBeDisabled();
+  });
+
+  it("should display avatar selection options", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Choose Your Avatar")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("AccountPage - Notification Preferences", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should display notification toggle switches", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Expiring Products")).toBeInTheDocument();
+      expect(screen.getByText("Badge Unlocked")).toBeInTheDocument();
+      expect(screen.getByText("Streak Milestones")).toBeInTheDocument();
+      expect(screen.getByText("Stale Products")).toBeInTheDocument();
+    });
+  });
+
+  it("should display threshold configuration", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Expiry Warning")).toBeInTheDocument();
+      expect(screen.getByText("Stale Product Warning")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("AccountPage - Mobile Navigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should navigate to EcoPoints when clicked", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("EcoPoints")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("EcoPoints"));
+    expect(mockNavigate).toHaveBeenCalledWith("/ecopoints");
+  });
+
+  it("should navigate to Badges when clicked", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Badges")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Badges"));
+    expect(mockNavigate).toHaveBeenCalledWith("/badges");
+  });
+
+  it("should navigate to Rewards when clicked", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Rewards")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Rewards"));
+    expect(mockNavigate).toHaveBeenCalledWith("/rewards");
+  });
+
+  it("should navigate to Notifications when clicked", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Notifications")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Notifications"));
+    expect(mockNavigate).toHaveBeenCalledWith("/notifications");
+  });
+});
+

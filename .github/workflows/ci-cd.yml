@@ -126,7 +126,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           cd recommendation-engine
-          pytest test_app.py test_ml.py -v \
+          pytest test_*.py -v \
             --cov=. --cov-report=term-missing \
             --cov-report=html:coverage-html \
             --cov-report=lcov:coverage.lcov \
@@ -187,28 +187,38 @@ jobs:
           path: recommendation-cov/
         continue-on-error: true
 
-      - name: Merge coverage and generate report
+      - name: Merge coverage and generate detailed HTML reports
         run: |
-          mkdir -p merged-coverage
+          mkdir -p combined-report/backend combined-report/frontend combined-report/recommendation
 
-          # Collect available lcov files
+          # Collect available lcov files and generate detailed HTML
           LCOV_ARGS=""
           if [ -f backend-cov/lcov.info ]; then
             LCOV_ARGS="$LCOV_ARGS -a backend-cov/lcov.info"
+            # Generate detailed HTML for backend using genhtml
+            genhtml backend-cov/lcov.info -o combined-report/backend --title "Backend Coverage" --legend || true
           fi
           if [ -f frontend-cov/lcov.info ]; then
             LCOV_ARGS="$LCOV_ARGS -a frontend-cov/lcov.info"
+            # Copy frontend Istanbul HTML report (already detailed with line-by-line)
+            if [ -d frontend-cov ]; then
+              cp -r frontend-cov/* combined-report/frontend/ 2>/dev/null || true
+            fi
           fi
           if [ -f recommendation-cov/coverage.lcov ]; then
             LCOV_ARGS="$LCOV_ARGS -a recommendation-cov/coverage.lcov"
+            # Copy recommendation pytest-cov HTML report
+            if [ -d recommendation-cov/coverage-html ]; then
+              cp -r recommendation-cov/coverage-html/* combined-report/recommendation/ 2>/dev/null || true
+            fi
           fi
 
+          # Generate merged lcov for PR annotations
           if [ -n "$LCOV_ARGS" ]; then
-            lcov $LCOV_ARGS -o merged-coverage/lcov.info
+            lcov $LCOV_ARGS -o combined-report/lcov.info 2>/dev/null || true
           fi
-          mkdir -p merged-coverage/html
 
-      - name: Extract per-component coverage
+      - name: Extract per-component coverage and generate dashboard
         id: coverage
         run: |
           extract_lcov_metric() {
@@ -216,7 +226,6 @@ jobs:
             if [ -f "$file" ]; then
               local result
               result=$(lcov --summary "$file" 2>&1 | grep "$metric" | awk '{print $2}' | tr -d '%')
-              # Check for empty, "no", "no data", or non-numeric values
               if [ -z "$result" ] || echo "$result" | grep -qiE "^(no|n/a|nan)"; then
                 echo "N/A"
               elif echo "$result" | grep -qE '^[0-9.]+$'; then
@@ -229,76 +238,6 @@ jobs:
             fi
           }
 
-          # Backend: extract from lcov summary
-          BE_LINES=$(extract_lcov_metric backend-cov/lcov.info "lines")
-          BE_FUNCS=$(extract_lcov_metric backend-cov/lcov.info "functions")
-          BE_BRANCH=$(extract_lcov_metric backend-cov/lcov.info "branches")
-
-          # Frontend: extract from lcov.info (Vitest outputs lcov.info, not coverage-summary.json)
-          FE_LINES=$(extract_lcov_metric frontend-cov/lcov.info "lines")
-          FE_FUNCS=$(extract_lcov_metric frontend-cov/lcov.info "functions")
-          FE_BRANCH=$(extract_lcov_metric frontend-cov/lcov.info "branches")
-
-          # Recommendation: extract from lcov summary
-          RE_LINES=$(extract_lcov_metric recommendation-cov/coverage.lcov "lines")
-          RE_FUNCS=$(extract_lcov_metric recommendation-cov/coverage.lcov "functions")
-          RE_BRANCH=$(extract_lcov_metric recommendation-cov/coverage.lcov "branches")
-
-          # Calculate averages, filtering out non-numeric values (safe_float handles N/A, "no", empty, etc.)
-          AVG_LINES=$(python3 -c "vals=[float(v) for v in '${BE_LINES},${FE_LINES},${RE_LINES}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
-          AVG_FUNCS=$(python3 -c "vals=[float(v) for v in '${BE_FUNCS},${FE_FUNCS},${RE_FUNCS}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
-          AVG_BRANCH=$(python3 -c "vals=[float(v) for v in '${BE_BRANCH},${FE_BRANCH},${RE_BRANCH}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
-
-          echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Lines | Functions | Branches |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|-------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend | ${BE_LINES}% | ${BE_FUNCS}% | ${BE_BRANCH}% |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | ${FE_LINES}% | ${FE_FUNCS}% | ${FE_BRANCH}% |" >> $GITHUB_STEP_SUMMARY
-          echo "| Recommendation Engine | ${RE_LINES}% | ${RE_FUNCS}% | ${RE_BRANCH}% |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Average** | **${AVG_LINES}%** | **${AVG_FUNCS}%** | **${AVG_BRANCH}%** |" >> $GITHUB_STEP_SUMMARY
-
-          # Generate simple HTML coverage report with muted colors
-          cat > merged-coverage/html/index.html << 'HTMLEOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>EcoPlate Coverage Report</title>
-            <style>
-              * { box-sizing: border-box; margin: 0; padding: 0; }
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; padding: 2rem; line-height: 1.6; }
-              .container { max-width: 900px; margin: 0 auto; }
-              h1 { color: #fff; margin-bottom: 0.5rem; font-size: 1.75rem; }
-              .subtitle { color: #888; margin-bottom: 2rem; font-size: 0.9rem; }
-              table { width: 100%; border-collapse: collapse; background: #16213e; border-radius: 8px; overflow: hidden; }
-              th, td { padding: 1rem 1.25rem; text-align: left; }
-              th { background: #0f3460; color: #fff; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
-              tr:not(:last-child) td { border-bottom: 1px solid #1a1a2e; }
-              tr:hover td { background: #1a2a4a; }
-              .component { font-weight: 500; }
-              .metric { font-family: 'SF Mono', Monaco, monospace; font-size: 0.95rem; }
-              .good { color: #4ade80; }
-              .okay { color: #fbbf24; }
-              .poor { color: #f87171; }
-              .na { color: #666; }
-              .avg-row td { background: #0f3460; font-weight: 600; }
-              .footer { margin-top: 2rem; color: #666; font-size: 0.8rem; text-align: center; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>EcoPlate Coverage Report</h1>
-              <p class="subtitle">Combined test coverage across all components</p>
-              <table>
-                <thead>
-                  <tr><th>Component</th><th>Lines</th><th>Functions</th><th>Branches</th></tr>
-                </thead>
-                <tbody>
-          HTMLEOF
-
-          # Function to determine color class
           get_color() {
             val="$1"
             if [ "$val" = "N/A" ]; then echo "na"
@@ -308,35 +247,172 @@ jobs:
             fi
           }
 
-          # Add rows
-          echo "<tr><td class=\"component\">Backend</td><td class=\"metric $(get_color $BE_LINES)\">${BE_LINES}%</td><td class=\"metric $(get_color $BE_FUNCS)\">${BE_FUNCS}%</td><td class=\"metric $(get_color $BE_BRANCH)\">${BE_BRANCH}%</td></tr>" >> merged-coverage/html/index.html
-          echo "<tr><td class=\"component\">Frontend</td><td class=\"metric $(get_color $FE_LINES)\">${FE_LINES}%</td><td class=\"metric $(get_color $FE_FUNCS)\">${FE_FUNCS}%</td><td class=\"metric $(get_color $FE_BRANCH)\">${FE_BRANCH}%</td></tr>" >> merged-coverage/html/index.html
-          echo "<tr><td class=\"component\">Recommendation Engine</td><td class=\"metric $(get_color $RE_LINES)\">${RE_LINES}%</td><td class=\"metric $(get_color $RE_FUNCS)\">${RE_FUNCS}%</td><td class=\"metric $(get_color $RE_BRANCH)\">${RE_BRANCH}%</td></tr>" >> merged-coverage/html/index.html
-          echo "<tr class=\"avg-row\"><td class=\"component\">Average</td><td class=\"metric $(get_color $AVG_LINES)\">${AVG_LINES}%</td><td class=\"metric $(get_color $AVG_FUNCS)\">${AVG_FUNCS}%</td><td class=\"metric $(get_color $AVG_BRANCH)\">${AVG_BRANCH}%</td></tr>" >> merged-coverage/html/index.html
+          # Extract metrics
+          BE_LINES=$(extract_lcov_metric backend-cov/lcov.info "lines")
+          BE_FUNCS=$(extract_lcov_metric backend-cov/lcov.info "functions")
+          BE_BRANCH=$(extract_lcov_metric backend-cov/lcov.info "branches")
+          FE_LINES=$(extract_lcov_metric frontend-cov/lcov.info "lines")
+          FE_FUNCS=$(extract_lcov_metric frontend-cov/lcov.info "functions")
+          FE_BRANCH=$(extract_lcov_metric frontend-cov/lcov.info "branches")
+          RE_LINES=$(extract_lcov_metric recommendation-cov/coverage.lcov "lines")
+          RE_FUNCS=$(extract_lcov_metric recommendation-cov/coverage.lcov "functions")
+          RE_BRANCH=$(extract_lcov_metric recommendation-cov/coverage.lcov "branches")
 
-          cat >> merged-coverage/html/index.html << 'HTMLEOF'
-                </tbody>
-              </table>
-              <p class="footer">Generated by EcoPlate CI/CD Pipeline</p>
+          # Calculate averages
+          AVG_LINES=$(python3 -c "vals=[float(v) for v in '${BE_LINES},${FE_LINES},${RE_LINES}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
+          AVG_FUNCS=$(python3 -c "vals=[float(v) for v in '${BE_FUNCS},${FE_FUNCS},${RE_FUNCS}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
+          AVG_BRANCH=$(python3 -c "vals=[float(v) for v in '${BE_BRANCH},${FE_BRANCH},${RE_BRANCH}'.split(',') if v.replace('.','',1).isdigit()]; print(f'{sum(vals)/len(vals):.1f}' if vals else 'N/A')")
+
+          # File counts for each component
+          BE_FILES=$(find combined-report/backend -name "*.html" 2>/dev/null | wc -l | tr -d ' ')
+          FE_FILES=$(find combined-report/frontend -name "*.html" 2>/dev/null | wc -l | tr -d ' ')
+          RE_FILES=$(find combined-report/recommendation -name "*.html" 2>/dev/null | wc -l | tr -d ' ')
+
+          # GitHub Step Summary
+          echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Lines | Functions | Branches |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|-----------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | ${BE_LINES}% | ${BE_FUNCS}% | ${BE_BRANCH}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${FE_LINES}% | ${FE_FUNCS}% | ${FE_BRANCH}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Recommendation Engine | ${RE_LINES}% | ${RE_FUNCS}% | ${RE_BRANCH}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Average** | **${AVG_LINES}%** | **${AVG_FUNCS}%** | **${AVG_BRANCH}%** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Download **combined-coverage-report** artifact for detailed line-by-line coverage." >> $GITHUB_STEP_SUMMARY
+
+          # Generate comprehensive HTML dashboard
+          REPORT_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
+          cat > combined-report/index.html << HTMLEOF
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>EcoPlate - Combined Coverage Report</title>
+            <style>
+              :root { --bg-primary: #0f172a; --bg-secondary: #1e293b; --bg-card: #334155; --text-primary: #f1f5f9; --text-secondary: #94a3b8; --accent: #3b82f6; --good: #22c55e; --okay: #eab308; --poor: #ef4444; --border: #475569; }
+              * { box-sizing: border-box; margin: 0; padding: 0; }
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; min-height: 100vh; }
+              .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+              header { margin-bottom: 2rem; }
+              h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+              .subtitle { color: var(--text-secondary); font-size: 0.95rem; }
+              .meta { display: flex; gap: 2rem; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary); }
+              .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+              .summary-card { background: var(--bg-secondary); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); }
+              .summary-card h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 1rem; }
+              .summary-value { font-size: 2.5rem; font-weight: 700; font-family: 'SF Mono', Monaco, monospace; }
+              .summary-value.good { color: var(--good); }
+              .summary-value.okay { color: var(--okay); }
+              .summary-value.poor { color: var(--poor); }
+              .summary-label { color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem; }
+              .progress-bar { width: 100%; height: 6px; background: var(--bg-primary); border-radius: 3px; overflow: hidden; margin-top: 0.5rem; }
+              .progress-fill { height: 100%; border-radius: 3px; }
+              .progress-fill.good { background: var(--good); }
+              .progress-fill.okay { background: var(--okay); }
+              .progress-fill.poor { background: var(--poor); }
+              .quick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+              .quick-link { display: flex; align-items: center; gap: 1rem; padding: 1.25rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--text-primary); transition: all 0.2s ease; }
+              .quick-link:hover { border-color: var(--accent); transform: translateY(-2px); }
+              .quick-link-icon { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+              .quick-link-icon.backend { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+              .quick-link-icon.frontend { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
+              .quick-link-icon.recommendation { background: linear-gradient(135deg, #22c55e, #10b981); }
+              .quick-link-content h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
+              .quick-link-content p { font-size: 0.85rem; color: var(--text-secondary); }
+              .table-container { background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 2rem; }
+              .table-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+              .table-header h2 { font-size: 1.1rem; font-weight: 600; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { padding: 1rem 1.5rem; text-align: left; }
+              th { background: var(--bg-card); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; }
+              tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
+              tr:hover td { background: rgba(59, 130, 246, 0.05); }
+              .metric { font-family: 'SF Mono', Monaco, monospace; font-size: 0.9rem; }
+              .metric.good { color: var(--good); }
+              .metric.okay { color: var(--okay); }
+              .metric.poor { color: var(--poor); }
+              .avg-row { background: var(--bg-card); font-weight: 600; }
+              footer { text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 0.85rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <header>
+                <h1>EcoPlate Coverage Report</h1>
+                <p class="subtitle">Combined test coverage with detailed line-by-line analysis</p>
+                <div class="meta"><span>Generated: ${REPORT_DATE}</span></div>
+              </header>
+              <div class="summary-grid">
+                <div class="summary-card">
+                  <h3>Average Line Coverage</h3>
+                  <div class="summary-value $(get_color ${AVG_LINES})">${AVG_LINES}%</div>
+                  <p class="summary-label">Across all components</p>
+                  <div class="progress-bar"><div class="progress-fill $(get_color ${AVG_LINES})" style="width: ${AVG_LINES}%"></div></div>
+                </div>
+                <div class="summary-card">
+                  <h3>Average Function Coverage</h3>
+                  <div class="summary-value $(get_color ${AVG_FUNCS})">${AVG_FUNCS}%</div>
+                  <p class="summary-label">Functions tested</p>
+                  <div class="progress-bar"><div class="progress-fill $(get_color ${AVG_FUNCS})" style="width: ${AVG_FUNCS}%"></div></div>
+                </div>
+                <div class="summary-card">
+                  <h3>Average Branch Coverage</h3>
+                  <div class="summary-value $(get_color ${AVG_BRANCH})">${AVG_BRANCH}%</div>
+                  <p class="summary-label">Decision branches tested</p>
+                  <div class="progress-bar"><div class="progress-fill $(get_color ${AVG_BRANCH})" style="width: ${AVG_BRANCH}%"></div></div>
+                </div>
+              </div>
+              <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">Detailed Reports (Click to View Line-by-Line Coverage)</h2>
+              <div class="quick-links">
+                <a href="backend/index.html" class="quick-link">
+                  <div class="quick-link-icon backend">⚙️</div>
+                  <div class="quick-link-content"><h4>Backend Coverage</h4><p>Bun API server • ${BE_LINES}% lines • ${BE_FILES} files</p></div>
+                </a>
+                <a href="frontend/index.html" class="quick-link">
+                  <div class="quick-link-icon frontend">🖥️</div>
+                  <div class="quick-link-content"><h4>Frontend Coverage</h4><p>React + Capacitor • ${FE_LINES}% lines • ${FE_FILES} files</p></div>
+                </a>
+                <a href="recommendation/index.html" class="quick-link">
+                  <div class="quick-link-icon recommendation">🤖</div>
+                  <div class="quick-link-content"><h4>Recommendation Engine</h4><p>Python Flask ML API • ${RE_LINES}% lines • ${RE_FILES} files</p></div>
+                </a>
+              </div>
+              <div class="table-container">
+                <div class="table-header"><h2>Coverage by Component</h2></div>
+                <table>
+                  <thead><tr><th>Component</th><th>Lines</th><th>Functions</th><th>Branches</th><th>Detailed Report</th></tr></thead>
+                  <tbody>
+                    <tr><td>Backend (Bun)</td><td class="metric $(get_color ${BE_LINES})">${BE_LINES}%</td><td class="metric $(get_color ${BE_FUNCS})">${BE_FUNCS}%</td><td class="metric $(get_color ${BE_BRANCH})">${BE_BRANCH}%</td><td><a href="backend/index.html" style="color: var(--accent);">View Details →</a></td></tr>
+                    <tr><td>Frontend (React)</td><td class="metric $(get_color ${FE_LINES})">${FE_LINES}%</td><td class="metric $(get_color ${FE_FUNCS})">${FE_FUNCS}%</td><td class="metric $(get_color ${FE_BRANCH})">${FE_BRANCH}%</td><td><a href="frontend/index.html" style="color: var(--accent);">View Details →</a></td></tr>
+                    <tr><td>Recommendation Engine (Python)</td><td class="metric $(get_color ${RE_LINES})">${RE_LINES}%</td><td class="metric $(get_color ${RE_FUNCS})">${RE_FUNCS}%</td><td class="metric $(get_color ${RE_BRANCH})">${RE_BRANCH}%</td><td><a href="recommendation/index.html" style="color: var(--accent);">View Details →</a></td></tr>
+                    <tr class="avg-row"><td>Average</td><td class="metric">${AVG_LINES}%</td><td class="metric">${AVG_FUNCS}%</td><td class="metric">${AVG_BRANCH}%</td><td></td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <footer>
+                <p>Generated by EcoPlate CI/CD Pipeline</p>
+                <p style="margin-top: 0.5rem;">Thresholds: <span style="color: var(--good);">≥70% Good</span> • <span style="color: var(--okay);">≥50% Okay</span> • <span style="color: var(--poor);">&lt;50% Needs Work</span></p>
+              </footer>
             </div>
           </body>
           </html>
           HTMLEOF
 
       - name: Annotate PR with coverage
-        if: github.event_name == 'pull_request' && hashFiles('merged-coverage/lcov.info') != ''
+        if: github.event_name == 'pull_request' && hashFiles('combined-report/lcov.info') != ''
         uses: zgosalvez/github-actions-report-lcov@v4
         with:
-          coverage-files: merged-coverage/lcov.info
+          coverage-files: combined-report/lcov.info
           minimum-coverage: 60
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload merged coverage report
+      - name: Upload combined coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: combined-coverage-report
-          path: merged-coverage/html/
+          path: combined-report/
           retention-days: 14
 
   build-check:
@@ -1309,6 +1385,8 @@ jobs:
           path: |
             security-report.html
             security-summary.md
+            security-baseline.json
+            reports/
           retention-days: 90
 
       - name: Upload baseline for future comparisons
