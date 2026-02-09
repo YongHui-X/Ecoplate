@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Test artifacts
+screenshots/
+reports/
+
+# OS files
+.DS_Store
+Thumbs.db

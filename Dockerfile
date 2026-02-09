@@ -16,7 +16,7 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/bun.lockb* ./
 
 # Install frontend dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy frontend source
 COPY frontend/ .
@@ -35,7 +35,7 @@ WORKDIR /app/ecolocker
 COPY ecolocker/package.json ecolocker/bun.lockb* ./
 
 # Install ecolocker dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy ecolocker source
 COPY ecolocker/ .
@@ -54,7 +54,7 @@ WORKDIR /app/backend
 COPY backend/package.json backend/bun.lockb* ./
 
 # Install backend dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy backend source
 COPY backend/ .

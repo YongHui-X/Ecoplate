@@ -14,7 +14,7 @@ import { registerNotificationRoutes } from "./routes/notifications";
 import { registerRewardsRoutes } from "./routes/rewards";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { db } from "./db/connection";
 
 // Re-export db for backwards compatibility
@@ -101,30 +101,38 @@ function addSecurityHeaders(response: Response, isApi: boolean = false): Respons
   });
 }
 
+/** Safely join a base directory with a user-supplied path, preventing directory traversal */
+function safePath(baseDir: string, userPath: string): string | null {
+  const resolved = resolve(baseDir, userPath.replace(/^\/+/, ""));
+  // Ensure the resolved path is still within the base directory
+  if (!resolved.startsWith(resolve(baseDir))) {
+    return null;
+  }
+  return resolved;
+}
+
 async function serveStatic(path: string): Promise<Response | null> {
-  const publicDir = join(import.meta.dir, "../public");
+  const publicDir = resolve(join(import.meta.dir, "../public"));
 
   // Handle uploads directory (stored in public/uploads/)
   if (path.startsWith("/uploads/")) {
-    const uploadPath = join(publicDir, path);
-    if (existsSync(uploadPath)) {
-      const file = Bun.file(uploadPath);
-      return new Response(file, {
-        headers: { "Content-Type": getMimeType(uploadPath) },
-      });
-    }
-    return null;
+    const uploadPath = safePath(publicDir, path);
+    if (!uploadPath || !existsSync(uploadPath)) return null;
+    const file = Bun.file(uploadPath);
+    return new Response(file, {
+      headers: { "Content-Type": getMimeType(uploadPath) },
+    });
   }
 
   // Handle EcoLocker SPA under /ecolocker/
   if (path.startsWith("/ecolocker")) {
-    const ecolockerDir = join(publicDir, "ecolocker");
+    const ecolockerDir = resolve(join(publicDir, "ecolocker"));
     // Strip the /ecolocker prefix to get the relative path
     const relativePath = path.replace(/^\/ecolocker\/?/, "/") || "/";
-    let filePath = join(ecolockerDir, relativePath);
+    let filePath = safePath(ecolockerDir, relativePath);
 
     // SPA fallback: serve index.html for non-file paths
-    if (relativePath === "/" || !existsSync(filePath)) {
+    if (!filePath || relativePath === "/" || !existsSync(filePath)) {
       filePath = join(ecolockerDir, "index.html");
     }
 
@@ -138,10 +146,10 @@ async function serveStatic(path: string): Promise<Response | null> {
     });
   }
 
-  let filePath = join(publicDir, path);
+  let filePath = safePath(publicDir, path);
 
   // Default to index.html for root or non-existent files (SPA routing)
-  if (path === "/" || !existsSync(filePath)) {
+  if (!filePath || path === "/" || !existsSync(filePath)) {
     filePath = join(publicDir, "index.html");
   }
 

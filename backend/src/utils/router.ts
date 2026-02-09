@@ -25,10 +25,18 @@ export class Router {
 
   private addRoute(method: string, path: string, handler: RouteHandler) {
     const paramNames: string[] = [];
-    const patternStr = path.replace(/:([^/]+)/g, (_, name) => {
-      paramNames.push(name);
-      return "([^/]+)";
-    });
+    // Split path into segments, escape literal parts, then reassemble with capture groups
+    const segments = path.split(/(:[^/]+)/);
+    const patternStr = segments
+      .map((seg) => {
+        if (seg.startsWith(":")) {
+          paramNames.push(seg.slice(1));
+          return "([^/]+)";
+        }
+        // Escape regex metacharacters in literal path segments to prevent ReDoS
+        return seg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      })
+      .join("");
     const pattern = new RegExp(`^${patternStr}$`);
     this.routes.push({ method, pattern, paramNames, handler });
   }

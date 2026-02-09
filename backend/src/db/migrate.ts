@@ -56,6 +56,16 @@ async function migrate() {
 
           sqlite.exec(finalStatement);
         } catch (error: any) {
+          // Skip "already exists" errors for idempotent re-runs
+          if (error.message?.includes('already exists')) {
+            console.log(`  Skipped (already exists): ${statement.substring(0, 60).split('\n')[0]}...`);
+            continue;
+          }
+          // Skip "duplicate column" errors from ALTER TABLE re-runs
+          if (error.message?.includes('duplicate column')) {
+            console.log(`  Skipped (column already exists): ${statement.substring(0, 60).split('\n')[0]}...`);
+            continue;
+          }
           console.error(`Error executing statement: ${statement.substring(0, 100)}...`);
           throw error;
         }
