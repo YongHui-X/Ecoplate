@@ -185,7 +185,7 @@ jobs:
 
           if [ -n "$LCOV_ARGS" ]; then
             lcov $LCOV_ARGS -o merged-coverage/lcov.info
-            genhtml merged-coverage/lcov.info -o merged-coverage/html --title "EcoPlate Combined Coverage"
+            genhtml merged-coverage/lcov.info -o merged-coverage/html --title "EcoPlate Combined Coverage" --ignore-errors source
           else
             mkdir -p merged-coverage/html
             echo "<html><body><h1>No coverage data available</h1></body></html>" > merged-coverage/html/index.html
@@ -197,7 +197,13 @@ jobs:
           extract_lcov_metric() {
             local file="$1" metric="$2"
             if [ -f "$file" ]; then
-              lcov --summary "$file" 2>&1 | grep "$metric" | awk '{print $2}' | tr -d '%'
+              local result
+              result=$(lcov --summary "$file" 2>&1 | grep "$metric" | awk '{print $2}' | tr -d '%')
+              if [ -z "$result" ] || echo "$result" | grep -qi "no data"; then
+                echo "N/A"
+              else
+                echo "$result"
+              fi
             else
               echo "0"
             fi
@@ -222,9 +228,9 @@ jobs:
           RE_FUNCS=$(extract_lcov_metric recommendation-cov/coverage.lcov "functions")
           RE_BRANCH=$(extract_lcov_metric recommendation-cov/coverage.lcov "branches")
 
-          AVG_LINES=$(python3 -c "vals=[float('${BE_LINES}'),float('${FE_LINES}'),float('${RE_LINES}')]; print(f'{sum(vals)/len(vals):.1f}')")
-          AVG_FUNCS=$(python3 -c "vals=[float('${BE_FUNCS}'),float('${FE_FUNCS}'),float('${RE_FUNCS}')]; print(f'{sum(vals)/len(vals):.1f}')")
-          AVG_BRANCH=$(python3 -c "vals=[float('${BE_BRANCH}'),float('${FE_BRANCH}'),float('${RE_BRANCH}')]; print(f'{sum(vals)/len(vals):.1f}')")
+          AVG_LINES=$(python3 -c "vals=[v for v in ['${BE_LINES}','${FE_LINES}','${RE_LINES}'] if v != 'N/A']; print(f'{sum(float(v) for v in vals)/len(vals):.1f}' if vals else 'N/A')")
+          AVG_FUNCS=$(python3 -c "vals=[v for v in ['${BE_FUNCS}','${FE_FUNCS}','${RE_FUNCS}'] if v != 'N/A']; print(f'{sum(float(v) for v in vals)/len(vals):.1f}' if vals else 'N/A')")
+          AVG_BRANCH=$(python3 -c "vals=[v for v in ['${BE_BRANCH}','${FE_BRANCH}','${RE_BRANCH}'] if v != 'N/A']; print(f'{sum(float(v) for v in vals)/len(vals):.1f}' if vals else 'N/A')")
 
           echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
