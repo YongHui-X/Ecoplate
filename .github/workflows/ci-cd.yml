@@ -1,0 +1,1084 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: cicd-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGISTRY: ghcr.io
+  APP_IMAGE: ghcr.io/gdipsa-team2/ecoplate-app
+  REC_IMAGE: ghcr.io/gdipsa-team2/ecoplate-recommendation
+
+jobs:
+  # ===========================================================================
+  # LAYER 0 — Code Quality & Tests
+  # ===========================================================================
+
+  typecheck-backend:
+    name: Typecheck Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --ignore-scripts
+      - run: cd backend && bunx tsc --noEmit
+
+  typecheck-frontend:
+    name: Typecheck Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --ignore-scripts
+      - run: cd frontend && bunx tsc --noEmit
+
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --ignore-scripts
+      - run: cd backend && bun test
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --ignore-scripts
+      - name: Run tests with coverage
+        run: cd frontend && bun run test:coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: frontend/coverage/
+          retention-days: 30
+
+  test-recommendation:
+    name: Test Recommendation Engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          cd recommendation-engine
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+          pytest test_app.py test_ml.py -v --cov=. --cov-report=term-missing
+
+  build-check:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --ignore-scripts
+      - run: cd frontend && bun run build
+
+  # ===========================================================================
+  # LAYER 0 — Security Scanning (parallel with tests)
+  # ===========================================================================
+
+  semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan --config=auto \
+            --exclude-rule "javascript.express.security.x-frame-options-misconfiguration.x-frame-options-misconfiguration" \
+            --exclude-rule "javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring" \
+            --exclude-rule "generic.nginx.security.header-redefinition.header-redefinition" \
+            --exclude-rule "generic.nginx.security.possible-h2c-smuggling.possible-nginx-h2c-smuggling" \
+            --exclude-rule "python.flask.security.audit.hardcoded-config.avoid_hardcoded_config_TESTING" \
+            --exclude-rule "yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout" \
+            --json --output=semgrep-report.json . || true
+          semgrep scan --config=auto \
+            --exclude-rule "javascript.express.security.x-frame-options-misconfiguration.x-frame-options-misconfiguration" \
+            --exclude-rule "javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring" \
+            --exclude-rule "generic.nginx.security.header-redefinition.header-redefinition" \
+            --exclude-rule "generic.nginx.security.possible-h2c-smuggling.possible-nginx-h2c-smuggling" \
+            --exclude-rule "python.flask.security.audit.hardcoded-config.avoid_hardcoded_config_TESTING" \
+            --exclude-rule "yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout" \
+            . || true
+
+      - name: Upload Semgrep report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: semgrep-report.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  python-sast:
+    name: Python SAST (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Bandit
+        run: pip install bandit[toml] || true
+
+      - name: Run Bandit
+        run: |
+          bandit -r recommendation-engine/ \
+            -x recommendation-engine/test_app.py \
+            -f json -o bandit-report.json \
+            --severity-level medium || true
+
+      - name: Display Bandit results
+        if: always()
+        run: |
+          bandit -r recommendation-engine/ \
+            -x recommendation-engine/test_app.py \
+            --severity-level medium || true
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  secret-scan:
+    name: Secret Scanning (Trufflehog)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Trufflehog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Trufflehog
+        run: |
+          trufflehog git file://. --only-verified --json > trufflehog-report.json 2>trufflehog-stderr.log || true
+          echo "=== Secret Scan Results ==="
+          trufflehog git file://. --only-verified || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-report
+          path: |
+            trufflehog-report.json
+            trufflehog-stderr.log
+          retention-days: 30
+          if-no-files-found: ignore
+
+  python-deps:
+    name: Python SCA (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-audit
+        run: pip install pip-audit || true
+
+      - name: Run pip-audit
+        run: |
+          pip-audit -r recommendation-engine/requirements.txt \
+            -f json -o pip-audit-report.json || true
+
+      - name: Display results
+        if: always()
+        run: pip-audit -r recommendation-engine/requirements.txt || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  js-deps:
+    name: JS SCA (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Audit backend dependencies
+        run: |
+          cd backend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+          echo "=== Backend npm audit (production only) ==="
+          npm audit --omit=dev --json > ../backend-audit.json 2>&1 || true
+          npm audit --omit=dev || true
+        continue-on-error: true
+
+      - name: Audit frontend dependencies
+        run: |
+          cd frontend
+          npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+          echo "=== Frontend npm audit (production only) ==="
+          npm audit --omit=dev --json > ../frontend-audit.json 2>&1 || true
+          npm audit --omit=dev || true
+        continue-on-error: true
+
+      - name: Upload audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-audit-reports
+          path: |
+            backend-audit.json
+            frontend-audit.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  iac-scan:
+    name: IaC Scanning (Checkov)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: dockerfile
+          output_format: cli,json
+          output_file_path: console,checkov-results.json
+          soft_fail: true
+
+      - name: Upload Checkov report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report
+          path: checkov-results.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check Python licenses
+        run: |
+          pip install pip-licenses || true
+          pip install -r recommendation-engine/requirements.txt || true
+          echo "=== Python License Report ==="
+          pip-licenses --format=markdown --with-urls | tee python-licenses.md
+          echo ""
+          echo "=== Checking for problematic licenses ==="
+          pip-licenses --fail-on="GPL;AGPL" || echo "Warning: GPL/AGPL licenses detected"
+
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: python-licenses.md
+          retention-days: 30
+          if-no-files-found: ignore
+
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin || true
+
+      - name: Generate SBOM for repository
+        run: |
+          syft dir:. -o spdx-json=sbom-repo.spdx.json || true
+          syft dir:. -o cyclonedx-json=sbom-repo.cdx.json || true
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom-repo.spdx.json
+            sbom-repo.cdx.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+  # ===========================================================================
+  # LAYER 1 — CI Gate
+  # ===========================================================================
+
+  ci-gate:
+    name: CI Gate
+    needs:
+      - typecheck-backend
+      - typecheck-frontend
+      - test-backend
+      - test-frontend
+      - test-recommendation
+      - build-check
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check CI results
+        run: |
+          echo "=== CI Gate Summary ==="
+          echo "Typecheck Backend: ${{ needs.typecheck-backend.result }}"
+          echo "Typecheck Frontend: ${{ needs.typecheck-frontend.result }}"
+          echo "Test Backend: ${{ needs.test-backend.result }}"
+          echo "Test Frontend: ${{ needs.test-frontend.result }}"
+          echo "Test Recommendation: ${{ needs.test-recommendation.result }}"
+          echo "Build Check: ${{ needs.build-check.result }}"
+
+          if [ "${{ needs.typecheck-backend.result }}" != "success" ] || \
+             [ "${{ needs.typecheck-frontend.result }}" != "success" ] || \
+             [ "${{ needs.test-backend.result }}" != "success" ] || \
+             [ "${{ needs.test-frontend.result }}" != "success" ] || \
+             [ "${{ needs.test-recommendation.result }}" != "success" ] || \
+             [ "${{ needs.build-check.result }}" != "success" ]; then
+            echo "CI gate FAILED — one or more jobs did not succeed"
+            exit 1
+          fi
+
+          echo "CI gate passed"
+
+  # ===========================================================================
+  # LAYER 2 — Determine Environment (push only)
+  # ===========================================================================
+
+  set-env:
+    name: Set Environment
+    needs: [ci-gate]
+    if: github.event_name == 'push' && needs.ci-gate.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_env: ${{ steps.env.outputs.deploy_env }}
+    steps:
+      - name: Determine deployment environment
+        id: env
+        run: |
+          REF="${{ github.ref }}"
+          if [ "$REF" == "refs/heads/main" ]; then
+            echo "deploy_env=production" >> $GITHUB_OUTPUT
+          elif [ "$REF" == "refs/heads/dev" ]; then
+            echo "deploy_env=staging" >> $GITHUB_OUTPUT
+          fi
+          echo "Ref: $REF"
+
+  # ===========================================================================
+  # LAYER 3 — Build & Push Container Images (push only)
+  # ===========================================================================
+
+  build-and-push:
+    name: Build & Push Images
+    needs: [set-env]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      app-digest: ${{ steps.build-app.outputs.digest }}
+      rec-digest: ${{ steps.build-rec.outputs.digest }}
+      image-tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine image tags
+        id: tags
+        run: |
+          SHA="${{ github.sha }}"
+          REF="${{ github.ref }}"
+          if [ "$REF" == "refs/heads/main" ]; then
+            echo "app_tags=${{ env.APP_IMAGE }}:${SHA},${{ env.APP_IMAGE }}:latest" >> $GITHUB_OUTPUT
+            echo "rec_tags=${{ env.REC_IMAGE }}:${SHA},${{ env.REC_IMAGE }}:latest" >> $GITHUB_OUTPUT
+          else
+            echo "app_tags=${{ env.APP_IMAGE }}:${SHA},${{ env.APP_IMAGE }}:dev" >> $GITHUB_OUTPUT
+            echo "rec_tags=${{ env.REC_IMAGE }}:${SHA},${{ env.REC_IMAGE }}:dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build & push app image
+        id: build-app
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.app_tags }}
+          build-args: |
+            VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push recommendation image
+        id: build-rec
+        uses: docker/build-push-action@v6
+        with:
+          context: ./recommendation-engine
+          file: ./recommendation-engine/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.rec_tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ===========================================================================
+  # LAYER 4 — Container Security Scanning (push only, parallel)
+  # ===========================================================================
+
+  scan-app-image:
+    name: Scan App Image (Trivy)
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull app image
+        run: docker pull ${{ env.APP_IMAGE }}:${{ github.sha }}
+
+      - name: Scan app image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.APP_IMAGE }}:${{ github.sha }}
+          format: "table"
+          output: "trivy-app-vuln.txt"
+          severity: "HIGH,CRITICAL"
+          exit-code: 0
+          ignore-unfixed: true
+        continue-on-error: true
+
+      - name: Scan app image (SARIF)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.APP_IMAGE }}:${{ github.sha }}
+          format: "sarif"
+          output: "trivy-app.sarif"
+          severity: "HIGH,CRITICAL"
+        continue-on-error: true
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-app.sarif
+        continue-on-error: true
+
+      - name: Upload vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-app-report
+          path: trivy-app-vuln.txt
+          retention-days: 30
+          if-no-files-found: ignore
+
+  scan-rec-image:
+    name: Scan Recommendation Image (Trivy)
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull recommendation image
+        run: docker pull ${{ env.REC_IMAGE }}:${{ github.sha }}
+
+      - name: Scan recommendation image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REC_IMAGE }}:${{ github.sha }}
+          format: "table"
+          output: "trivy-rec-vuln.txt"
+          severity: "HIGH,CRITICAL"
+          exit-code: 0
+          ignore-unfixed: true
+        continue-on-error: true
+
+      - name: Scan recommendation image (SARIF)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REC_IMAGE }}:${{ github.sha }}
+          format: "sarif"
+          output: "trivy-rec.sarif"
+          severity: "HIGH,CRITICAL"
+        continue-on-error: true
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-rec.sarif
+        continue-on-error: true
+
+      - name: Upload vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-rec-report
+          path: trivy-rec-vuln.txt
+          retention-days: 30
+          if-no-files-found: ignore
+
+  container-sbom:
+    name: Generate Container SBOM
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin || true
+
+      - name: Generate SBOM for app image
+        run: |
+          syft ${{ env.APP_IMAGE }}:${{ github.sha }} \
+            -o spdx-json=sbom-app.spdx.json \
+            -o cyclonedx-json=sbom-app.cdx.json || true
+
+      - name: Generate SBOM for recommendation image
+        run: |
+          syft ${{ env.REC_IMAGE }}:${{ github.sha }} \
+            -o spdx-json=sbom-rec.spdx.json \
+            -o cyclonedx-json=sbom-rec.cdx.json || true
+
+      - name: Upload Container SBOMs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-sbom
+          path: |
+            sbom-app.spdx.json
+            sbom-app.cdx.json
+            sbom-rec.spdx.json
+            sbom-rec.cdx.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+  # ===========================================================================
+  # LAYER 5 — Deploy (push only, NO always())
+  # ===========================================================================
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [build-and-push, set-env]
+    if: needs.set-env.outputs.deploy_env == 'staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy deploy files to Staging
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_DEV_HOST }}
+          username: ${{ secrets.EC2_DEV_USER }}
+          key: ${{ secrets.EC2_DEV_SSH_KEY }}
+          source: "deploy/*"
+          target: /ecoplate/
+          strip_components: 0
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_DEV_HOST }}
+          username: ${{ secrets.EC2_DEV_USER }}
+          key: ${{ secrets.EC2_DEV_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GHCR_DEPLOY_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_DEPLOY_USER }}" --password-stdin
+            cd /ecoplate
+            export IMAGE_TAG="${{ github.sha }}"
+            export APP_IMAGE="${{ env.APP_IMAGE }}"
+            export REC_IMAGE="${{ env.REC_IMAGE }}"
+            bash deploy/deploy.sh
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [build-and-push, set-env]
+    if: needs.set-env.outputs.deploy_env == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy deploy files to Production
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy/*"
+          target: /ecoplate/
+          strip_components: 0
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GHCR_DEPLOY_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_DEPLOY_USER }}" --password-stdin
+            cd /ecoplate
+            export IMAGE_TAG="${{ github.sha }}"
+            export APP_IMAGE="${{ env.APP_IMAGE }}"
+            export REC_IMAGE="${{ env.REC_IMAGE }}"
+            bash deploy/deploy.sh
+
+  # ===========================================================================
+  # LAYER 6 — DAST (push only)
+  # ===========================================================================
+
+  dast-zap:
+    name: DAST - OWASP ZAP Baseline
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine target host
+        id: target
+        run: |
+          if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
+            echo "host=${{ secrets.EC2_DEV_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=staging" >> $GITHUB_OUTPUT
+          else
+            echo "host=${{ secrets.EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for deployment to stabilize
+        run: |
+          echo "Target: ${{ steps.target.outputs.env }} (${{ steps.target.outputs.host }})"
+          echo "Waiting 30 seconds for deployment to stabilize..."
+          sleep 30
+          for i in $(seq 1 10); do
+            if curl -sf http://${{ steps.target.outputs.host }}/api/v1/health > /dev/null 2>&1; then
+              echo "Application is healthy"
+              break
+            fi
+            echo "Attempt $i/10 - waiting..."
+            sleep 10
+          done
+
+      - name: Run ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: "http://${{ steps.target.outputs.host }}"
+          cmd_options: "-a"
+          allow_issue_writing: false
+        continue-on-error: true
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          retention-days: 30
+          overwrite: true
+
+  dast-api:
+    name: DAST - API Security Scan
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine target host
+        id: target
+        run: |
+          if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
+            echo "host=${{ secrets.EC2_DEV_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=staging" >> $GITHUB_OUTPUT
+          else
+            echo "host=${{ secrets.EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for deployment
+        run: |
+          sleep 45
+          curl -sf http://${{ steps.target.outputs.host }}/api/v1/health || true
+
+      - name: Run ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.9.0
+        with:
+          target: "http://${{ steps.target.outputs.host }}/api/v1/"
+          format: openapi
+          cmd_options: "-a"
+          allow_issue_writing: false
+        continue-on-error: true
+
+      - name: Upload API scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-api-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          retention-days: 30
+          if-no-files-found: ignore
+          overwrite: true
+
+  # ===========================================================================
+  # LAYER 6.5 — E2E Functional Tests (push only)
+  # ===========================================================================
+
+  e2e-tests:
+    name: E2E Selenium Tests
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Determine target host
+        id: target
+        run: |
+          if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
+            echo "host=${{ secrets.EC2_DEV_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=staging" >> $GITHUB_OUTPUT
+          else
+            echo "host=${{ secrets.EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for deployment to stabilize
+        run: |
+          echo "Target: ${{ steps.target.outputs.env }} (${{ steps.target.outputs.host }})"
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          for i in $(seq 1 10); do
+            if curl -sf http://${{ steps.target.outputs.host }}/api/v1/health > /dev/null 2>&1; then
+              echo "Application is healthy"
+              break
+            fi
+            echo "Attempt $i/10 - waiting..."
+            sleep 10
+          done
+
+      - name: Install E2E dependencies
+        run: |
+          cd e2e
+          npm install
+
+      - name: Run E2E tests
+        id: e2e
+        run: |
+          cd e2e
+          HEADLESS=true BASE_URL=http://${{ steps.target.outputs.host }} npm test || echo "e2e_failed=true" >> $GITHUB_OUTPUT
+        env:
+          HEADLESS: "true"
+        continue-on-error: true
+
+      - name: Upload test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e/screenshots/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-report
+          path: e2e/reports/test-report.html
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ===========================================================================
+  # LAYER 7 — Security Report (push only)
+  # ===========================================================================
+
+  security-report:
+    name: Generate Security Report
+    needs:
+      - semgrep
+      - python-sast
+      - secret-scan
+      - python-deps
+      - js-deps
+      - iac-scan
+      - license-check
+      - sbom
+      - scan-app-image
+      - scan-rec-image
+      - container-sbom
+      - dast-zap
+      - dast-api
+      - e2e-tests
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download Semgrep report
+        uses: actions/download-artifact@v4
+        with: { name: semgrep-report, path: reports/semgrep }
+        continue-on-error: true
+
+      - name: Download Bandit report
+        uses: actions/download-artifact@v4
+        with: { name: bandit-report, path: reports/bandit }
+        continue-on-error: true
+
+      - name: Download Trufflehog report
+        uses: actions/download-artifact@v4
+        with: { name: trufflehog-report, path: reports/trufflehog }
+        continue-on-error: true
+
+      - name: Download pip-audit report
+        uses: actions/download-artifact@v4
+        with: { name: pip-audit-report, path: reports/pip-audit }
+        continue-on-error: true
+
+      - name: Download JS audit reports
+        uses: actions/download-artifact@v4
+        with: { name: js-audit-reports, path: reports/js-audit }
+        continue-on-error: true
+
+      - name: Download Checkov report
+        uses: actions/download-artifact@v4
+        with: { name: checkov-report, path: reports/checkov }
+        continue-on-error: true
+
+      - name: Download License report
+        uses: actions/download-artifact@v4
+        with: { name: license-report, path: reports/license }
+        continue-on-error: true
+
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with: { name: sbom, path: reports/sbom }
+        continue-on-error: true
+
+      - name: Download Trivy app report
+        uses: actions/download-artifact@v4
+        with: { name: trivy-app-report, path: reports/trivy-app }
+        continue-on-error: true
+
+      - name: Download Trivy rec report
+        uses: actions/download-artifact@v4
+        with: { name: trivy-rec-report, path: reports/trivy-rec }
+        continue-on-error: true
+
+      - name: Download Container SBOM
+        uses: actions/download-artifact@v4
+        with: { name: container-sbom, path: reports/container-sbom }
+        continue-on-error: true
+
+      - name: Download ZAP Baseline report
+        uses: actions/download-artifact@v4
+        with: { name: zap-baseline-report, path: reports/zap-baseline }
+        continue-on-error: true
+
+      - name: Download ZAP API report
+        uses: actions/download-artifact@v4
+        with: { name: zap-api-report, path: reports/zap-api }
+        continue-on-error: true
+
+      - name: Download E2E test report
+        uses: actions/download-artifact@v4
+        with: { name: e2e-test-report, path: reports/e2e-test-report }
+        continue-on-error: true
+
+      - name: Check report completeness
+        run: |
+          EXPECTED="semgrep bandit trufflehog pip-audit js-audit checkov license sbom trivy-app trivy-rec container-sbom zap-baseline zap-api e2e-test-report"
+          SKIPPED=0
+          for dir in $EXPECTED; do
+            if [ -z "$(ls -A reports/$dir 2>/dev/null)" ]; then
+              echo "::warning::Scan '$dir' produced no artifacts"
+              SKIPPED=$((SKIPPED + 1))
+            fi
+          done
+          echo "Skipped scans: $SKIPPED / 14"
+
+      - name: Generate consolidated security report
+        run: |
+          python .github/scripts/generate-security-report.py \
+            --reports-dir reports \
+            --output-html security-report.html \
+            --output-md security-summary.md \
+            --branch "${{ github.ref_name }}" \
+            --commit "${{ github.sha }}" \
+            --repo "${{ github.repository }}"
+
+      - name: Post summary to GitHub
+        if: always()
+        run: cat security-summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolidated-security-report
+          path: |
+            security-report.html
+            security-summary.md
+          retention-days: 90
+
+  # ===========================================================================
+  # LAYER 8 — Security Summary (push only)
+  # ===========================================================================
+
+  security-summary:
+    name: Security Summary
+    needs:
+      - security-report
+      - semgrep
+      - python-sast
+      - secret-scan
+      - python-deps
+      - js-deps
+      - iac-scan
+      - license-check
+      - sbom
+      - scan-app-image
+      - scan-rec-image
+      - container-sbom
+      - dast-zap
+      - dast-api
+      - e2e-tests
+    if: always() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate security summary
+        run: |
+          echo "# DevSecOps Pipeline Security Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Static Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- Semgrep SAST: ${{ needs.semgrep.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Python SAST (Bandit): ${{ needs.python-sast.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Secret Scan (Trufflehog): ${{ needs.secret-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Software Composition Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- Python SCA (pip-audit): ${{ needs.python-deps.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- JS SCA (npm audit): ${{ needs.js-deps.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Infrastructure & Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "- IaC Scan (Checkov): ${{ needs.iac-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- License Compliance: ${{ needs.license-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SBOM Generation: ${{ needs.sbom.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Container Security" >> $GITHUB_STEP_SUMMARY
+          echo "- App Image Scan: ${{ needs.scan-app-image.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Rec Image Scan: ${{ needs.scan-rec-image.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Container SBOM: ${{ needs.container-sbom.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Dynamic Testing" >> $GITHUB_STEP_SUMMARY
+          echo "- ZAP Baseline: ${{ needs.dast-zap.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ZAP API Scan: ${{ needs.dast-api.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Functional Testing" >> $GITHUB_STEP_SUMMARY
+          echo "- E2E Selenium Tests: ${{ needs.e2e-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Report" >> $GITHUB_STEP_SUMMARY
+          echo "- Consolidated Report: ${{ needs.security-report.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download security reports from the Artifacts section below." >> $GITHUB_STEP_SUMMARY

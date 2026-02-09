@@ -1,12 +1,13 @@
 name: Security Report
 
 on:
-  workflow_run:
-    workflows: ["CD"]
-    types: [completed]
-    branches: [main, dev]
-
   workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to download artifacts from"
+        required: false
+        default: "main"
+        type: string
 
 permissions:
   contents: read
@@ -16,161 +17,171 @@ jobs:
   generate-report:
     name: Generate Consolidated Security Report
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion != 'cancelled'
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+          ref: ${{ inputs.branch }}
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Resolve branch and commit
-        id: meta
-        run: |
-          echo "branch=${{ github.event.workflow_run.head_branch || github.ref_name }}" >> $GITHUB_OUTPUT
-          echo "commit=${{ github.event.workflow_run.head_sha || github.sha }}" >> $GITHUB_OUTPUT
+      # ---- Download CI/CD Artifacts ----
+      - name: Download Semgrep report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: semgrep-report
+          path: reports/semgrep
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-      # ---- Generate scan data from latest pipeline results ----
-      - name: Prepare scan reports
-        run: |
-          python3 << 'PYEOF'
-          import json, os
+      - name: Download Bandit report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: bandit-report
+          path: reports/bandit
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          base = "reports"
+      - name: Download Trufflehog report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: trufflehog-report
+          path: reports/trufflehog
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── Semgrep: 13 MEDIUM + 1 LOW ──
-          os.makedirs(f"{base}/semgrep", exist_ok=True)
-          findings = [
-            ("yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout", ".github/workflows/cd.yml", 71, "WARNING"),
-            ("yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout", ".github/workflows/cd.yml", 315, "WARNING"),
-            ("yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout", ".github/workflows/cd.yml", 354, "WARNING"),
-            ("yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout", ".github/workflows/security-report.yml", 23, "WARNING"),
-            ("javascript.express.security.x-frame-options-misconfiguration.x-frame-options-misconfiguration", "backend/src/index.ts", 77, "WARNING"),
-            ("javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal", "backend/src/index.ts", 109, "WARNING"),
-            ("javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal", "backend/src/index.ts", 141, "WARNING"),
-            ("javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring", "backend/src/services/locker-service.ts", 356, "INFO"),
-            ("javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp", "backend/src/utils/router.ts", 32, "WARNING"),
-            ("generic.nginx.security.header-redefinition.header-redefinition", "deploy/nginx.conf", 49, "WARNING"),
-            ("generic.nginx.security.header-redefinition.header-redefinition", "deploy/nginx.conf", 50, "WARNING"),
-            ("generic.nginx.security.possible-h2c-smuggling.possible-nginx-h2c-smuggling", "deploy/nginx.conf", 93, "WARNING"),
-            ("python.flask.security.audit.app-run-param-config.avoid_app_run_with_bad_host", "recommendation-engine/app.py", 552, "WARNING"),
-            ("python.flask.security.audit.hardcoded-config.avoid_hardcoded_config_TESTING", "recommendation-engine/test_app.py", 30, "WARNING"),
-          ]
-          results = []
-          msgs = {
-            "workflow-run-target-code-checkout": "This GitHub Actions workflow file uses `workflow_run` and checks out code from the incoming pull request. When using `workflow_run`, the Action runs in the context of the target repository, which includes access to all repository secrets.",
-            "x-frame-options-misconfiguration": "By letting user input control `X-Frame-Options` header, there is a risk that software does not properly verify whether or not a browser should be allowed to render a page in an `iframe`.",
-            "path-join-resolve-traversal": "Detected possible user input going into a `path.join` or `path.resolve` function. This could possibly lead to a path traversal vulnerability.",
-            "unsafe-formatstring": "Detected string concatenation with a non-literal variable in a util.format / console.log function.",
-            "detect-non-literal-regexp": "RegExp() called with a `path` function argument, this might allow an attacker to cause a Regular Expression Denial-of-Service (ReDoS).",
-            "header-redefinition": "The 'add_header' directive is called in a 'location' block after headers have been set at the server block.",
-            "possible-nginx-h2c-smuggling": "Conditions for Nginx H2C smuggling identified. H2C smuggling allows upgrading HTTP/1.1 connections to lesser-known HTTP/2 over cleartext (h2c) connections.",
-            "avoid_app_run_with_bad_host": "Running flask app with host 0.0.0.0 could expose the server publicly.",
-            "avoid_hardcoded_config_TESTING": "Hardcoded variable `TESTING` detected. Use environment variables or config files instead",
-          }
-          for cid, path, line, sev in findings:
-            short = cid.split(".")[-1]
-            results.append({"check_id": cid, "path": path, "start": {"line": line, "col": 1}, "end": {"line": line, "col": 50}, "extra": {"severity": sev, "message": msgs.get(short, "")}})
-          with open(f"{base}/semgrep/semgrep-report.json", "w") as f:
-            json.dump({"version": "1.150.0", "results": results, "errors": []}, f)
+      - name: Download pip-audit report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: pip-audit-report
+          path: reports/pip-audit
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── Bandit: PASS ──
-          os.makedirs(f"{base}/bandit", exist_ok=True)
-          with open(f"{base}/bandit/bandit-report.json", "w") as f:
-            json.dump({"results": []}, f)
+      - name: Download JS audit reports
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: js-audit-reports
+          path: reports/js-audit
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── Trufflehog: PASS ──
-          os.makedirs(f"{base}/trufflehog", exist_ok=True)
-          with open(f"{base}/trufflehog/trufflehog-report.json", "w") as f:
-            f.write("")
+      - name: Download Checkov report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: checkov-report
+          path: reports/checkov
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── npm audit: 1 MEDIUM (esbuild in backend) ──
-          os.makedirs(f"{base}/js-audit", exist_ok=True)
-          with open(f"{base}/js-audit/backend-audit.json", "w") as f:
-            json.dump({"auditReportVersion": 2, "vulnerabilities": {"esbuild": {"name": "esbuild", "severity": "moderate", "isDirect": True, "via": [{"severity": "moderate"}], "effects": []}}}, f)
-          with open(f"{base}/js-audit/frontend-audit.json", "w") as f:
-            json.dump({"auditReportVersion": 2, "vulnerabilities": {}}, f)
+      - name: Download License report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: license-report
+          path: reports/license
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── Checkov: 1 MEDIUM ──
-          os.makedirs(f"{base}/checkov", exist_ok=True)
-          with open(f"{base}/checkov/checkov-results.json", "w") as f:
-            json.dump([{"results": {"passed_checks": [{}]*252, "failed_checks": [{"check_id": "CKV_DOCKER_3", "check_name": "Ensure that a user for the container has been created", "file_path": "/deploy/Dockerfile.nginx", "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/docker-policies/docker-policy-index/ensure-that-a-user-for-the-container-has-been-created"}]}, "summary": {"passed": 252, "failed": 1}}], f)
+      - name: Download SBOM
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: sbom
+          path: reports/sbom
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── License: PASS ──
-          os.makedirs(f"{base}/license", exist_ok=True)
-          with open(f"{base}/license/python-licenses.md", "w") as f:
-            f.write("| Name | Version | License |\n|------|---------|----------|\n| Flask | 3.1.0 | BSD License |\n| requests | 2.32.3 | Apache Software License |\n| numpy | 2.2.3 | BSD License |\n")
+      - name: Download Trivy app report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: trivy-app-report
+          path: reports/trivy-app
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── SBOM: PASS ──
-          os.makedirs(f"{base}/sbom", exist_ok=True)
-          with open(f"{base}/sbom/sbom-repo.cdx.json", "w") as f:
-            json.dump({"bomFormat": "CycloneDX", "components": [{"name": f"pkg-{i}"} for i in range(180)]}, f)
+      - name: Download Trivy rec report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: trivy-rec-report
+          path: reports/trivy-rec
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── Trivy App & Rec: PASS ──
-          os.makedirs(f"{base}/trivy-app", exist_ok=True)
-          with open(f"{base}/trivy-app/trivy-app-vuln.txt", "w") as f:
-            f.write("ghcr.io/gdipsa-team2/ecoplate-app (alpine 3.20.6)\nTotal: 0 (HIGH: 0, CRITICAL: 0)\n")
-          os.makedirs(f"{base}/trivy-rec", exist_ok=True)
-          with open(f"{base}/trivy-rec/trivy-rec-vuln.txt", "w") as f:
-            f.write("ghcr.io/gdipsa-team2/ecoplate-rec (python 3.11-slim)\nTotal: 0 (HIGH: 0, CRITICAL: 0)\n")
+      - name: Download Container SBOM
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: container-sbom
+          path: reports/container-sbom
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── Container SBOM: PASS ──
-          os.makedirs(f"{base}/container-sbom", exist_ok=True)
-          with open(f"{base}/container-sbom/sbom-app.cdx.json", "w") as f:
-            json.dump({"bomFormat": "CycloneDX", "components": [{"name": f"c-{i}"} for i in range(95)]}, f)
-          with open(f"{base}/container-sbom/sbom-rec.cdx.json", "w") as f:
-            json.dump({"bomFormat": "CycloneDX", "components": [{"name": f"r-{i}"} for i in range(60)]}, f)
+      - name: Download ZAP Baseline report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: zap-baseline-report
+          path: reports/zap-baseline
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
-          # ── ZAP Baseline: 2 MEDIUM + 2 LOW (suppressed alerts included) ──
-          os.makedirs(f"{base}/zap-baseline", exist_ok=True)
-          with open(f"{base}/zap-baseline/report_json.json", "w") as f:
-            json.dump({"site": [{"alerts": [
-              {"alert": "CSP: script-src unsafe-inline", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "<p>Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks.</p>"},
-              {"alert": "CSP: style-src unsafe-inline", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "<p>Content Security Policy (CSP) is an added layer of security that helps to detect and mitigate certain types of attacks.</p>"},
-              {"alert": "Insufficient Site Isolation Against Spectre Vulnerability", "riskcode": "1", "riskdesc": "Low (Medium)", "desc": "<p>Cross-Origin-Embedder-Policy header is a response header that prevents a document from loading any cross-origin resources.</p>"},
-              {"alert": "Private IP Disclosure", "riskcode": "1", "riskdesc": "Low (Medium)", "desc": "<p>A private IP (such as 10.x.x.x, 172.x.x.x, 192.168.x.x) or an Amazon EC2 private hostname was found.</p>"},
-              {"alert": "Sec-Fetch-Dest Header is Missing", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "suppressed"},
-              {"alert": "Sec-Fetch-Mode Header is Missing", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "suppressed"},
-              {"alert": "Sec-Fetch-Site Header is Missing", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "suppressed"},
-              {"alert": "Sec-Fetch-User Header is Missing", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "suppressed"},
-              {"alert": "Modern Web Application", "riskcode": "0", "riskdesc": "Informational (Medium)", "desc": "suppressed"},
-              {"alert": "Base64 Disclosure", "riskcode": "0", "riskdesc": "Informational (Medium)", "desc": "<p>Base64 encoded data was disclosed.</p>"},
-              {"alert": "Information Disclosure - Suspicious Comments", "riskcode": "0", "riskdesc": "Informational (Low)", "desc": "<p>The response appears to contain suspicious comments.</p>"},
-              {"alert": "Storable and Cacheable Content", "riskcode": "0", "riskdesc": "Informational (Medium)", "desc": "<p>The response contents are storable by caching components.</p>"},
-            ]}]}, f)
-
-          # ── ZAP API: 1 LOW (suppressed alerts included) ──
-          os.makedirs(f"{base}/zap-api", exist_ok=True)
-          with open(f"{base}/zap-api/report_json.json", "w") as f:
-            json.dump({"site": [{"alerts": [
-              {"alert": "Unexpected Content-Type was returned", "riskcode": "1", "riskdesc": "Low (Medium)", "desc": "<p>A Content-Type of text/html was returned by the server.</p>"},
-              {"alert": "Sec-Fetch-Dest Header is Missing", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "suppressed"},
-              {"alert": "Sec-Fetch-Mode Header is Missing", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "suppressed"},
-              {"alert": "Sec-Fetch-Site Header is Missing", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "suppressed"},
-              {"alert": "Sec-Fetch-User Header is Missing", "riskcode": "2", "riskdesc": "Medium (High)", "desc": "suppressed"},
-              {"alert": "A Client Error response code was returned by the server", "riskcode": "0", "riskdesc": "Informational (Medium)", "desc": "<p>A response code of 404 was returned.</p>"},
-              {"alert": "Storable and Cacheable Content", "riskcode": "0", "riskdesc": "Informational (Medium)", "desc": "<p>The response contents are storable.</p>"},
-            ]}]}, f)
-
-          print("Scan reports prepared successfully")
-          PYEOF
-
-      - name: List reports
-        run: find reports/ -type f
+      - name: Download ZAP API report
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: ci-cd.yml
+          branch: ${{ inputs.branch }}
+          name: zap-api-report
+          path: reports/zap-api
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
 
       # ---- Generate Report ----
+      - name: List downloaded reports
+        run: find reports/ -type f 2>/dev/null || echo "No reports found"
+
       - name: Generate consolidated security report
         run: |
           python .github/scripts/generate-security-report.py \
             --reports-dir reports \
             --output-html security-report.html \
             --output-md security-summary.md \
-            --branch "${{ steps.meta.outputs.branch }}" \
-            --commit "${{ steps.meta.outputs.commit }}" \
+            --branch "${{ inputs.branch }}" \
+            --commit "${{ github.sha }}" \
             --repo "${{ github.repository }}"
 
       - name: Post summary to GitHub

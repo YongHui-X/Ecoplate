@@ -1,0 +1,26 @@
+{
+  "name": "ecoplate-e2e",
+  "version": "1.0.0",
+  "description": "End-to-end tests for EcoPlate using Selenium WebDriver",
+  "scripts": {
+    "test": "jest --runInBand",
+    "test:headed": "HEADLESS=false jest --runInBand",
+    "test:auth": "jest --runInBand specs/auth",
+    "test:myfridge": "jest --runInBand specs/myfridge",
+    "test:marketplace": "jest --runInBand specs/marketplace",
+    "test:gamification": "jest --runInBand specs/gamification",
+    "test:messages": "jest --runInBand specs/messages",
+    "test:account": "jest --runInBand specs/account"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.0",
+    "@types/selenium-webdriver": "^4.1.22",
+    "chromedriver": "^131.0.0",
+    "jest": "^29.7.0",
+    "jest-html-reporter": "^3.10.2",
+    "selenium-webdriver": "^4.18.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -289,6 +289,57 @@ def parse_sbom(reports_dir):
     return ScanResult("Syft (Source)", "SBOM", "pass", summary_text=f"{count} components catalogued")
 
 
+def parse_e2e_results(reports_dir):
+    """Parse E2E test results from Jest HTML reporter output."""
+    fp = os.path.join(reports_dir, "e2e-test-report", "test-report.html")
+    if not os.path.exists(fp):
+        return ScanResult("E2E Tests", "Functional", "skipped", summary_text="Report not available")
+
+    text = safe_read_text(fp)
+    if not text:
+        return ScanResult("E2E Tests", "Functional", "error", error_message="Failed to read report")
+
+    findings = []
+
+    # Parse test results from HTML
+    # Look for test summary patterns
+    passed_match = re.search(r'(\d+)\s*(?:tests?\s+)?passed', text, re.IGNORECASE)
+    failed_match = re.search(r'(\d+)\s*(?:tests?\s+)?failed', text, re.IGNORECASE)
+
+    passed = int(passed_match.group(1)) if passed_match else 0
+    failed = int(failed_match.group(1)) if failed_match else 0
+
+    # Extract failed test names if available
+    # Look for common patterns in Jest HTML reporter
+    failed_tests = re.findall(r'class="failed"[^>]*>([^<]+)<', text)
+    if not failed_tests:
+        failed_tests = re.findall(r'data-testname="([^"]+)"[^>]*class="[^"]*failed', text)
+
+    for test_name in failed_tests[:20]:  # Limit to 20 failures
+        findings.append(Finding(
+            title=test_name.strip(),
+            severity="high",
+            description="E2E test failed",
+            location="e2e/specs/"
+        ))
+
+    # If we detected failures but couldn't extract names
+    if failed > 0 and not findings:
+        for i in range(min(failed, 10)):
+            findings.append(Finding(
+                title=f"E2E Test Failure #{i+1}",
+                severity="high",
+                description="E2E test failed - see HTML report for details",
+                location="e2e/specs/"
+            ))
+
+    total = passed + failed
+    summary = f"{passed} passed, {failed} failed" if total > 0 else "No test results found"
+    status = "pass" if failed == 0 and passed > 0 else ("fail" if failed > 0 else "skipped")
+
+    return ScanResult("E2E Tests", "Functional", status, findings, summary)
+
+
 def parse_trivy(reports_dir, subdir, label):
     fp = os.path.join(reports_dir, subdir, f"trivy-{'app' if 'app' in subdir else 'rec'}-vuln.txt")
     if not os.path.exists(fp):
@@ -387,6 +438,7 @@ def collect_all(reports_dir):
         parse_container_sbom(reports_dir),
         parse_zap(reports_dir, "zap-baseline", "Baseline"),
         parse_zap(reports_dir, "zap-api", "API Scan"),
+        parse_e2e_results(reports_dir),
     ]
 
 
