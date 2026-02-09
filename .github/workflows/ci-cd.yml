@@ -864,10 +864,18 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Setup Chrome
-        uses: browser-actions/setup-chrome@v1
+      - name: Setup Firefox
+        uses: browser-actions/setup-firefox@v1
         with:
-          chrome-version: stable
+          firefox-version: latest
+
+      - name: Setup GeckoDriver
+        uses: browser-actions/setup-geckodriver@latest
+
+      - name: Verify browser versions
+        run: |
+          firefox --version
+          geckodriver --version
 
       - name: Determine target host
         id: target
@@ -904,7 +912,7 @@ jobs:
         id: e2e
         run: |
           cd e2e
-          HEADLESS=true BASE_URL=http://${{ steps.target.outputs.host }} npm test 2>&1 | tee test-output.log
+          npm test 2>&1 | tee test-output.log
           TEST_EXIT_CODE=${PIPESTATUS[0]}
           if [ $TEST_EXIT_CODE -ne 0 ]; then
             echo "e2e_failed=true" >> $GITHUB_OUTPUT
@@ -912,6 +920,8 @@ jobs:
           exit 0
         env:
           HEADLESS: "true"
+          BROWSER: "firefox"
+          BASE_URL: http://${{ steps.target.outputs.host }}
         continue-on-error: true
 
       - name: Generate fallback report if missing

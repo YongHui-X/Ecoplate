@@ -8,7 +8,7 @@ export const config = {
 
   // Browser configuration
   browser: {
-    name: 'chrome',
+    name: process.env.BROWSER || 'firefox',  // Firefox is more stable in CI
     headless: process.env.HEADLESS !== 'false', // Default to headless
     windowSize: {
       width: 1280,
