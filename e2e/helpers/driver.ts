@@ -7,7 +7,7 @@ import * as path from 'path';
 export async function createDriver(): Promise<WebDriver> {
   const options = new chrome.Options();
 
-  if (config.headless) {
+  if (config.browser.headless) {
     options.addArguments('--headless=new');
   }
 
@@ -24,9 +24,9 @@ export async function createDriver(): Promise<WebDriver> {
     .build();
 
   await driver.manage().setTimeouts({
-    implicit: config.timeout.implicit,
-    pageLoad: config.timeout.pageLoad,
-    script: config.timeout.script,
+    implicit: config.timeouts.implicit,
+    pageLoad: config.timeouts.pageLoad,
+    script: config.timeouts.script,
   });
 
   return driver;
