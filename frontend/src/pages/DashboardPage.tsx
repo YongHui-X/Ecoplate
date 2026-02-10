@@ -483,7 +483,7 @@ export default function DashboardPage() {
               <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
                 CO&#8322; by Category
               </h3>
-              <div className="h-48 sm:h-64">
+              <div className="h-56 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -491,15 +491,15 @@ export default function DashboardPage() {
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
-                      cy="50%"
-                      outerRadius="60%"
+                      cy="42%"
+                      outerRadius="65%"
                       label={({ percent }) =>
-                        (percent ?? 0) > 0.05
+                        (percent ?? 0) > 0.01
                           ? `${((percent ?? 0) * 100).toFixed(0)}%`
                           : ""
                       }
                       labelLine={false}
-                      fontSize={10}
+                      fontSize={11}
                     >
                       {co2Data.co2ByCategory.map((_, i) => (
                         <Cell
@@ -512,11 +512,11 @@ export default function DashboardPage() {
                       formatter={(value) => [`${value} kg`, "CO\u2082"]}
                     />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
-                      iconSize={8}
-                      wrapperStyle={{ fontSize: 10, paddingLeft: 10 }}
+                      layout="horizontal"
+                      align="center"
+                      verticalAlign="bottom"
+                      iconSize={10}
+                      wrapperStyle={{ fontSize: 11, paddingTop: 5 }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -917,7 +917,7 @@ export default function DashboardPage() {
               <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
                 Food by Category
               </h3>
-              <div className="h-48 sm:h-64">
+              <div className="h-56 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -925,15 +925,15 @@ export default function DashboardPage() {
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
-                      cy="50%"
-                      outerRadius="60%"
+                      cy="42%"
+                      outerRadius="65%"
                       label={({ percent }) =>
-                        (percent ?? 0) > 0.05
+                        (percent ?? 0) > 0.01
                           ? `${((percent ?? 0) * 100).toFixed(0)}%`
                           : ""
                       }
                       labelLine={false}
-                      fontSize={10}
+                      fontSize={11}
                     >
                       {foodData.foodByCategory.map((_, i) => (
                         <Cell
@@ -946,11 +946,11 @@ export default function DashboardPage() {
                       formatter={(value) => [`${value} kg`, "Quantity"]}
                     />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
-                      iconSize={8}
-                      wrapperStyle={{ fontSize: 10, paddingLeft: 10 }}
+                      layout="horizontal"
+                      align="center"
+                      verticalAlign="bottom"
+                      iconSize={10}
+                      wrapperStyle={{ fontSize: 11, paddingTop: 5 }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
