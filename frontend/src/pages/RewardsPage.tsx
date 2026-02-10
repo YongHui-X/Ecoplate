@@ -144,7 +144,7 @@ export default function RewardsPage() {
       </div>
 
       {/* Balance Card */}
-      <Card className="p-6 mb-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+      <div className="p-6 mb-6 rounded-2xl shadow-sm text-white" style={{ background: 'linear-gradient(to right, #22c55e, #059669)' }}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm opacity-90">Your Balance</p>
@@ -156,7 +156,7 @@ export default function RewardsPage() {
           </div>
           <Gift className="h-16 w-16 opacity-50" />
         </div>
-      </Card>
+      </div>
 
       {/* Filter Tabs */}
       <div className="flex gap-2 mb-6">
