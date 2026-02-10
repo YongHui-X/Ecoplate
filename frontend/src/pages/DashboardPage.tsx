@@ -715,44 +715,34 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Price Comparison + Discount Distribution */}
+        {/* Sales Speed + Discount Distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-                Price Comparison
+                Sales Speed
               </h3>
-              <div className="h-56 sm:h-72 -ml-2 sm:ml-0">
+              <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={financialData.priceComparison}
-                    margin={{ top: 5, right: 5, bottom: 50, left: 0 }}
+                    data={financialData.salesSpeed}
+                    margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-muted"
                     />
                     <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 8, textAnchor: "end" }}
-                      tickMargin={5}
-                      interval={0}
-                      angle={-45}
-                      height={60}
+                      dataKey="range"
+                      tick={{ fontSize: 10 }}
+                      tickMargin={8}
                     />
-                    <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={35} />
+                    <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={25} />
                     <Tooltip contentStyle={{ fontSize: 12 }} />
-                    <Legend wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
                     <Bar
-                      dataKey="originalPrice"
-                      fill="#94a3b8"
-                      name="Original"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="sellingPrice"
-                      fill="#22c55e"
-                      name="Sold For"
+                      dataKey="count"
+                      fill="#f59e0b"
+                      name="Listings"
                       radius={[4, 4, 0, 0]}
                     />
                   </BarChart>
@@ -796,33 +786,43 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Sales Speed */}
+        {/* Price Comparison */}
         <Card className="overflow-hidden">
           <CardContent className="p-3 sm:p-4 lg:p-6">
             <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              Sales Speed
+              Price Comparison
             </h3>
-            <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
+            <div className="h-56 sm:h-72 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={financialData.salesSpeed}
-                  margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
+                  data={financialData.priceComparison}
+                  margin={{ top: 5, right: 5, bottom: 50, left: 0 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
                     className="stroke-muted"
                   />
                   <XAxis
-                    dataKey="range"
-                    tick={{ fontSize: 10 }}
-                    tickMargin={8}
+                    dataKey="name"
+                    tick={{ fontSize: 8, textAnchor: "end" }}
+                    tickMargin={5}
+                    interval={0}
+                    angle={-45}
+                    height={60}
                   />
-                  <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={25} />
+                  <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={35} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 10, paddingTop: 10 }} />
                   <Bar
-                    dataKey="count"
-                    fill="#f59e0b"
-                    name="Listings"
+                    dataKey="originalPrice"
+                    fill="#94a3b8"
+                    name="Original"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="sellingPrice"
+                    fill="#22c55e"
+                    name="Sold For"
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
