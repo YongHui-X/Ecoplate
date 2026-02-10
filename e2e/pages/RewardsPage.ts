@@ -7,13 +7,13 @@ export class RewardsPage extends BasePage {
   private myRedemptionsButton = By.xpath("//button[contains(text(), 'My Redemptions')]");
 
   // Balance card
-  private balanceCard = By.css('.bg-gradient-to-r');
-  private balanceAmount = By.xpath("//span[contains(@class, 'text-3xl')]");
+  private balanceCard = By.css('.bg-primary');
+  private balanceAmount = By.xpath("//span[contains(@class, 'text-4xl')]");
 
   // Filter tabs
   private allFilterButton = By.xpath("//button[contains(text(), 'All')]");
-  private physicalFilterButton = By.xpath("//button[contains(text(), 'Physical')]");
-  private voucherFilterButton = By.xpath("//button[contains(text(), 'Vouchers')]");
+  private apparelFilterButton = By.xpath("//button[contains(text(), 'Apparel')]");
+  private foodFilterButton = By.xpath("//button[contains(text(), 'Food & Beverage')]");
 
   // Rewards grid
   private rewardCards = By.css('.grid > div');
@@ -66,24 +66,24 @@ export class RewardsPage extends BasePage {
     await this.click(this.allFilterButton);
   }
 
-  async clickPhysicalFilter(): Promise<void> {
-    await this.click(this.physicalFilterButton);
+  async clickApparelFilter(): Promise<void> {
+    await this.click(this.apparelFilterButton);
   }
 
-  async clickVoucherFilter(): Promise<void> {
-    await this.click(this.voucherFilterButton);
+  async clickFoodFilter(): Promise<void> {
+    await this.click(this.foodFilterButton);
   }
 
   async isAllFilterVisible(): Promise<boolean> {
     return this.isVisible(this.allFilterButton);
   }
 
-  async isPhysicalFilterVisible(): Promise<boolean> {
-    return this.isVisible(this.physicalFilterButton);
+  async isApparelFilterVisible(): Promise<boolean> {
+    return this.isVisible(this.apparelFilterButton);
   }
 
-  async isVoucherFilterVisible(): Promise<boolean> {
-    return this.isVisible(this.voucherFilterButton);
+  async isFoodFilterVisible(): Promise<boolean> {
+    return this.isVisible(this.foodFilterButton);
   }
 
   // Rewards grid

@@ -43,12 +43,12 @@ describe('Rewards', () => {
 
   it('should display filter tabs', async () => {
     const allVisible = await rewardsPage.isAllFilterVisible();
-    const physicalVisible = await rewardsPage.isPhysicalFilterVisible();
-    const voucherVisible = await rewardsPage.isVoucherFilterVisible();
+    const apparelVisible = await rewardsPage.isApparelFilterVisible();
+    const foodVisible = await rewardsPage.isFoodFilterVisible();
 
     expect(allVisible).toBe(true);
-    expect(physicalVisible).toBe(true);
-    expect(voucherVisible).toBe(true);
+    expect(apparelVisible).toBe(true);
+    expect(foodVisible).toBe(true);
   });
 
   it('should show rewards or empty state', async () => {
@@ -86,8 +86,8 @@ describe('Rewards - Filter Functionality', () => {
     await rewardsPage.goto();
   });
 
-  it('should filter by physical rewards', async () => {
-    await rewardsPage.clickPhysicalFilter();
+  it('should filter by apparel rewards', async () => {
+    await rewardsPage.clickApparelFilter();
     // Allow time for filter to apply
     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -95,8 +95,8 @@ describe('Rewards - Filter Functionality', () => {
     expect(url).toContain('/rewards');
   });
 
-  it('should filter by voucher rewards', async () => {
-    await rewardsPage.clickVoucherFilter();
+  it('should filter by food rewards', async () => {
+    await rewardsPage.clickFoodFilter();
     // Allow time for filter to apply
     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -106,7 +106,7 @@ describe('Rewards - Filter Functionality', () => {
 
   it('should show all rewards when All filter clicked', async () => {
     // First filter to something else
-    await rewardsPage.clickPhysicalFilter();
+    await rewardsPage.clickApparelFilter();
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Then click All
