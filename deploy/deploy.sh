@@ -84,7 +84,8 @@ deploy() {
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
             -keyout "${ssl_dir}/key.pem" \
             -out "${ssl_dir}/cert.pem" \
-            -subj "/CN=ecoplate/O=EcoPlate/C=SG" 2>/dev/null
+            -subj "/CN=ecoplate/O=EcoPlate/C=SG" \
+            -addext "subjectAltName=IP:18.143.173.20" 2>/dev/null
         chmod 644 "${ssl_dir}/cert.pem" "${ssl_dir}/key.pem"
         log "SSL certificate generated at ${ssl_dir}/"
     else

@@ -3,7 +3,7 @@ const getApiBase = (): string => {
     (window as any).Capacitor !== undefined;
 
   if (isCapacitor) {
-    const url = import.meta.env.VITE_API_URL || 'http://10.0.2.2:3000/api/v1';
+    const url = import.meta.env.VITE_API_URL || 'https://18.143.173.20/api/v1';
     console.log('[API] Capacitor mode, using:', url);
     return url;
   }

@@ -5,7 +5,16 @@ const config: CapacitorConfig = {
   appName: 'EcoPlate',
   webDir: 'backend/public',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'https',
+    allowNavigation: ['18.143.173.20']
+  },
+  plugins: {
+    CapacitorHttp: {
+      enabled: true
+    }
+  },
+  android: {
+    allowMixedContent: true
   }
 };
 

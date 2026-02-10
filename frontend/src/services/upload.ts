@@ -8,7 +8,7 @@ import { Capacitor } from "@capacitor/core";
 // Use relative URLs on web (goes through Vite proxy), full URL on mobile
 const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
 const API_BASE_URL = isNative
-  ? (import.meta.env.VITE_API_URL || "http://10.0.2.2:3000")
+  ? (import.meta.env.VITE_API_URL || "https://18.143.173.20")
   : "";
 
 export interface UploadImageResponse {

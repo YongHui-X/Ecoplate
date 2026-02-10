@@ -27,12 +27,13 @@ const sidebarItems = [
   { to: "/badges", icon: Award, label: "Badges" },
 ];
 
-// Mobile bottom tab items (5 main tabs)
+// Mobile bottom tab items (6 main tabs)
 const mobileTabItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/myfridge", icon: Refrigerator, label: "Fridge" },
   { to: "/marketplace", icon: Store, label: "Market" },
-  { to: "/messages", icon: MessageCircle, label: "Messages" },
+  { to: "/rewards", icon: Gift, label: "Rewards" },
+  { to: "/messages", icon: MessageCircle, label: "Msgs" },
   { to: "/account", icon: User, label: "Account" },
 ];
 
@@ -198,7 +199,7 @@ export default function Layout() {
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary rounded-full" />
                   )}
                   <span className="relative">
-                    <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                    <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                     {item.to === "/messages" && unreadCount > 0 && (
                       <span className="absolute -top-1 -right-2 bg-destructive text-destructive-foreground text-[10px] font-bold h-4 min-w-[16px] flex items-center justify-center rounded-full px-1">
                         {unreadCount > 99 ? "99+" : unreadCount}
@@ -206,7 +207,7 @@ export default function Layout() {
                     )}
                   </span>
                   <span className={cn(
-                    "text-[10px] mt-1 font-medium",
+                    "text-[9px] mt-0.5 font-medium leading-tight",
                     isActive ? "text-primary" : "text-muted-foreground"
                   )}>
                     {item.label}
