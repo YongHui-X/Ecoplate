@@ -549,4 +549,4 @@ if __name__ == '__main__':
     logger.info(f"Price model available: {price_predictor.is_ml_available()}")
     logger.info(f"Recommendation model available: {product_recommender.is_ml_available()}")
     # nosec B104 - binding to 0.0.0.0 is required for Docker container networking
-    app.run(host='0.0.0.0', port=port, debug=debug)  # nosec B104
+    app.run(host='0.0.0.0', port=port, debug=debug)  # nosec B104 # nosemgrep: avoid_app_run_with_bad_host

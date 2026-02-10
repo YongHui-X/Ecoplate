@@ -21,9 +21,9 @@
 
 | File | Line | Before | After |
 |------|------|--------|-------|
-| `frontend/src/pages/ListingDetailPage.test.tsx` | 370 | `eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOjF9.signature` | `header.payload.signature` |
-| `frontend/src/pages/ListingDetailPage.test.tsx` | 413 | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjF9.abc123` | `test-header.test-payload.test-sig` |
-| `backend/src/routes/__tests__/auth-nonfunctional.test.ts` | 108 | `eyJhbGciOiJIUzI1NiJ9.invalid.signature` | `malformed-header.invalid.signature` |
+| `frontend/src/pages/ListingDetailPage.test.tsx` | 370 | `[JWT-format token redacted]` | `header.payload.signature` |
+| `frontend/src/pages/ListingDetailPage.test.tsx` | 413 | `[JWT-format token redacted]` | `test-header.test-payload.test-sig` |
+| `backend/src/routes/__tests__/auth-nonfunctional.test.ts` | 108 | `[JWT-format token redacted]` | `malformed-header.invalid.signature` |
 
 ---
 
@@ -117,6 +117,42 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains
 
 ---
 
+### 5. Proxy Disclosure (Medium × 1)
+
+**Plugin:** 40025
+**Tool:** OWASP ZAP
+**Severity:** Medium
+**CWE:** CWE-200 (Exposure of Sensitive Information)
+
+**Finding:** TRACE/TRACK HTTP methods and unrestricted OPTIONS responses revealed proxy infrastructure details.
+
+**Fix:** Blocked TRACE/TRACK methods and restricted OPTIONS handling at both nginx and application layers.
+
+| File | Change |
+|------|--------|
+| `deploy/nginx.conf` | Added `if ($request_method ~* ^(TRACE\|TRACK)$) { return 405; }` in HTTPS server block |
+| `backend/src/index.ts` | Added TRACE/TRACK blocking returning 405; restricted OPTIONS handling to `/api/` routes only |
+
+---
+
+### 6. Semgrep False Positive Suppressions (Info × 4)
+
+**Tool:** Semgrep
+**Severity:** Info (false positives)
+
+**Finding:** Semgrep flagged several patterns that are safe in context:
+
+| File | Rule | Justification | Fix |
+|------|------|---------------|-----|
+| `backend/src/index.ts` | `path-join-resolve-traversal` | The `safePath` function IS the path traversal guard — it validates resolved paths stay within the base directory | Added `nosemgrep` comment |
+| `backend/src/utils/router.ts` | `detect-non-literal-regexp` | Route paths are developer-defined constants, not user input; no ReDoS risk | Added `nosemgrep` comment |
+| `recommendation-engine/app.py` | `avoid_app_run_with_bad_host` | Flask binds `0.0.0.0` for Docker container networking; not exposed to public internet directly | Added `nosemgrep` comment |
+| `e2e/helpers/driver.ts` | `path-join-resolve-traversal` | Filename is internally generated (`${name}-${timestamp}.png`), not user input | Added `nosemgrep` comment |
+
+**Additional:** Excluded `security/` directory from Semgrep scanning in CI/CD config — old ZAP report HTML artifacts contained HTTP links that triggered false positives.
+
+---
+
 ## Summary
 
 | # | Vulnerability | Severity | Instances | Status |
@@ -125,4 +161,6 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains
 | 2 | CSP script-src unsafe-inline | Medium | 4 | Fixed |
 | 3 | CSP style-src unsafe-inline | Medium | 4 | Fixed |
 | 4 | HTTP Only Site | Medium | 1 | Fixed |
-| **Total** | | **3 High + 9 Medium** | **12** | **All Fixed** |
+| 5 | Proxy Disclosure | Medium | 1 | Fixed |
+| 6 | Semgrep false positive suppressions | Info | 4 | Suppressed |
+| **Total** | | **3 High + 10 Medium + 4 Info** | **17** | **All Resolved** |

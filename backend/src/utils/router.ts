@@ -37,7 +37,7 @@ export class Router {
         return seg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       })
       .join("");
-    const pattern = new RegExp(`^${patternStr}$`);
+    const pattern = new RegExp(`^${patternStr}$`); // nosemgrep: detect-non-literal-regexp — route paths are developer-defined, not user input
     this.routes.push({ method, pattern, paramNames, handler });
   }
 

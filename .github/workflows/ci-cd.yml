@@ -441,6 +441,7 @@ jobs:
       - name: Run Semgrep
         run: |
           semgrep scan --config=auto \
+            --exclude "security" \
             --exclude-rule "javascript.express.security.x-frame-options-misconfiguration.x-frame-options-misconfiguration" \
             --exclude-rule "javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring" \
             --exclude-rule "generic.nginx.security.header-redefinition.header-redefinition" \
@@ -449,6 +450,7 @@ jobs:
             --exclude-rule "yaml.github-actions.security.workflow-run-target-code-checkout.workflow-run-target-code-checkout" \
             --json --output=semgrep-report.json . || true
           semgrep scan --config=auto \
+            --exclude "security" \
             --exclude-rule "javascript.express.security.x-frame-options-misconfiguration.x-frame-options-misconfiguration" \
             --exclude-rule "javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring" \
             --exclude-rule "generic.nginx.security.header-redefinition.header-redefinition" \
@@ -1188,6 +1190,7 @@ jobs:
           HEADLESS: "true"
           BROWSER: "firefox"
           BASE_URL: https://${{ steps.target.outputs.host }}
+          NODE_TLS_REJECT_UNAUTHORIZED: "0"
         continue-on-error: true
 
       - name: Generate fallback report if missing

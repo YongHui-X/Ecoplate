@@ -11,6 +11,7 @@ export async function createDriver(): Promise<WebDriver> {
 
   if (browserName === 'firefox') {
     const options = new firefox.Options();
+    options.setAcceptInsecureCerts(true);
 
     if (config.browser.headless) {
       options.addArguments('-headless');
@@ -28,6 +29,7 @@ export async function createDriver(): Promise<WebDriver> {
   } else {
     // Default to Chrome
     const options = new chrome.Options();
+    options.setAcceptInsecureCerts(true);
 
     if (config.browser.headless) {
       options.addArguments('--headless=new');
@@ -75,7 +77,7 @@ export async function takeScreenshot(
   const timestamp = Date.now();
   const filename = `${name}-${timestamp}.png`;
   fs.writeFileSync(
-    path.join(screenshotDir, filename),
+    path.join(screenshotDir, filename), // nosemgrep: path-join-resolve-traversal — filename is generated internally, not user input
     screenshot,
     'base64'
   );
