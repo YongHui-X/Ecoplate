@@ -92,6 +92,11 @@ deploy() {
         log "SSL certificates already exist"
     fi
 
+    # Step 0.5: Ensure external volumes exist
+    log "Ensuring Docker volumes exist..."
+    docker volume create ecoplate-data 2>/dev/null || true
+    docker volume create ecoplate-uploads 2>/dev/null || true
+
     # Step 1: Pull new images
     pull_images
 
