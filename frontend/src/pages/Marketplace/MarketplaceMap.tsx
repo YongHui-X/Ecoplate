@@ -9,6 +9,7 @@ import { List, Map as MapIcon, Loader2, MapPin, AlertCircle } from "lucide-react
 import { useNavigate } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import type { MarketplaceListingWithDistance } from "../../types/marketplace";
+import { loadGoogleMapsScript, isGoogleMapsConfigured } from "../../utils/googleMaps";
 
 interface MarketplaceMapProps {
   listings?: MarketplaceListingWithDistance[];
@@ -18,31 +19,6 @@ interface MarketplaceMapProps {
 
 // Default center (Singapore) - only used for initial map view when no listings
 const DEFAULT_CENTER = { lat: 1.3521, lng: 103.8198 };
-
-// Load Google Maps script
-function loadGoogleMapsScript(apiKey: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.google?.maps) {
-      resolve();
-      return;
-    }
-
-    const existingScript = document.getElementById("google-maps-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve());
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Google Maps"));
-    document.head.appendChild(script);
-  });
-}
 
 export default function MarketplaceMap({
   listings = [],
@@ -85,13 +61,12 @@ export default function MarketplaceMap({
 
   // Load Google Maps
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
+    if (!isGoogleMapsConfigured()) {
       setLoadError("Google Maps API key not configured");
       return;
     }
 
-    loadGoogleMapsScript(apiKey)
+    loadGoogleMapsScript()
       .then(() => setIsLoaded(true))
       .catch((err) => setLoadError(err.message));
   }, []);

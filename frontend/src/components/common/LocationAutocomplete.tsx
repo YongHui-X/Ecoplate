@@ -3,8 +3,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { MapPin, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+import { loadGoogleMapsScript } from '../../utils/googleMaps';
 
 interface PlacePrediction {
   place_id: string;
@@ -22,31 +21,6 @@ interface LocationAutocompleteProps {
   label?: string;
   required?: boolean;
   className?: string;
-}
-
-// Load Google Maps script with Places library
-function loadGoogleMapsScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.google?.maps?.places) {
-      resolve();
-      return;
-    }
-
-    const existingScript = document.getElementById("google-maps-places-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve());
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "google-maps-places-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Google Maps"));
-    document.head.appendChild(script);
-  });
 }
 
 /**
@@ -115,7 +89,6 @@ export function LocationAutocomplete({
         {
           input: query,
           componentRestrictions: { country: 'sg' }, // Limit to Singapore
-          types: ['address', 'establishment', 'geocode'],
         },
         (predictions, status) => {
           setLoading(false);
@@ -124,6 +97,7 @@ export function LocationAutocomplete({
             setShowSuggestions(true);
           } else {
             setSuggestions([]);
+            setShowSuggestions(true); // Show "no results" message
           }
         }
       );

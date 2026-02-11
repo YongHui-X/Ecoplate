@@ -35,9 +35,9 @@ export function formatRelativeTime(dateInput: string | Date): string {
 
 /**
  * Format a date/time for message timestamps
- * Shows time for today, "Yesterday" for yesterday, or date for older
+ * Always shows date and time
  * @param dateInput - ISO date string or Date object
- * @returns Formatted time/date string
+ * @returns Formatted date and time string
  */
 export function formatMessageTime(dateInput: string | Date): string {
   const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
@@ -55,13 +55,19 @@ export function formatMessageTime(dateInput: string | Date): string {
   });
 
   if (isToday) {
-    return timeString;
+    return `Today, ${timeString}`;
   }
   if (isYesterday) {
-    return `Yesterday ${timeString}`;
+    return `Yesterday, ${timeString}`;
   }
 
-  return `${date.toLocaleDateString()} ${timeString}`;
+  // Format as "Feb 10, 10:30 AM"
+  const dateString = date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
+
+  return `${dateString}, ${timeString}`;
 }
 
 /**

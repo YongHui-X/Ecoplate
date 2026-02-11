@@ -29,12 +29,11 @@ const sidebarItems = [
   { to: "/badges", icon: Award, label: "Badges" },
 ];
 
-// Mobile bottom tab items (6 main tabs)
+// Mobile bottom tab items (5 main tabs)
 const mobileTabItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/myfridge", icon: Refrigerator, label: "Fridge" },
   { to: "/marketplace", icon: Store, label: "Market" },
-  { to: "/rewards", icon: Gift, label: "Rewards" },
   { to: "/messages", icon: MessageCircle, label: "Msgs" },
   { to: "/account", icon: User, label: "Account" },
 ];

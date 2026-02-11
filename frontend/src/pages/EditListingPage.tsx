@@ -11,6 +11,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
 import { PRODUCT_UNITS } from "../constants/units";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
+import { LocationPreviewMap } from "../components/common/LocationPreviewMap";
 import { ImagePicker } from "../components/common/ImagePicker";
 
 export default function EditListingPage() {
@@ -313,6 +314,8 @@ export default function EditListingPage() {
               label="Pickup Location"
               placeholder="Search for address, postal code, or landmark in Singapore"
             />
+
+            <LocationPreviewMap coordinates={coordinates} />
 
             {/* Product Images */}
             <div className="space-y-2">

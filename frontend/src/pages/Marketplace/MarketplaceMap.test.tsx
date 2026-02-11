@@ -12,7 +12,7 @@ describe('MarketplaceMap', () => {
     import.meta.env.VITE_GOOGLE_MAPS_API_KEY = 'test-api-key';
 
     // Pre-set window.google so loadGoogleMapsScript resolves immediately
-    (window as any).google = { maps: {} };
+    (window as any).google = { maps: { places: {} } };
 
     const module = await import('./MarketplaceMap');
     MarketplaceMap = module.default;
@@ -79,6 +79,7 @@ describe('MarketplaceMap', () => {
 
     (window as any).google = {
       maps: {
+        places: {},
         Map: vi.fn(function () {
           return {
             panTo: vi.fn(),

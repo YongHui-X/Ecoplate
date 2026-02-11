@@ -9,6 +9,7 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { ArrowLeft, ImagePlus, X, Leaf, Sparkles, TrendingDown } from "lucide-react";
 import { LocationAutocomplete } from "../components/common/LocationAutocomplete";
+import { LocationPreviewMap } from "../components/common/LocationPreviewMap";
 import { calculateCo2Preview } from "../components/common/Co2Badge";
 import { PRODUCT_UNITS } from "../constants/units";
 
@@ -443,6 +444,8 @@ export default function CreateListingPage() {
               label="Pickup Location"
               placeholder="Search for address, postal code, or landmark in Singapore"
             />
+
+            <LocationPreviewMap coordinates={coordinates} />
 
             <div className="space-y-2">
               <Label htmlFor="pickupInstructions">Pickup Instructions</Label>
