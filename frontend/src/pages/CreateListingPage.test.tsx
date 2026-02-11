@@ -285,3 +285,281 @@ describe("CreateListingPage - MyFridge Integration Logic", () => {
     expect(selectedUnit).toBe("pcs");
   });
 });
+
+describe("CreateListingPage - Form Interactions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation(() => {
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+  });
+
+  it("should update description textarea", () => {
+    renderWithProviders(<CreateListingPage />);
+    const descInput = screen.getByLabelText("Description");
+    fireEvent.change(descInput, { target: { value: "Test description" } });
+    expect(descInput).toHaveValue("Test description");
+  });
+
+  it("should update category selection", () => {
+    renderWithProviders(<CreateListingPage />);
+    const categorySelect = screen.getByLabelText("Category");
+    fireEvent.change(categorySelect, { target: { value: "dairy" } });
+    expect(categorySelect).toHaveValue("dairy");
+  });
+
+  it("should update unit selection", () => {
+    renderWithProviders(<CreateListingPage />);
+    const unitSelect = screen.getByLabelText("Unit");
+    fireEvent.change(unitSelect, { target: { value: "kg" } });
+    expect(unitSelect).toHaveValue("kg");
+  });
+
+  it("should update quantity input", () => {
+    renderWithProviders(<CreateListingPage />);
+    const quantityInput = screen.getByLabelText("Quantity");
+    fireEvent.change(quantityInput, { target: { value: "5" } });
+    expect(quantityInput).toHaveValue(5);
+  });
+
+  it("should update expiry date input", () => {
+    renderWithProviders(<CreateListingPage />);
+    const expiryInput = screen.getByLabelText("Expiry Date");
+    fireEvent.change(expiryInput, { target: { value: "2025-12-31" } });
+    expect(expiryInput).toHaveValue("2025-12-31");
+  });
+
+  it("should update selling price input", () => {
+    renderWithProviders(<CreateListingPage />);
+    const priceInput = screen.getByLabelText("Selling Price ($)");
+    fireEvent.change(priceInput, { target: { value: "5.99" } });
+    expect(priceInput).toHaveValue(5.99);
+  });
+
+  it("should update pickup instructions", () => {
+    renderWithProviders(<CreateListingPage />);
+    const instructionsInput = screen.getByLabelText("Pickup Instructions");
+    fireEvent.change(instructionsInput, { target: { value: "Call before coming" } });
+    expect(instructionsInput).toHaveValue("Call before coming");
+  });
+});
+
+describe("CreateListingPage - Price Recommendation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/price-recommendation")) {
+        return Promise.resolve({
+          ok: true,
+          text: () =>
+            Promise.resolve(JSON.stringify({
+              recommended_price: 8.0,
+              min_price: 6.0,
+              max_price: 10.0,
+              original_price: 12.0,
+              discount_percentage: 33,
+              days_until_expiry: 5,
+              category: "produce",
+              urgency_label: "Normal",
+              reasoning: "Based on expiry date and category",
+            })),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+  });
+
+  it("should display loading state when fetching recommendation", async () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    fireEvent.change(originalPriceInput, { target: { value: "12" } });
+
+    // Initially might show loading state
+    await waitFor(() => {
+      const loadingOrRecommendation = screen.queryByText("Getting price recommendation...") ||
+                                       screen.queryByText("Suggested Price");
+      expect(loadingOrRecommendation).toBeInTheDocument();
+    }, { timeout: 2000 });
+  });
+
+  it("should display discount percentage in recommendation", async () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    fireEvent.change(originalPriceInput, { target: { value: "12" } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/33% off/)).toBeInTheDocument();
+    });
+  });
+
+  it("should display urgency label in recommendation", async () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    fireEvent.change(originalPriceInput, { target: { value: "12" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Normal")).toBeInTheDocument();
+    });
+  });
+
+  it("should display reasoning in recommendation", async () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    fireEvent.change(originalPriceInput, { target: { value: "12" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Based on expiry date and category")).toBeInTheDocument();
+    });
+  });
+
+  it("should display price range in recommendation", async () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    fireEvent.change(originalPriceInput, { target: { value: "12" } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Range: \$6\.00 - \$10\.00/)).toBeInTheDocument();
+    });
+  });
+
+  it("should have button to apply recommended price", async () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    fireEvent.change(originalPriceInput, { target: { value: "12" } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Use \$8\.00/ })).toBeInTheDocument();
+    });
+  });
+
+  it("should apply recommended price when button clicked", async () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    fireEvent.change(originalPriceInput, { target: { value: "12" } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Use \$8\.00/ })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Use \$8\.00/ }));
+
+    const sellingPriceInput = screen.getByLabelText("Selling Price ($)");
+    expect(sellingPriceInput).toHaveValue(8);
+  });
+});
+
+describe("CreateListingPage - CO2 Preview", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation(() => {
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+  });
+
+  it("should not show CO2 preview without category", () => {
+    renderWithProviders(<CreateListingPage />);
+    expect(screen.queryByText(/Estimated CO₂ Reduced/)).not.toBeInTheDocument();
+  });
+
+  it("should show CO2 preview with category and quantity", async () => {
+    renderWithProviders(<CreateListingPage />);
+
+    const categorySelect = screen.getByLabelText("Category");
+    fireEvent.change(categorySelect, { target: { value: "meat" } });
+
+    const quantityInput = screen.getByLabelText("Quantity");
+    fireEvent.change(quantityInput, { target: { value: "3" } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Estimated CO₂ Reduced/)).toBeInTheDocument();
+    });
+  });
+
+  it("should show eco message with CO2 preview", async () => {
+    renderWithProviders(<CreateListingPage />);
+
+    const categorySelect = screen.getByLabelText("Category");
+    fireEvent.change(categorySelect, { target: { value: "produce" } });
+
+    const quantityInput = screen.getByLabelText("Quantity");
+    fireEvent.change(quantityInput, { target: { value: "2" } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/helping reduce emissions from food waste/)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("CreateListingPage - Image Upload UI", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display Add button for images", () => {
+    renderWithProviders(<CreateListingPage />);
+    expect(screen.getByText("Add")).toBeInTheDocument();
+  });
+
+  it("should have hidden file input", () => {
+    renderWithProviders(<CreateListingPage />);
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toBeInTheDocument();
+    expect(fileInput).toHaveClass("hidden");
+  });
+
+  it("should accept multiple images", () => {
+    renderWithProviders(<CreateListingPage />);
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toHaveAttribute("multiple");
+  });
+
+  it("should only accept image files", () => {
+    renderWithProviders(<CreateListingPage />);
+    const fileInput = document.querySelector('input[type="file"]');
+    expect(fileInput).toHaveAttribute("accept", "image/*");
+  });
+});
+
+describe("CreateListingPage - Category Options", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have all category options", () => {
+    renderWithProviders(<CreateListingPage />);
+    const categorySelect = screen.getByLabelText("Category");
+
+    expect(categorySelect).toContainHTML("Produce");
+    expect(categorySelect).toContainHTML("Dairy");
+    expect(categorySelect).toContainHTML("Meat");
+    expect(categorySelect).toContainHTML("Bakery");
+    expect(categorySelect).toContainHTML("Frozen");
+    expect(categorySelect).toContainHTML("Beverages");
+    expect(categorySelect).toContainHTML("Pantry");
+    expect(categorySelect).toContainHTML("Other");
+  });
+
+  it("should have Select... as default option", () => {
+    renderWithProviders(<CreateListingPage />);
+    const categorySelect = screen.getByLabelText("Category");
+    expect(categorySelect).toContainHTML("Select...");
+  });
+});
+
+describe("CreateListingPage - Buttons State", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have enabled Create Listing button initially", () => {
+    renderWithProviders(<CreateListingPage />);
+    const submitButton = screen.getByRole("button", { name: "Create Listing" });
+    expect(submitButton).not.toBeDisabled();
+  });
+
+  it("should have enabled Cancel button initially", () => {
+    renderWithProviders(<CreateListingPage />);
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    expect(cancelButton).not.toBeDisabled();
+  });
+});

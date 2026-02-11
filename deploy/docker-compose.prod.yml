@@ -35,6 +35,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DATABASE_PATH=/app/data/ecoplate.db
       - RECOMMENDATION_ENGINE_URL=http://ecoplate-recommendation:5000
+      - TZ=Asia/Singapore
     volumes:
       - ecoplate-data:/app/data
     depends_on:
