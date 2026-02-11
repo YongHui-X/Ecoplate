@@ -5,6 +5,7 @@ import { Card, CardContent } from "../components/ui/card";
 import { Skeleton, SkeletonCard } from "../components/ui/skeleton";
 import {
   Leaf,
+  Trash2,
   Utensils,
   DollarSign,
   Star,
@@ -15,6 +16,7 @@ import {
   Clock,
   ShieldCheck,
   Package,
+  Info,
 } from "lucide-react";
 import {
   LineChart,
@@ -37,11 +39,13 @@ import {
 interface DashboardStats {
   summary: {
     totalCo2Reduced: number;
+    totalCo2Wasted: number;
     totalFoodSaved: number;
     totalMoneySaved: number;
   };
   co2ChartData: Array<{ date: string; value: number }>;
   foodChartData: Array<{ date: string; value: number }>;
+  wasteRatioChartData: Array<{ date: string; wasted: number; consumed: number; ratio: number }>;
   impactEquivalence: {
     carKmAvoided: number;
     treesPlanted: number;
@@ -54,6 +58,7 @@ interface CO2Data {
   co2ByCategory: Array<{ name: string; value: number }>;
   co2Trend: Array<{ date: string; value: number }>;
   topItems: Array<{ name: string; value: number }>;
+  wasteRatioChartData: Array<{ date: string; wasted: number; consumed: number; ratio: number }>;
   impactEquivalence: {
     carKmAvoided: number;
     treesPlanted: number;
@@ -215,11 +220,20 @@ export default function DashboardPage() {
     const summary = summaryData?.summary;
     const statCards = [
       {
+        label: "Total CO₂ Wasted",
+        value: `${summary?.totalCo2Wasted ?? 0} kg`,
+        icon: Trash2,
+        color: "text-red-500",
+        bg: "bg-red-500/10",
+        tooltip: "CO₂ emissions from food you wasted during consumption tracking",
+      },
+      {
         label: "Total CO₂ Reduced",
         value: `${summary?.totalCo2Reduced ?? 0} kg`,
         icon: Leaf,
         color: "text-primary",
         bg: "bg-primary/10",
+        tooltip: "CO₂ emissions prevented by selling food on the marketplace instead of wasting it",
       },
       {
         label: "Total Food Saved",
@@ -227,6 +241,7 @@ export default function DashboardPage() {
         icon: Utensils,
         color: "text-orange-500",
         bg: "bg-orange-500/10",
+        tooltip: "Total weight of food consumed, sold, or shared instead of wasted",
       },
       {
         label: "Total Money Saved",
@@ -234,24 +249,7 @@ export default function DashboardPage() {
         icon: DollarSign,
         color: "text-blue-500",
         bg: "bg-blue-500/10",
-      },
-      {
-        label:
-          activePeriod === "day"
-            ? "EcoPoints (Today)"
-            : activePeriod === "month"
-              ? "EcoPoints (Month)"
-              : "EcoPoints (Annual)",
-        value: `${
-          activePeriod === "day"
-            ? (pointsData?.stats?.pointsToday ?? 0)
-            : activePeriod === "month"
-              ? (pointsData?.stats?.pointsThisMonth ?? 0)
-              : (pointsData?.points.total ?? 0)
-        }`,
-        icon: Star,
-        color: "text-yellow-500",
-        bg: "bg-yellow-500/10",
+        tooltip: "Money earned from selling food on the marketplace",
       },
     ];
 
@@ -261,18 +259,21 @@ export default function DashboardPage() {
         value: summaryData?.impactEquivalence.carKmAvoided ?? 0,
         unit: "km",
         icon: Car,
+        tooltip: "Equivalent car kilometers not driven based on CO₂ reduced",
       },
       {
         label: "Trees planted equivalent",
         value: summaryData?.impactEquivalence.treesPlanted ?? 0,
         unit: "",
         icon: TreePine,
+        tooltip: "Number of trees needed to absorb the same amount of CO₂",
       },
       {
         label: "Electricity saved",
         value: summaryData?.impactEquivalence.electricitySaved ?? 0,
         unit: "kWh",
         icon: Zap,
+        tooltip: "Equivalent electricity not consumed based on CO₂ reduced",
       },
     ];
 
@@ -280,8 +281,16 @@ export default function DashboardPage() {
       <>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
           {statCards.map((card) => (
-            <Card key={card.label} className="card-hover">
+            <Card key={card.label} className="card-hover relative">
               <CardContent className="p-2.5 sm:p-4">
+                {card.tooltip && (
+                  <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 group">
+                    <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                    <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                      {card.tooltip}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div
                     className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl ${card.bg} flex-shrink-0`}
@@ -304,11 +313,19 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden relative">
           <CardContent className="p-3 sm:p-4 lg:p-6">
-            <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              CO&#8322; Saved Over Time
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                CO&#8322; Reduced by Selling
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  CO₂ emissions prevented over time by selling food on the marketplace
+                </div>
+              </div>
+            </div>
             <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -328,7 +345,7 @@ export default function DashboardPage() {
                     stroke="hsl(var(--primary))"
                     strokeWidth={2}
                     dot={{ r: 3 }}
-                    name="CO₂ (kg)"
+                    name="CO₂ Reduced (kg)"
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -336,11 +353,19 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden relative">
           <CardContent className="p-3 sm:p-4 lg:p-6">
-            <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              Food Saved Over Time
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                Food Saved Over Time
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  Total weight of food consumed, sold, or shared over time
+                </div>
+              </div>
+            </div>
             <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -368,17 +393,82 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden relative">
           <CardContent className="p-3 sm:p-4 lg:p-6">
-            <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              Impact Equivalence
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                CO&#8322; Wasted vs Consumed
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  Comparison of CO₂ from wasted food vs consumed food over time
+                </div>
+              </div>
+            </div>
+            <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={summaryData?.wasteRatioChartData || []}
+                  margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-muted"
+                  />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickMargin={8} />
+                  <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={35} />
+                  <Tooltip contentStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="consumed"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    name="Consumed (kg)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="wasted"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    name="Wasted (kg)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden relative">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                Impact Equivalence
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  Real-world equivalents of your CO₂ reduction impact
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-2 sm:gap-4">
               {impactItems.map((item) => (
                 <div
                   key={item.label}
-                  className="text-center p-2 sm:p-4 rounded-lg sm:rounded-xl bg-muted/50"
+                  className="text-center p-2 sm:p-4 rounded-lg sm:rounded-xl bg-muted/50 relative group/item"
                 >
+                  {item.tooltip && (
+                    <div className="absolute top-1 right-1">
+                      <Info className="h-3 w-3 text-muted-foreground/30 group-hover/item:text-muted-foreground/60" />
+                      <div className="absolute right-0 top-4 w-40 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover/item:opacity-100 group-hover/item:visible transition-all z-50 text-left">
+                        {item.tooltip}
+                      </div>
+                    </div>
+                  )}
                   <item.icon className="h-5 w-5 sm:h-8 sm:w-8 mx-auto mb-1 sm:mb-2 text-primary" />
                   <p className="text-sm sm:text-xl font-bold">
                     {item.value}
@@ -402,87 +492,90 @@ export default function DashboardPage() {
 
   const renderCO2Tab = () => {
     if (!co2Data) return null;
+
+    const co2Cards = [
+      {
+        label: "Total CO₂ Reduced",
+        value: `${co2Data.totalCo2Reduced} kg`,
+        icon: Leaf,
+        color: "text-primary",
+        bg: "bg-primary/10",
+        tooltip: "CO₂ emissions prevented by selling food on the marketplace instead of wasting it",
+      },
+      {
+        label: "Car km Avoided",
+        value: co2Data.impactEquivalence.carKmAvoided,
+        icon: Car,
+        color: "text-green-500",
+        bg: "bg-green-500/10",
+        tooltip: "Equivalent car kilometers not driven based on CO₂ reduced",
+      },
+      {
+        label: "Trees Planted Equiv.",
+        value: co2Data.impactEquivalence.treesPlanted,
+        icon: TreePine,
+        color: "text-emerald-500",
+        bg: "bg-emerald-500/10",
+        tooltip: "Number of trees needed to absorb the same amount of CO₂",
+      },
+      {
+        label: "Electricity Saved",
+        value: `${co2Data.impactEquivalence.electricitySaved} kWh`,
+        icon: Zap,
+        color: "text-yellow-500",
+        bg: "bg-yellow-500/10",
+        tooltip: "Equivalent electricity not consumed based on CO₂ reduced",
+      },
+    ];
+
     return (
       <>
         {/* Summary cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-primary/10 flex-shrink-0">
-                  <Leaf className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+          {co2Cards.map((card) => (
+            <Card key={card.label} className="card-hover relative">
+              <CardContent className="p-2.5 sm:p-4">
+                {card.tooltip && (
+                  <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 group">
+                    <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                    <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                      {card.tooltip}
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl ${card.bg} flex-shrink-0`}>
+                    <card.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${card.color}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
+                      {card.label}
+                    </p>
+                    <p className="text-base sm:text-xl font-bold truncate">
+                      {card.value}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Total CO&#8322; Reduced
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {co2Data.totalCo2Reduced} kg
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-green-500/10 flex-shrink-0">
-                  <Car className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Car km Avoided
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {co2Data.impactEquivalence.carKmAvoided}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-emerald-500/10 flex-shrink-0">
-                  <TreePine className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Trees Planted Equiv.
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {co2Data.impactEquivalence.treesPlanted}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-yellow-500/10 flex-shrink-0">
-                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Electricity Saved
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {co2Data.impactEquivalence.electricitySaved} kWh
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* CO2 by Category Pie + Trend Line */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden relative">
             <CardContent className="p-3 sm:p-4 lg:p-6">
-              <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-                CO&#8322; by Category
-              </h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-sm sm:text-base font-semibold">
+                  CO&#8322; by Category
+                </h3>
+                <div className="group relative">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                  <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    Breakdown of CO₂ emissions by food category
+                  </div>
+                </div>
+              </div>
               <div className="h-56 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -561,12 +654,62 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Top Items */}
+        {/* Waste Ratio Chart */}
         <Card className="overflow-hidden">
           <CardContent className="p-3 sm:p-4 lg:p-6">
             <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              Top Items by CO&#8322; Saved
+              CO&#8322; Wasted vs Consumed
             </h3>
+            <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={co2Data.wasteRatioChartData || []}
+                  margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-muted"
+                  />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickMargin={8} />
+                  <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={35} />
+                  <Tooltip contentStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="consumed"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    name="Consumed (kg)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="wasted"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    name="Wasted (kg)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Top Items */}
+        <Card className="overflow-hidden relative">
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                Top Items by CO&#8322; Saved
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  Food items that contributed most to CO₂ reduction
+                </div>
+              </div>
+            </div>
             <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -601,86 +744,89 @@ export default function DashboardPage() {
 
   const renderFinancialTab = () => {
     if (!financialData) return null;
+
+    const financialCards = [
+      {
+        label: "Total Earned",
+        value: `$${financialData.totalEarned}`,
+        icon: TrendingUp,
+        color: "text-green-500",
+        bg: "bg-green-500/10",
+        tooltip: "Total money earned from selling food on the marketplace",
+      },
+      {
+        label: "Saved by Buying",
+        value: `$${financialData.totalSavedByBuying}`,
+        icon: ShieldCheck,
+        color: "text-blue-500",
+        bg: "bg-blue-500/10",
+        tooltip: "Money saved by buying discounted food from the marketplace",
+      },
+      {
+        label: "Items Sold",
+        value: financialData.totalListingsSold,
+        icon: Package,
+        color: "text-orange-500",
+        bg: "bg-orange-500/10",
+        tooltip: "Total number of listings you have sold",
+      },
+      {
+        label: "Avg Time to Sell",
+        value: `${financialData.avgTimeToSell}h`,
+        icon: Clock,
+        color: "text-purple-500",
+        bg: "bg-purple-500/10",
+        tooltip: "Average time it takes for your listings to sell",
+      },
+    ];
+
     return (
       <>
         {/* Summary cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-green-500/10 flex-shrink-0">
-                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+          {financialCards.map((card) => (
+            <Card key={card.label} className="card-hover relative">
+              <CardContent className="p-2.5 sm:p-4">
+                {card.tooltip && (
+                  <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 group">
+                    <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                    <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                      {card.tooltip}
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl ${card.bg} flex-shrink-0`}>
+                    <card.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${card.color}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
+                      {card.label}
+                    </p>
+                    <p className="text-base sm:text-xl font-bold truncate">
+                      {card.value}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Total Earned
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    ${financialData.totalEarned}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-blue-500/10 flex-shrink-0">
-                  <ShieldCheck className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Saved by Buying
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    ${financialData.totalSavedByBuying}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-orange-500/10 flex-shrink-0">
-                  <Package className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Items Sold
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {financialData.totalListingsSold}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-purple-500/10 flex-shrink-0">
-                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Avg Time to Sell
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {financialData.avgTimeToSell}h
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Savings over time */}
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden relative">
           <CardContent className="p-3 sm:p-4 lg:p-6">
-            <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              Earnings Over Time
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                Earnings Over Time
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  Your marketplace earnings over time
+                </div>
+              </div>
+            </div>
             <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -717,11 +863,19 @@ export default function DashboardPage() {
 
         {/* Sales Speed + Discount Distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden relative">
             <CardContent className="p-3 sm:p-4 lg:p-6">
-              <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-                Sales Speed
-              </h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-sm sm:text-base font-semibold">
+                  Sales Speed
+                </h3>
+                <div className="group relative">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                  <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    How quickly your listings sell after being posted
+                  </div>
+                </div>
+              </div>
               <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -751,11 +905,19 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden relative">
             <CardContent className="p-3 sm:p-4 lg:p-6">
-              <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-                Discount Distribution
-              </h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-sm sm:text-base font-semibold">
+                  Discount Distribution
+                </h3>
+                <div className="group relative">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                  <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    Distribution of discount percentages on your sold listings
+                  </div>
+                </div>
+              </div>
               <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -787,11 +949,19 @@ export default function DashboardPage() {
         </div>
 
         {/* Price Comparison */}
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden relative">
           <CardContent className="p-3 sm:p-4 lg:p-6">
-            <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              Price Comparison
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                Price Comparison
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  Compare your listing prices vs original prices for sold items
+                </div>
+              </div>
+            </div>
             <div className="h-64 sm:h-80 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -836,87 +1006,92 @@ export default function DashboardPage() {
   const renderFoodTab = () => {
     if (!foodData) return null;
 
+    const foodCards = [
+      {
+        title: "Consumed",
+        value: `${foodData.totalConsumed} kg`,
+        icon: Utensils,
+        bgColor: "bg-green-500/10",
+        iconColor: "text-green-500",
+        tooltip: "Total weight of food you've consumed from your inventory",
+      },
+      {
+        title: `Wasted (${foodData.wasteRate}%)`,
+        value: `${foodData.totalWasted} kg`,
+        icon: Utensils,
+        bgColor: "bg-red-500/10",
+        iconColor: "text-red-500",
+        tooltip: "Food that expired or was thrown away without being consumed",
+      },
+      {
+        title: "Shared",
+        value: `${foodData.totalShared} kg`,
+        icon: Utensils,
+        bgColor: "bg-blue-500/10",
+        iconColor: "text-blue-500",
+        tooltip: "Food you've shared with others through donations or gifts",
+      },
+      {
+        title: "Sold",
+        value: `${foodData.totalSold} kg`,
+        icon: DollarSign,
+        bgColor: "bg-orange-500/10",
+        iconColor: "text-orange-500",
+        tooltip: "Food you've sold through the marketplace before it expired",
+      },
+    ];
+
     return (
       <>
         {/* Summary cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-green-500/10 flex-shrink-0">
-                  <Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Consumed
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {foodData.totalConsumed} kg
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-red-500/10 flex-shrink-0">
-                  <Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Wasted ({foodData.wasteRate}%)
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {foodData.totalWasted} kg
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-blue-500/10 flex-shrink-0">
-                  <Utensils className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Shared
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {foodData.totalShared} kg
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-hover">
-            <CardContent className="p-2.5 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-orange-500/10 flex-shrink-0">
-                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
-                    Sold
-                  </p>
-                  <p className="text-base sm:text-xl font-bold truncate">
-                    {foodData.totalSold} kg
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {foodCards.map((card, index) => {
+            const IconComponent = card.icon;
+            return (
+              <Card key={index} className="card-hover">
+                <CardContent className="p-2.5 sm:p-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl ${card.bgColor} flex-shrink-0`}>
+                      <IconComponent className={`h-4 w-4 sm:h-5 sm:w-5 ${card.iconColor}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1">
+                        <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate">
+                          {card.title}
+                        </p>
+                        <div className="relative group flex-shrink-0">
+                          <Info className="h-3 w-3 text-muted-foreground/50 cursor-help" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-popover border rounded shadow-lg text-xs w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                            {card.tooltip}
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-base sm:text-xl font-bold truncate">
+                        {card.value}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Food by Category Pie + Trend */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4 lg:p-6">
-              <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-                Food by Category
-              </h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-sm sm:text-base font-semibold">
+                  Food by Category
+                </h3>
+                <div className="group relative">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                  <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    Distribution of your food consumption by category
+                  </div>
+                </div>
+              </div>
               <div className="h-56 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -960,9 +1135,17 @@ export default function DashboardPage() {
 
           <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4 lg:p-6">
-              <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-                Saved vs Wasted Trend
-              </h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-sm sm:text-base font-semibold">
+                  Saved vs Wasted Trend
+                </h3>
+                <div className="group relative">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                  <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    Comparison of food saved (consumed + sold + shared) vs wasted over time
+                  </div>
+                </div>
+              </div>
               <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -1006,9 +1189,17 @@ export default function DashboardPage() {
         {/* Top Items */}
         <Card className="overflow-hidden">
           <CardContent className="p-3 sm:p-4 lg:p-6">
-            <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              Top Items by Quantity
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                Top Items by Quantity
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  Your most frequently tracked food items by weight
+                </div>
+              </div>
+            </div>
             <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart

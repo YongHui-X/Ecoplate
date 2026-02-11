@@ -2,6 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { products, productSustainabilityMetrics } from "../db/schema";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import type * as schema from "../db/schema";
+import { convertToKg } from "../utils/co2-calculator";
 
 // ==================== Emission Factors ====================
 // Source: Unified with frontend/src/utils/co2Calculator.ts (kg CO2e per kg food)
@@ -117,6 +118,7 @@ export interface IngredientInput {
   productId: number;
   productName: string;
   quantityUsed: number;
+  unit?: string | null;
   category: string;
   unitPrice: number;
   co2Emission?: number;
@@ -234,8 +236,12 @@ export function calculateWasteMetrics(
 
     const consumedQty = ingredient.quantityUsed - wastedQty;
 
-    const co2Wasted = wastedQty * ef;
-    const co2Saved = consumedQty * ef;
+    // Convert to kg for CO2 calculation (consistent with confirm-ingredients)
+    const consumedInKg = convertToKg(consumedQty, ingredient.unit);
+    const wastedInKg = convertToKg(wastedQty, ingredient.unit);
+
+    const co2Wasted = wastedInKg * ef;
+    const co2Saved = consumedInKg * ef;
     const economicWaste =
       ingredient.quantityUsed > 0
         ? (wastedQty / ingredient.quantityUsed) * ingredient.unitPrice
@@ -246,8 +252,8 @@ export function calculateWasteMetrics(
     totalCO2Saved += co2Saved;
     totalEconomicWaste += economicWaste;
     totalEconomicConsumed += economicConsumed;
-    totalWasteWeight += wastedQty;
-    totalUsedWeight += ingredient.quantityUsed;
+    totalWasteWeight += wastedInKg;
+    totalUsedWeight += consumedInKg + wastedInKg;
 
     itemBreakdown.push({
       productId: ingredient.productId,

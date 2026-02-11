@@ -587,6 +587,7 @@ Provide a brief overallObservation describing the waste level (e.g., "Minimal wa
         productId: i.productId,
         productName: i.productName,
         quantityUsed: i.quantityUsed,
+        unit: i.unit,
         category: i.category,
         unitPrice: i.unitPrice,
         co2Emission: i.co2Emission,
