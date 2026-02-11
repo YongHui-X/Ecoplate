@@ -238,7 +238,7 @@ export function registerMyFridgeRoutes(router: Router) {
       const openai = new OpenAI({ apiKey });
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4.1-nano",
+        model: "gpt-4.1-micro",
         messages: [
           {
             role: "user",
