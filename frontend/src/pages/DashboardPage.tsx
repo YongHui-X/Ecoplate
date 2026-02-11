@@ -12,10 +12,10 @@ import {
   TreePine,
   Zap,
   TrendingUp,
-  Clock,
   ShieldCheck,
   Package,
   Info,
+  Star,
 } from "lucide-react";
 import {
   LineChart,
@@ -80,6 +80,8 @@ interface FinancialData {
   }>;
   discountDistribution: Array<{ range: string; count: number }>;
   salesSpeed: Array<{ range: string; count: number }>;
+  ecoPointsBalance: number;
+  ecoPointsEarned: Array<{ date: string; points: number }>;
 }
 
 interface FoodData {
@@ -750,12 +752,12 @@ export default function DashboardPage() {
         tooltip: "Total number of listings you have sold",
       },
       {
-        label: "Avg Time to Sell",
-        value: `${financialData.avgTimeToSell}h`,
-        icon: Clock,
-        color: "text-purple-500",
-        bg: "bg-purple-500/10",
-        tooltip: "Average time it takes for your listings to sell",
+        label: "EcoPoints",
+        value: financialData.ecoPointsBalance,
+        icon: Star,
+        color: "text-yellow-500",
+        bg: "bg-yellow-500/10",
+        tooltip: "Your current EcoPoints balance",
       },
     ];
 
@@ -840,25 +842,25 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Sales Speed + Discount Distribution */}
+        {/* EcoPoints Earned + Discount Distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="overflow-hidden relative">
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <h3 className="text-sm sm:text-base font-semibold">
-                  Sales Speed
+                  EcoPoints Earned
                 </h3>
                 <div className="group relative">
                   <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
                   <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                    How quickly your listings sell after being posted
+                    Lifetime EcoPoints earned from positive actions
                   </div>
                 </div>
               </div>
               <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={financialData.salesSpeed}
+                  <LineChart
+                    data={financialData.ecoPointsEarned}
                     margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
                   >
                     <CartesianGrid
@@ -866,19 +868,24 @@ export default function DashboardPage() {
                       className="stroke-muted"
                     />
                     <XAxis
-                      dataKey="range"
+                      dataKey="date"
                       tick={{ fontSize: 10 }}
                       tickMargin={8}
                     />
-                    <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={25} />
-                    <Tooltip contentStyle={{ fontSize: 12 }} />
-                    <Bar
-                      dataKey="count"
-                      fill="#f59e0b"
-                      name="Listings"
-                      radius={[4, 4, 0, 0]}
+                    <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={35} />
+                    <Tooltip
+                      formatter={(value) => [`${value}`, "Points"]}
+                      contentStyle={{ fontSize: 12 }}
                     />
-                  </BarChart>
+                    <Line
+                      type="monotone"
+                      dataKey="points"
+                      stroke="#eab308"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      name="EcoPoints"
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>

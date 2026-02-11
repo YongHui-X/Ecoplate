@@ -467,6 +467,49 @@ export async function getFinancialStats(
       Math.round((totalHours / validSoldListings.length) * 10) / 10;
   }
 
+  // EcoPoints data
+  const userPointsRecord = db
+    .select()
+    .from(schema.userPoints)
+    .where(eq(schema.userPoints.userId, userId))
+    .get();
+
+  const ecoPointsBalance = userPointsRecord?.totalPoints ?? 0;
+
+  // Calculate earned points from sustainability metrics (only positive actions)
+  const metricsForPoints = db
+    .select()
+    .from(schema.productSustainabilityMetrics)
+    .where(
+      and(
+        eq(schema.productSustainabilityMetrics.userId, userId),
+        gte(schema.productSustainabilityMetrics.todayDate, toDateString(rangeStart))
+      )
+    )
+    .all();
+
+  const earnedPointsMap = new Map<string, number>();
+  for (const m of metricsForPoints) {
+    const type = m.type?.toLowerCase();
+    // Only count positive point actions (consumed, sold, shared)
+    if (type === "consumed" || type === "sold" || type === "shared") {
+      const co2Value = m.co2Value ?? 0;
+      let points: number;
+      if (type === "sold") {
+        points = Math.round(co2Value * 1.5);
+      } else {
+        points = Math.round(co2Value);
+      }
+      if (points <= 0) points = 1; // Minimum 1 point for positive action
+      const dateKey = formatDate(parseMetricDate(m.todayDate), period);
+      earnedPointsMap.set(dateKey, (earnedPointsMap.get(dateKey) || 0) + points);
+    }
+  }
+
+  const ecoPointsEarned = Array.from(earnedPointsMap.entries())
+    .map(([date, points]) => ({ date, points }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
   return {
     totalEarned: Math.round(totalEarned * 100) / 100,
     totalSpent: Math.round(totalSpent * 100) / 100,
@@ -478,6 +521,8 @@ export async function getFinancialStats(
     priceComparison,
     discountDistribution,
     salesSpeed,
+    ecoPointsBalance,
+    ecoPointsEarned,
   };
 }
 
