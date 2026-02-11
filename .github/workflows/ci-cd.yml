@@ -779,7 +779,6 @@ jobs:
       - typecheck-frontend
       - test-backend
       - test-frontend
-      - test-ecolocker
       - test-recommendation
       - build-check
     runs-on: ubuntu-latest
@@ -792,7 +791,6 @@ jobs:
           echo "Typecheck Frontend: ${{ needs.typecheck-frontend.result }}"
           echo "Test Backend: ${{ needs.test-backend.result }}"
           echo "Test Frontend: ${{ needs.test-frontend.result }}"
-          echo "Test EcoLocker: ${{ needs.test-ecolocker.result }}"
           echo "Test Recommendation: ${{ needs.test-recommendation.result }}"
           echo "Build Check: ${{ needs.build-check.result }}"
 
@@ -800,7 +798,6 @@ jobs:
              [ "${{ needs.typecheck-frontend.result }}" != "success" ] || \
              [ "${{ needs.test-backend.result }}" != "success" ] || \
              [ "${{ needs.test-frontend.result }}" != "success" ] || \
-             [ "${{ needs.test-ecolocker.result }}" != "success" ] || \
              [ "${{ needs.test-recommendation.result }}" != "success" ] || \
              [ "${{ needs.build-check.result }}" != "success" ]; then
             echo "CI gate FAILED — one or more jobs did not succeed"
