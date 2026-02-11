@@ -384,13 +384,22 @@ export default function ListingDetailPage() {
                   <Card className="bg-primary/10 border-primary/20">
                     <CardContent className="p-4">
                       <p className="text-sm text-primary font-medium">
-                        Reserved for a buyer. Manage reservation from the conversation.
+                        Reserved for a buyer. Coordinate the handover via messages.
                       </p>
                     </CardContent>
                   </Card>
                   <Button
+                    onClick={handleMessageSeller}
+                    disabled={actionLoading}
+                    className="w-full"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Message Buyer
+                  </Button>
+                  <Button
                     onClick={handleMarkCompleted}
                     disabled={actionLoading}
+                    variant="outline"
                     className="w-full"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />

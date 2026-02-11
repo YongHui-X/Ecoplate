@@ -357,7 +357,7 @@ export default function RewardsPage() {
                   {redemptionResult.redemptionCode}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Show this code at the pickup location
+                  Copy this code and redeem it in the merchant's app
                 </p>
               </div>
 

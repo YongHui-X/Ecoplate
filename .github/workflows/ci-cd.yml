@@ -110,6 +110,38 @@ jobs:
           path: frontend/coverage/
           retention-days: 14
 
+  test-ecolocker:
+    name: Test EcoLocker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --ignore-scripts
+      - name: Run EcoLocker tests with coverage
+        run: cd ecolocker && bun run test -- --coverage 2>&1 | tee test-output.txt
+      - name: Write test summary
+        if: always()
+        run: |
+          echo "## EcoLocker Test Results" >> $GITHUB_STEP_SUMMARY
+          # Extract Vitest summary line (format: "Tests  X passed | Y skipped")
+          SUMMARY=$(grep -E "Tests.*passed" ecolocker/test-output.txt | tail -1 | sed 's/\x1b\[[0-9;]*m//g' || echo "No results")
+          echo "✅ **$SUMMARY**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # Extract coverage summary
+          echo "### Coverage" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "^(Statements|Branches|Functions|Lines)\s*:" ecolocker/test-output.txt >> $GITHUB_STEP_SUMMARY || echo "See job logs for details"
+          echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: Upload EcoLocker coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecolocker-coverage
+          path: ecolocker/coverage/
+          retention-days: 14
+
   test-recommendation:
     name: Test Recommendation Engine
     runs-on: ubuntu-latest
@@ -791,6 +823,7 @@ jobs:
       - typecheck-frontend
       - test-backend
       - test-frontend
+      - test-ecolocker
       - test-recommendation
       - build-check
     runs-on: ubuntu-latest
@@ -803,6 +836,7 @@ jobs:
           echo "Typecheck Frontend: ${{ needs.typecheck-frontend.result }}"
           echo "Test Backend: ${{ needs.test-backend.result }}"
           echo "Test Frontend: ${{ needs.test-frontend.result }}"
+          echo "Test EcoLocker: ${{ needs.test-ecolocker.result }}"
           echo "Test Recommendation: ${{ needs.test-recommendation.result }}"
           echo "Build Check: ${{ needs.build-check.result }}"
 
@@ -810,6 +844,7 @@ jobs:
              [ "${{ needs.typecheck-frontend.result }}" != "success" ] || \
              [ "${{ needs.test-backend.result }}" != "success" ] || \
              [ "${{ needs.test-frontend.result }}" != "success" ] || \
+             [ "${{ needs.test-ecolocker.result }}" != "success" ] || \
              [ "${{ needs.test-recommendation.result }}" != "success" ] || \
              [ "${{ needs.build-check.result }}" != "success" ]; then
             echo "CI gate FAILED — one or more jobs did not succeed"
@@ -1335,6 +1370,93 @@ jobs:
           if-no-files-found: ignore
 
   # ===========================================================================
+  # LAYER 6.6 — Playwright E2E Tests (push only)
+  # ===========================================================================
+
+  e2e-playwright:
+    name: Playwright E2E Tests
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Determine target host
+        id: target
+        run: |
+          if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
+            echo "host=${{ secrets.EC2_DEV_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=staging" >> $GITHUB_OUTPUT
+          else
+            echo "host=${{ secrets.EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "env=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for deployment to stabilize
+        run: |
+          echo "Target: ${{ steps.target.outputs.env }} (${{ steps.target.outputs.host }})"
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          for i in $(seq 1 10); do
+            if curl -sfk https://${{ steps.target.outputs.host }}/api/v1/health > /dev/null 2>&1; then
+              echo "Application is healthy"
+              break
+            fi
+            echo "Attempt $i/10 - waiting..."
+            sleep 10
+          done
+
+      - name: Install Playwright dependencies
+        run: |
+          cd e2e-playwright
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: |
+          cd e2e-playwright
+          npx playwright test --project=chromium 2>&1 | tee test-output.log
+        env:
+          BASE_URL: https://${{ steps.target.outputs.host }}
+          NODE_TLS_REJECT_UNAUTHORIZED: "0"
+        continue-on-error: true
+
+      - name: Write Playwright test summary
+        if: always()
+        run: |
+          echo "## Playwright E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f e2e-playwright/test-output.log ]; then
+            PASSED=$(grep -c "✓\|passed" e2e-playwright/test-output.log 2>/dev/null || echo "0")
+            FAILED=$(grep -c "✕\|failed" e2e-playwright/test-output.log 2>/dev/null || echo "0")
+            echo "✅ **$PASSED passed, $FAILED failed**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No test output available" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e-playwright/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: e2e-playwright/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ===========================================================================
   # LAYER 7 — Security Report (push only)
   # ===========================================================================
 
@@ -1355,6 +1477,7 @@ jobs:
       - dast-zap
       - dast-api
       - e2e-tests
+      - e2e-playwright
     if: always() && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -1434,6 +1557,11 @@ jobs:
         with: { name: e2e-test-report, path: reports/e2e-test-report }
         continue-on-error: true
 
+      - name: Download Playwright report
+        uses: actions/download-artifact@v4
+        with: { name: playwright-report, path: reports/playwright-report }
+        continue-on-error: true
+
       - name: Download previous baseline for comparison
         uses: dawidd6/action-download-artifact@v3
         with:
@@ -1447,7 +1575,7 @@ jobs:
 
       - name: Check report completeness
         run: |
-          EXPECTED="semgrep bandit trufflehog pip-audit js-audit checkov license sbom trivy-app trivy-rec container-sbom zap-full zap-api e2e-test-report"
+          EXPECTED="semgrep bandit trufflehog pip-audit js-audit checkov license sbom trivy-app trivy-rec container-sbom zap-full zap-api e2e-test-report playwright-report"
           SKIPPED=0
           for dir in $EXPECTED; do
             if [ -z "$(ls -A reports/$dir 2>/dev/null)" ]; then
@@ -1455,7 +1583,7 @@ jobs:
               SKIPPED=$((SKIPPED + 1))
             fi
           done
-          echo "Skipped scans: $SKIPPED / 14"
+          echo "Skipped scans: $SKIPPED / 15"
 
       - name: Generate consolidated security report
         run: |
@@ -1523,6 +1651,7 @@ jobs:
       - dast-zap
       - dast-api
       - e2e-tests
+      - e2e-playwright
     if: always() && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -1558,6 +1687,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Functional Testing" >> $GITHUB_STEP_SUMMARY
           echo "- E2E Selenium Tests: ${{ needs.e2e-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Playwright E2E Tests: ${{ needs.e2e-playwright.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Report" >> $GITHUB_STEP_SUMMARY
           echo "- Consolidated Report: ${{ needs.security-report.result }}" >> $GITHUB_STEP_SUMMARY

@@ -4,6 +4,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import MarketplacePage from "./MarketplacePage";
 import { ToastProvider } from "../contexts/ToastContext";
+import { axe } from "../test/accessibility.setup";
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -242,5 +243,14 @@ describe("MarketplacePage - Empty State", () => {
     await waitFor(() => {
       expect(screen.getByText("Create the first listing")).toBeInTheDocument();
     });
+  });
+
+  it("should have no accessibility violations", async () => {
+    const { container } = renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(screen.getByText("No listings found")).toBeInTheDocument();
+    });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

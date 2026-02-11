@@ -39,7 +39,7 @@ interface DashboardStats {
   summary: {
     totalCo2Reduced: number;
     totalCo2Wasted: number;
-    totalFoodSaved: number;
+    totalFoodSold: number;
     totalMoneySaved: number;
   };
   co2ChartData: Array<{ date: string; value: number }>;
@@ -215,12 +215,12 @@ export default function DashboardPage() {
         tooltip: "CO₂ emissions prevented by selling food on the marketplace instead of wasting it",
       },
       {
-        label: "Total Food Saved",
-        value: `${summary?.totalFoodSaved ?? 0} kg`,
+        label: "Total Food Sold",
+        value: `${summary?.totalFoodSold ?? 0} kg`,
         icon: Utensils,
         color: "text-orange-500",
         bg: "bg-orange-500/10",
-        tooltip: "Total weight of food consumed, sold, or shared instead of wasted",
+        tooltip: "Total weight of food sold through the marketplace",
       },
       {
         label: "Total Money Saved",
@@ -995,20 +995,20 @@ export default function DashboardPage() {
         tooltip: "Total weight of food you've consumed from your inventory",
       },
       {
-        title: `Wasted (${foodData.wasteRate}%)`,
+        title: "Wasted",
         value: `${foodData.totalWasted} kg`,
-        icon: Utensils,
+        icon: Trash2,
         bgColor: "bg-red-500/10",
         iconColor: "text-red-500",
         tooltip: "Food that expired or was thrown away without being consumed",
       },
       {
-        title: "Shared",
-        value: `${foodData.totalShared} kg`,
-        icon: Utensils,
-        bgColor: "bg-blue-500/10",
-        iconColor: "text-blue-500",
-        tooltip: "Food you've shared with others through donations or gifts",
+        title: "Waste Rate",
+        value: `${foodData.wasteRate}%`,
+        icon: Trash2,
+        bgColor: "bg-yellow-500/10",
+        iconColor: "text-yellow-500",
+        tooltip: "Percentage of food wasted compared to total consumed and wasted",
       },
       {
         title: "Sold",

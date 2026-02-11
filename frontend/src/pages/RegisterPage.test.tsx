@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import RegisterPage from './RegisterPage';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ToastProvider } from '../contexts/ToastContext';
+import { axe } from '../test/accessibility.setup';
 
 // Mock navigate
 vi.mock('react-router-dom', async () => {
@@ -131,6 +132,12 @@ describe('RegisterPage', () => {
     const confirmInput = screen.getByLabelText(/confirm password/i);
     expect(passwordInput).toHaveAttribute('type', 'password');
     expect(confirmInput).toHaveAttribute('type', 'password');
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = renderRegisterPage();
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
 

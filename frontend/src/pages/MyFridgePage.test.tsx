@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import MyFridgePage from "./MyFridgePage";
 import { ToastProvider } from "../contexts/ToastContext";
+import { axe } from "../test/accessibility.setup";
 
 // Mock the api module
 vi.mock("../services/api", () => ({
@@ -161,6 +162,19 @@ describe("MyFridgePage", () => {
     await waitFor(() => {
       expect(screen.getByText("No items in your fridge yet")).toBeInTheDocument();
     });
+  });
+
+  it("should have no accessibility violations", async () => {
+    vi.mocked(api.get).mockResolvedValue([]);
+
+    const { container } = renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No items in your fridge yet")).toBeInTheDocument();
+    });
+
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 
   it("should display product cards when products exist", async () => {

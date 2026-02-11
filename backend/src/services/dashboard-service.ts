@@ -160,7 +160,8 @@ export async function getDashboardStats(
     .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const totalFoodSaved = positiveMetrics.reduce(
+  // Total food sold (only from sold items)
+  const totalFoodSold = soldMetrics.reduce(
     (sum, m) => sum + (m.quantity ?? 0),
     0
   );
@@ -205,7 +206,7 @@ export async function getDashboardStats(
     summary: {
       totalCo2Reduced: Math.round(totalCo2Reduced * 100) / 100,
       totalCo2Wasted: Math.round(totalCo2Wasted * 100) / 100,
-      totalFoodSaved: Math.round(totalFoodSaved * 100) / 100,
+      totalFoodSold: Math.round(totalFoodSold * 100) / 100,
       totalMoneySaved: Math.round(totalMoneySaved * 100) / 100,
     },
     co2ChartData,
@@ -517,10 +518,11 @@ export async function getFoodStats(userId: number, period: Period = "month") {
   const totalWasted = wasted.reduce((sum, m) => sum + (m.quantity ?? 0), 0);
   const totalShared = shared.reduce((sum, m) => sum + (m.quantity ?? 0), 0);
   const totalSold = sold.reduce((sum, m) => sum + (m.quantity ?? 0), 0);
-  const totalFood = totalConsumed + totalWasted + totalShared + totalSold;
 
+  // Waste rate = wasted / (consumed + wasted)
+  const consumedPlusWasted = totalConsumed + totalWasted;
   const wasteRate =
-    totalFood > 0 ? Math.round((totalWasted / totalFood) * 1000) / 10 : 0;
+    consumedPlusWasted > 0 ? Math.round((totalWasted / consumedPlusWasted) * 1000) / 10 : 0;
 
   const categoryMap = new Map<string, number>();
   for (const m of metrics) {

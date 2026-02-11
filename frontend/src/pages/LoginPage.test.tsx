@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import LoginPage from './LoginPage';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ToastProvider } from '../contexts/ToastContext';
+import { axe } from '../test/accessibility.setup';
 
 // Mock navigate
 const mockNavigate = vi.fn();
@@ -104,6 +105,12 @@ describe('LoginPage', () => {
     renderLoginPage();
 
     expect(screen.getByText('EcoPlate')).toBeInTheDocument();
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = renderLoginPage();
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
 

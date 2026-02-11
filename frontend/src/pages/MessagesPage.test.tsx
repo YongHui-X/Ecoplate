@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import MessagesPage from "./MessagesPage";
 import { AuthProvider } from "../contexts/AuthContext";
 import { UnreadCountProvider } from "../contexts/UnreadCountContext";
+import { axe } from "../test/accessibility.setup";
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -294,5 +295,14 @@ describe("MessagesPage - Empty State", () => {
     await waitFor(() => {
       expect(screen.getByText("Start a conversation by messaging a seller on a listing")).toBeInTheDocument();
     });
+  });
+
+  it("should have no accessibility violations", async () => {
+    const { container } = renderWithProviders(<MessagesPage />);
+    await waitFor(() => {
+      expect(screen.getByText("No conversations yet")).toBeInTheDocument();
+    });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
