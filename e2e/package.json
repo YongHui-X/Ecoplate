@@ -10,7 +10,8 @@
     "test:marketplace": "jest --runInBand specs/marketplace",
     "test:gamification": "jest --runInBand specs/gamification",
     "test:messages": "jest --runInBand specs/messages",
-    "test:account": "jest --runInBand specs/account"
+    "test:account": "jest --runInBand specs/account",
+    "test:ecolocker": "jest --runInBand specs/ecolocker"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",

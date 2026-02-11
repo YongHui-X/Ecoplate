@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import {
@@ -13,53 +13,17 @@ import {
   WifiOff,
 } from "lucide-react";
 import { lockerApi, marketplaceApi, orderApi } from "../services/locker-api";
-import { getCurrentPosition } from "../services/capacitor";
 import { useToast } from "../contexts/ToastContext";
 import { getErrorMessage, useOnlineStatus } from "../utils/network";
+import { useGoogleMap } from "../hooks/useGoogleMap";
+import { useUserLocation } from "../hooks/useUserLocation";
+import { useLockerMarkers } from "../hooks/useLockerMarkers";
 import type { Locker, Listing } from "../types";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { formatPrice } from "@/lib/utils";
 
-// Load Google Maps script
-function loadGoogleMapsScript(apiKey: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.google?.maps) {
-      resolve();
-      return;
-    }
-
-    const existingScript = document.getElementById("google-maps-script");
-    if (existingScript) {
-      existingScript.addEventListener("load", () => resolve());
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Google Maps"));
-    document.head.appendChild(script);
-  });
-}
-
-// Green marker SVG for selected locker
-const GREEN_MARKER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
-  <path fill="#22c55e" stroke="#15803d" stroke-width="1" d="M12.5 0C5.6 0 0 5.6 0 12.5c0 9.4 12.5 28.5 12.5 28.5S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z"/>
-  <circle fill="#ffffff" cx="12.5" cy="12.5" r="5"/>
-</svg>`;
-
-// Red marker SVG for default locker
-const RED_MARKER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="25" height="41" viewBox="0 0 25 41">
-  <path fill="#ef4444" stroke="#b91c1c" stroke-width="1" d="M12.5 0C5.6 0 0 5.6 0 12.5c0 9.4 12.5 28.5 12.5 28.5S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z"/>
-  <circle fill="#ffffff" cx="12.5" cy="12.5" r="5"/>
-</svg>`;
-
-// InfoWindow content component
 function LockerInfoContent({
   locker,
   onSelect,
@@ -94,35 +58,35 @@ export function SelectLockerPage() {
 
   const [lockers, setLockers] = useState<Locker[]>([]);
   const [listing, setListing] = useState<(Listing & { seller: { id: number; name: string } }) | null>(null);
-  const [selectedLocker, setSelectedLocker] = useState<Locker | null>(null);
   const [loading, setLoading] = useState(true);
   const [lockerError, setLockerError] = useState<string | null>(null);
   const [listingError, setListingError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Google Maps refs
-  const mapRef = useRef<HTMLDivElement>(null);
-  const googleMapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<Map<number, google.maps.Marker>>(new Map());
-  const userMarkerRef = useRef<google.maps.Marker | null>(null);
-  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [mapLoadError, setMapLoadError] = useState<string | null>(null);
+  // Map hooks — independent lifecycle, no overlapping deps
+  const { mapRef, map, infoWindow, isLoaded, error: mapLoadError } = useGoogleMap();
+  useUserLocation({ map });
 
-  // Singapore center coordinates
-  const defaultCenter = { lat: 1.3521, lng: 103.8198 };
+  const renderInfoWindow = useCallback(
+    (container: HTMLDivElement, locker: Locker, onSelect: () => void) => {
+      const root = createRoot(container);
+      root.render(<LockerInfoContent locker={locker} onSelect={onSelect} />);
+    },
+    []
+  );
 
+  const { selectedLocker } = useLockerMarkers({
+    map,
+    infoWindow,
+    lockers,
+    selectable: true,
+    onInfoWindowRender: renderInfoWindow,
+  });
+
+  // Load data on mount
   useEffect(() => {
     let cancelled = false;
-
-    // Get user's location using Capacitor hybrid geolocation
-    getCurrentPosition().then((location) => {
-      if (!cancelled) setUserLocation(location);
-    });
-
     loadData(cancelled);
-
     return () => { cancelled = true; };
   }, [listingId]);
 
@@ -133,147 +97,11 @@ export function SelectLockerPage() {
     }
   }, [isOnline]);
 
-  // Load Google Maps
-  useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) {
-      setMapLoadError("Google Maps API key not configured");
-      return;
-    }
-
-    loadGoogleMapsScript(apiKey)
-      .then(() => setIsMapLoaded(true))
-      .catch((err) => setMapLoadError(err.message));
-  }, []);
-
-  // Initialize map
-  useEffect(() => {
-    if (!isMapLoaded || !mapRef.current || googleMapRef.current) return;
-
-    const mapCenter = userLocation || defaultCenter;
-
-    googleMapRef.current = new google.maps.Map(mapRef.current, {
-      center: mapCenter,
-      zoom: 12,
-      disableDefaultUI: false,
-      zoomControl: true,
-      streetViewControl: false,
-      mapTypeControl: false,
-      fullscreenControl: true,
-    });
-
-    infoWindowRef.current = new google.maps.InfoWindow();
-  }, [isMapLoaded, userLocation]);
-
-  // Update map center when user location changes
-  useEffect(() => {
-    if (!googleMapRef.current || !isMapLoaded) return;
-
-    if (userLocation) {
-      googleMapRef.current.panTo(userLocation);
-      googleMapRef.current.setZoom(13);
-
-      // Show user location marker (blue circle)
-      if (userMarkerRef.current) {
-        userMarkerRef.current.setPosition(userLocation);
-        userMarkerRef.current.setMap(googleMapRef.current);
-      } else {
-        userMarkerRef.current = new google.maps.Marker({
-          position: userLocation,
-          map: googleMapRef.current,
-          title: "Your Location",
-          icon: {
-            url: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#3b82f6" stroke="#ffffff" stroke-width="3"/><circle cx="12" cy="12" r="4" fill="#ffffff"/></svg>'),
-          },
-        });
-      }
-    }
-  }, [userLocation, isMapLoaded]);
-
-  // Handle locker selection
-  const handleSelectLocker = useCallback((locker: Locker) => {
-    // Update the previous selected marker back to red
-    if (selectedLocker) {
-      const prevMarker = markersRef.current.get(selectedLocker.id);
-      if (prevMarker) {
-        prevMarker.setIcon({
-          url: "data:image/svg+xml," + encodeURIComponent(RED_MARKER_SVG),
-          scaledSize: new google.maps.Size(25, 41),
-          anchor: new google.maps.Point(12, 41),
-        });
-      }
-    }
-
-    // Update the new selected marker to green
-    const newMarker = markersRef.current.get(locker.id);
-    if (newMarker) {
-      newMarker.setIcon({
-        url: "data:image/svg+xml," + encodeURIComponent(GREEN_MARKER_SVG),
-        scaledSize: new google.maps.Size(25, 41),
-        anchor: new google.maps.Point(12, 41),
-      });
-    }
-
-    setSelectedLocker(locker);
-    infoWindowRef.current?.close();
-  }, [selectedLocker]);
-
-  // Update locker markers
-  const updateMarkers = useCallback(() => {
-    if (!googleMapRef.current || !isMapLoaded) return;
-
-    // Clear existing markers
-    markersRef.current.forEach((marker) => marker.setMap(null));
-    markersRef.current.clear();
-
-    // Add new markers
-    lockers.forEach((locker) => {
-      const coords = parseCoordinates(locker.coordinates);
-      const isSelected = selectedLocker?.id === locker.id;
-
-      const marker = new google.maps.Marker({
-        position: coords,
-        map: googleMapRef.current,
-        title: locker.name,
-        icon: {
-          url: "data:image/svg+xml," + encodeURIComponent(isSelected ? GREEN_MARKER_SVG : RED_MARKER_SVG),
-          scaledSize: new google.maps.Size(25, 41),
-          anchor: new google.maps.Point(12, 41),
-        },
-      });
-
-      marker.addListener("click", () => {
-        if (!infoWindowRef.current || !googleMapRef.current) return;
-
-        const container = document.createElement("div");
-        const root = createRoot(container);
-        root.render(
-          <LockerInfoContent
-            locker={locker}
-            onSelect={() => handleSelectLocker(locker)}
-          />
-        );
-
-        infoWindowRef.current.setContent(container);
-        infoWindowRef.current.open(googleMapRef.current, marker);
-      });
-
-      markersRef.current.set(locker.id, marker);
-    });
-  }, [lockers, isMapLoaded, selectedLocker?.id, handleSelectLocker]);
-
-  useEffect(() => {
-    if (isMapLoaded && lockers.length > 0) {
-      updateMarkers();
-    }
-  }, [updateMarkers, isMapLoaded, lockers]);
-
   async function loadData(cancelled?: boolean) {
     try {
       setLoading(true);
       setLockerError(null);
 
-      // Load lockers and listing in parallel for faster page load
       const lockersPromise = lockerApi.getAll();
       const listingPromise = listingId
         ? marketplaceApi.getListing(parseInt(listingId, 10))
@@ -286,7 +114,6 @@ export function SelectLockerPage() {
 
       if (cancelled) return;
 
-      // Handle lockers result
       if (lockersData.status === "fulfilled") {
         setLockers(lockersData.value);
         setLockerError(null);
@@ -296,7 +123,6 @@ export function SelectLockerPage() {
         addToast(message, "error");
       }
 
-      // Handle listing result — non-fatal, page still works without it
       if (listingData.status === "fulfilled" && listingData.value) {
         setListing(listingData.value);
         setListingError(null);
@@ -306,11 +132,6 @@ export function SelectLockerPage() {
     } finally {
       if (!cancelled) setLoading(false);
     }
-  }
-
-  function parseCoordinates(coordString: string): { lat: number; lng: number } {
-    const [lat, lng] = coordString.split(",").map((s) => parseFloat(s.trim()));
-    return { lat, lng };
   }
 
   async function handleCreateOrder() {
@@ -398,7 +219,7 @@ export function SelectLockerPage() {
 
       {/* Map */}
       <div className="flex-1 relative">
-        {!isMapLoaded && (
+        {!isLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />

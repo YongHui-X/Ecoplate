@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, verifyAuthToken } from "../services/api";
+import { storage } from "../services/storage";
 import type { User } from "../types";
 
 interface AuthContextType {
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (ssoToken) {
       // Store the SSO token
-      localStorage.setItem("ecolocker_token", ssoToken);
+      storage.setToken(ssoToken);
 
       // Clear URL parameters
       const newUrl = window.location.pathname;
@@ -41,28 +42,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Store listing ID if provided
       if (listingIdParam) {
         setListingId(parseInt(listingIdParam, 10));
-        localStorage.setItem("ecolocker_pending_listing", listingIdParam);
+        storage.setPendingListing(listingIdParam);
       }
 
       // Verify the token and get user info
       verifyToken(ssoToken);
     } else {
       // Check for existing token
-      const token = localStorage.getItem("ecolocker_token");
-      const userData = localStorage.getItem("ecolocker_user");
-      const pendingListing = localStorage.getItem("ecolocker_pending_listing");
+      const token = storage.getToken();
+      const userData = storage.getUser();
+      const pendingListing = storage.getPendingListing();
 
       if (pendingListing) {
         setListingId(parseInt(pendingListing, 10));
       }
 
       if (token && userData) {
-        try {
-          setUser(JSON.parse(userData));
-        } catch {
-          localStorage.removeItem("ecolocker_token");
-          localStorage.removeItem("ecolocker_user");
-        }
+        setUser(userData);
       }
       setLoading(false);
     }
@@ -71,18 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function verifyToken(token: string) {
     try {
       // Use the token to get current user info
-      localStorage.setItem("ecolocker_token", token);
+      storage.setToken(token);
       const response = await verifyAuthToken();
       if (response) {
-        localStorage.setItem("ecolocker_user", JSON.stringify(response));
-        setUser(response);
+        storage.setUser(response as User);
+        setUser(response as User);
       } else {
-        localStorage.removeItem("ecolocker_token");
-        localStorage.removeItem("ecolocker_user");
+        storage.removeToken();
+        storage.removeUser();
       }
     } catch {
-      localStorage.removeItem("ecolocker_token");
-      localStorage.removeItem("ecolocker_user");
+      storage.removeToken();
+      storage.removeUser();
     } finally {
       setLoading(false);
     }
@@ -104,20 +100,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: string;
     }>("/auth/login", { email, password });
 
-    localStorage.setItem("ecolocker_token", response.token);
-    localStorage.setItem("ecolocker_user", JSON.stringify(response.user));
+    storage.setToken(response.token);
+    storage.setUser(response.user);
     setUser(response.user);
   };
 
   const clearListingId = () => {
     setListingId(null);
-    localStorage.removeItem("ecolocker_pending_listing");
+    storage.removePendingListing();
   };
 
   const logout = () => {
-    localStorage.removeItem("ecolocker_token");
-    localStorage.removeItem("ecolocker_user");
-    localStorage.removeItem("ecolocker_pending_listing");
+    storage.clearAll();
     setUser(null);
     setListingId(null);
   };

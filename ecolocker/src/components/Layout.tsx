@@ -6,11 +6,11 @@ import {
   Bell,
   LogOut,
   User,
-  ArrowLeft,
   Home,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { OfflineBanner } from "./OfflineBanner";
+import { getEcoPlateUrl } from "../services/navigation";
 import { cn } from "@/lib/utils";
 
 interface LayoutProps {
@@ -44,17 +44,6 @@ export function Layout({ children }: LayoutProps) {
 
           {user && (
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  const token = localStorage.getItem("ecolocker_token");
-                  window.location.href = token ? `/marketplace?token=${token}` : "/marketplace";
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-                title="Back to EcoPlate"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">EcoPlate</span>
-              </button>
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
                   <User className="h-4 w-4 text-muted-foreground" />
@@ -104,8 +93,7 @@ export function Layout({ children }: LayoutProps) {
             })}
             <button
               onClick={() => {
-                const token = localStorage.getItem("ecolocker_token");
-                window.location.href = token ? `/marketplace?token=${token}` : "/marketplace";
+                window.location.href = getEcoPlateUrl();
               }}
               className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
             >

@@ -12,7 +12,6 @@ import {
   Key,
   Calendar,
   Truck,
-  Home,
 } from "lucide-react";
 import { orderApi } from "../services/locker-api";
 import { useAuth } from "../contexts/AuthContext";
@@ -391,17 +390,6 @@ export function OrderDetailPage() {
             <p className="font-semibold text-lg">Order Complete!</p>
             <p className="text-sm mt-1">Thank you for using EcoLocker.</p>
           </div>
-
-          <Button
-            className="w-full"
-            onClick={() => {
-              const token = localStorage.getItem("ecolocker_token");
-              window.location.href = token ? `/marketplace?token=${token}` : "/marketplace";
-            }}
-          >
-            <Home className="h-4 w-4 mr-2" />
-            Continue Shopping on EcoPlate
-          </Button>
 
           <Button
             variant="outline"

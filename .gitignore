@@ -75,7 +75,7 @@ PRDs/
 claude.md
 agents/
 design/
-hooks/
+/hooks/
 mcp-configs/
 rules/
 scripts/
