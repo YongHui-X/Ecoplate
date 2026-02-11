@@ -24,6 +24,7 @@ import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { formatPrice, formatDateTime } from "@/lib/utils";
+import { getEcoPlateUrl } from "../services/navigation";
 
 const statusConfig: Record<
   string,
@@ -395,8 +396,7 @@ export function OrderDetailPage() {
           <Button
             className="w-full"
             onClick={() => {
-              const token = localStorage.getItem("ecolocker_token");
-              window.location.href = token ? `/marketplace?token=${token}` : "/marketplace";
+              window.location.href = getEcoPlateUrl();
             }}
           >
             <Home className="h-4 w-4 mr-2" />

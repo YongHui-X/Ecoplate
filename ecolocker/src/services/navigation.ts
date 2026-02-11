@@ -1,5 +1,7 @@
+import { storage } from "./storage";
+
 export function getEcoPlateUrl(path: string = "/marketplace"): string {
-  const token = localStorage.getItem("ecolocker_token");
+  const token = storage.getToken();
   if (token) {
     return `${path}?token=${token}`;
   }

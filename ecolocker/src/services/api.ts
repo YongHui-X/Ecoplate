@@ -1,3 +1,5 @@
+import { storage } from "./storage";
+
 const getApiBase = (): string => {
   const isCapacitor = typeof window !== 'undefined' &&
     (window as any).Capacitor !== undefined;
@@ -26,7 +28,7 @@ async function request<T>(
   options: RequestInit = {},
   skipAuthRedirect = false
 ): Promise<T> {
-  const token = localStorage.getItem("ecolocker_token");
+  const token = storage.getToken();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -46,8 +48,8 @@ async function request<T>(
 
   if (!response.ok) {
     if (response.status === 401 && !skipAuthRedirect) {
-      localStorage.removeItem("ecolocker_token");
-      localStorage.removeItem("ecolocker_user");
+      storage.removeToken();
+      storage.removeUser();
       window.dispatchEvent(new CustomEvent("auth:unauthorized"));
     }
     throw new ApiError(response.status, data.error || "Request failed");
