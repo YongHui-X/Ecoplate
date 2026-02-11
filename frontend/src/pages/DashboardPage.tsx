@@ -43,7 +43,7 @@ interface DashboardStats {
     totalMoneySaved: number;
   };
   co2ChartData: Array<{ date: string; value: number }>;
-  foodChartData: Array<{ date: string; value: number }>;
+  moneySavedChartData: Array<{ date: string; value: number }>;
   wasteRatioChartData: Array<{ date: string; wasted: number; consumed: number; ratio: number }>;
   impactEquivalence: {
     carKmAvoided: number;
@@ -338,19 +338,19 @@ export default function DashboardPage() {
           <CardContent className="p-3 sm:p-4 lg:p-6">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
               <h3 className="text-sm sm:text-base font-semibold">
-                Food Saved Over Time
+                Total Money Saved
               </h3>
               <div className="group relative">
                 <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
                 <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  Total weight of food consumed, sold, or shared over time
+                  Money earned from selling food on the marketplace over time
                 </div>
               </div>
             </div>
             <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={summaryData?.foodChartData || []}
+                  data={summaryData?.moneySavedChartData || []}
                   margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
                 >
                   <CartesianGrid
@@ -359,14 +359,17 @@ export default function DashboardPage() {
                   />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} tickMargin={8} />
                   <YAxis tick={{ fontSize: 10 }} tickMargin={4} width={35} />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value) => [`$${value}`, "Earned"]}
+                    contentStyle={{ fontSize: 12 }}
+                  />
                   <Line
                     type="monotone"
                     dataKey="value"
-                    stroke="#f97316"
+                    stroke="#3b82f6"
                     strokeWidth={2}
                     dot={{ r: 3 }}
-                    name="Food (kg)"
+                    name="Money Saved ($)"
                   />
                 </LineChart>
               </ResponsiveContainer>

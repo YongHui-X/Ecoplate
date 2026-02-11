@@ -142,18 +142,14 @@ export async function getDashboardStats(
     .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Chart data for food saved (consumed + sold + shared)
-  const positiveMetrics = metrics.filter(
-    (m) => m.type && ["consumed", "sold", "shared"].includes(m.type)
-  );
-  const foodMap = new Map<string, number>();
-  for (const m of positiveMetrics) {
-    const dateObj = parseMetricDate(m.todayDate);
-    const dateKey = formatDate(dateObj, period);
-    const mQuantity = m.quantity ?? 0;
-    foodMap.set(dateKey, (foodMap.get(dateKey) || 0) + mQuantity);
+  // Chart data for money saved over time (from sold listings)
+  const moneySavedMap = new Map<string, number>();
+  for (const l of soldListings) {
+    if (!l.completedAt) continue;
+    const dateKey = formatDate(l.completedAt, period);
+    moneySavedMap.set(dateKey, (moneySavedMap.get(dateKey) || 0) + (l.price || 0));
   }
-  const foodChartData = Array.from(foodMap.entries())
+  const moneySavedChartData = Array.from(moneySavedMap.entries())
     .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -207,7 +203,7 @@ export async function getDashboardStats(
       totalMoneySaved: Math.round(totalMoneySaved * 100) / 100,
     },
     co2ChartData,
-    foodChartData,
+    moneySavedChartData,
     wasteRatioChartData,
     impactEquivalence,
   };
@@ -251,43 +247,35 @@ export async function getCO2Stats(userId: number, period: Period = "month") {
     )
     .all();
 
-  const positiveMetrics = metrics.filter(
-    (m) => m.type && ["consumed", "sold", "shared"].includes(m.type)
-  );
-
-  const categoryMap = new Map<string, number>();
-  let totalCo2 = 0;
-
-  // CO2 Reduced = from sold listings (use pre-calculated co2Saved)
+  // CO2 Reduced = from sold listings only (use pre-calculated co2Saved)
   let totalCo2Reduced = soldListings.reduce(
     (sum, l) => sum + (l.co2Saved || 0),
     0
   );
 
-  for (const m of positiveMetrics) {
-    const co2 = resolveMetricCo2(m, productMap);
-    if (co2 === 0 && m.productId != null && !productMap.get(m.productId)) continue;
-    const product = m.productId != null ? productMap.get(m.productId) : undefined;
-    const catLabel = capitalizeCategory(product?.category ?? null);
-    totalCo2 += co2;
+  // CO2 by category (from sold listings)
+  const categoryMap = new Map<string, number>();
+  for (const l of soldListings) {
+    const co2 = l.co2Saved || 0;
+    const catLabel = capitalizeCategory(l.category ?? null);
     categoryMap.set(catLabel, (categoryMap.get(catLabel) || 0) + co2);
   }
 
+  // CO2 trend over time (from sold listings)
   const trendMap = new Map<string, number>();
-  for (const m of positiveMetrics) {
-    const dateObj = parseMetricDate(m.todayDate);
-    const dateKey = formatDate(dateObj, period);
-    const co2 = resolveMetricCo2(m, productMap);
+  for (const l of soldListings) {
+    if (!l.completedAt) continue;
+    const dateKey = formatDate(l.completedAt, period);
+    const co2 = l.co2Saved || 0;
     trendMap.set(dateKey, (trendMap.get(dateKey) || 0) + co2);
   }
 
+  // Top items by CO2 saved (from sold listings)
   const itemCo2 = new Map<string, number>();
-  for (const m of positiveMetrics) {
-    const co2 = resolveMetricCo2(m, productMap);
-    const product = m.productId != null ? productMap.get(m.productId) : undefined;
-    const productName = product?.productName ?? "Unknown";
-    if (co2 === 0 && m.productId != null && !product) continue;
-    itemCo2.set(productName, (itemCo2.get(productName) || 0) + co2);
+  for (const l of soldListings) {
+    const co2 = l.co2Saved || 0;
+    const name = l.title || "Unknown";
+    itemCo2.set(name, (itemCo2.get(name) || 0) + co2);
   }
 
   const co2ByCategory = Array.from(categoryMap.entries())
