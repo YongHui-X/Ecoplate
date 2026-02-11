@@ -105,9 +105,10 @@ function addSecurityHeaders(response: Response, isApi: boolean = false, nonce?: 
     headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     headers.set("Pragma", "no-cache");
   } else {
-    // SPA headers - use nonce-based CSP instead of unsafe-inline
+    // SPA headers - use nonce-based CSP for scripts, unsafe-inline for styles (required for Google Maps)
     const scriptSrc = nonce ? `'self' 'nonce-${nonce}' https://maps.googleapis.com` : "'self' https://maps.googleapis.com";
-    const styleSrc = nonce ? `'self' 'nonce-${nonce}' https://fonts.googleapis.com` : "'self' https://fonts.googleapis.com";
+    // Note: 'unsafe-inline' for styles is required because Google Maps dynamically injects inline styles
+    const styleSrc = `'self' 'unsafe-inline' https://fonts.googleapis.com`;
     headers.set("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc}; style-src ${styleSrc}; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com; connect-src 'self' https://maps.googleapis.com; font-src 'self' https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'`);
   }
 

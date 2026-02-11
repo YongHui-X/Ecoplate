@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import { notificationService, Notification } from "../services/notifications";
+import { storageGet, storageSet, storageGetSync } from "../services/capacitor";
 
 const CACHE_KEY = "ecoplate_notification_count";
+const TOKEN_KEY = "token";
 
 interface NotificationContextType {
   unreadCount: number;
@@ -16,51 +18,55 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-function getCachedCount(): number {
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      return parseInt(cached, 10) || 0;
-    }
-  } catch {
-    // localStorage not available
+// Synchronous initial value (for useState)
+function getCachedCountSync(): number {
+  const cached = storageGetSync(CACHE_KEY);
+  if (cached) {
+    return parseInt(cached, 10) || 0;
   }
   return 0;
 }
 
-function setCachedCount(count: number): void {
-  try {
-    localStorage.setItem(CACHE_KEY, String(count));
-  } catch {
-    // localStorage not available
-  }
+// Async cache set for cross-platform support (Android/Web)
+async function setCachedCount(count: number): Promise<void> {
+  await storageSet(CACHE_KEY, String(count));
 }
 
-function isLoggedIn(): boolean {
-  return !!localStorage.getItem("token");
+// Check if user is logged in (async for cross-platform support)
+async function isLoggedIn(): Promise<boolean> {
+  const token = await storageGet(TOKEN_KEY);
+  return !!token;
 }
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [unreadCount, setUnreadCount] = useState(getCachedCount);
+  const [unreadCount, setUnreadCount] = useState(getCachedCountSync);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const unreadCountRef = useRef(unreadCount);
+
+  // Keep ref in sync with state for use in callbacks
+  useEffect(() => {
+    unreadCountRef.current = unreadCount;
+  }, [unreadCount]);
 
   const refreshUnreadCount = useCallback(async () => {
-    if (!isLoggedIn()) {
+    const loggedIn = await isLoggedIn();
+    if (!loggedIn) {
       setUnreadCount(0);
       return;
     }
     try {
       const { count } = await notificationService.getUnreadCount();
       setUnreadCount(count);
-      setCachedCount(count);
+      await setCachedCount(count);
     } catch {
       // Silently fail - keep showing cached value
     }
   }, []);
 
   const refreshNotifications = useCallback(async () => {
-    if (!isLoggedIn()) {
+    const loggedIn = await isLoggedIn();
+    if (!loggedIn) {
       setNotifications([]);
       return;
     }
@@ -71,7 +77,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       // Also update unread count
       const unread = data.filter((n) => !n.isRead).length;
       setUnreadCount(unread);
-      setCachedCount(unread);
+      await setCachedCount(unread);
     } catch {
       // Silently fail
     } finally {
@@ -85,12 +91,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true, readAt: new Date().toISOString() } : n))
       );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-      setCachedCount(Math.max(0, unreadCount - 1));
+      const newCount = Math.max(0, unreadCountRef.current - 1);
+      setUnreadCount(newCount);
+      await setCachedCount(newCount);
     } catch {
       // Silently fail
     }
-  }, [unreadCount]);
+  }, []);
 
   const markAllAsRead = useCallback(async () => {
     try {
@@ -99,7 +106,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         prev.map((n) => ({ ...n, isRead: true, readAt: new Date().toISOString() }))
       );
       setUnreadCount(0);
-      setCachedCount(0);
+      await setCachedCount(0);
     } catch {
       // Silently fail
     }
@@ -111,21 +118,26 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       await notificationService.deleteNotification(id);
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       if (notification && !notification.isRead) {
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-        setCachedCount(Math.max(0, unreadCount - 1));
+        const newCount = Math.max(0, unreadCountRef.current - 1);
+        setUnreadCount(newCount);
+        await setCachedCount(newCount);
       }
     } catch {
       // Silently fail
     }
-  }, [notifications, unreadCount]);
+  }, [notifications]);
 
   useEffect(() => {
     // Fetch immediately on mount if logged in
-    if (isLoggedIn()) {
-      refreshUnreadCount();
-      // Also trigger a notification check on login
-      notificationService.triggerCheck().catch((err) => console.error("Notification check failed:", err));
-    }
+    const initNotifications = async () => {
+      const loggedIn = await isLoggedIn();
+      if (loggedIn) {
+        refreshUnreadCount();
+        // Also trigger a notification check on login
+        notificationService.triggerCheck().catch((err) => console.error("Notification check failed:", err));
+      }
+    };
+    initNotifications();
 
     // Listen for login event to refresh immediately
     const handleLogin = () => {
@@ -135,8 +147,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     window.addEventListener("auth:login", handleLogin);
 
     // Poll every 30 seconds
-    const interval = setInterval(() => {
-      if (isLoggedIn()) {
+    const interval = setInterval(async () => {
+      const loggedIn = await isLoggedIn();
+      if (loggedIn) {
         refreshUnreadCount();
       }
     }, 30000);

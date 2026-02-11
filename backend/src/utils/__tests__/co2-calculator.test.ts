@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   calculateCo2Saved,
+  convertToKg,
   getCategoryFactor,
   CO2_CATEGORY_FACTORS,
   CO2_DISPOSAL_FACTOR,
@@ -202,6 +203,72 @@ describe("calculateCo2Saved", () => {
       const result = calculateCo2Saved(1, "item", "bakery");
       expect(result).toBe(0.6);
     });
+  });
+});
+
+describe("convertToKg", () => {
+  test("converts bottle to kg (*0.3)", () => {
+    expect(convertToKg(1, "bottle")).toBe(0.3);
+  });
+
+  test("converts bottles to kg (*0.3)", () => {
+    expect(convertToKg(2, "bottles")).toBe(0.6);
+  });
+
+  test("converts can to kg (*0.3)", () => {
+    expect(convertToKg(1, "can")).toBe(0.3);
+  });
+
+  test("converts cans to kg (*0.3)", () => {
+    expect(convertToKg(3, "cans")).toBeCloseTo(0.9, 10);
+  });
+
+  test("converts loaf to kg (*0.3)", () => {
+    expect(convertToKg(1, "loaf")).toBe(0.3);
+  });
+
+  test("converts box to kg (*0.3)", () => {
+    expect(convertToKg(1, "box")).toBe(0.3);
+  });
+
+  test("converts boxes to kg (*0.3)", () => {
+    expect(convertToKg(2, "boxes")).toBe(0.6);
+  });
+
+  test("converts bunch to kg (*0.3)", () => {
+    expect(convertToKg(1, "bunch")).toBe(0.3);
+  });
+
+  test("converts bunches to kg (*0.3)", () => {
+    expect(convertToKg(2, "bunches")).toBe(0.6);
+  });
+
+  test("converts bag to kg (*0.3)", () => {
+    expect(convertToKg(1, "bag")).toBe(0.3);
+  });
+
+  test("converts bags to kg (*0.3)", () => {
+    expect(convertToKg(3, "bags")).toBeCloseTo(0.9, 10);
+  });
+
+  test("converts tray to kg (*0.3)", () => {
+    expect(convertToKg(1, "tray")).toBe(0.3);
+  });
+
+  test("converts trays to kg (*0.3)", () => {
+    expect(convertToKg(2, "trays")).toBe(0.6);
+  });
+
+  test("converts packs to kg (*0.3)", () => {
+    expect(convertToKg(2, "packs")).toBe(0.6);
+  });
+
+  test("converts dozen to kg (*12*0.3)", () => {
+    expect(convertToKg(1, "dozen")).toBeCloseTo(3.6, 10);
+  });
+
+  test("converts 2 dozen to kg", () => {
+    expect(convertToKg(2, "dozen")).toBeCloseTo(7.2, 10);
   });
 });
 

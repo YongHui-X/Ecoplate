@@ -41,8 +41,24 @@ export function convertToKg(quantity: number, unit: string | null | undefined): 
     case "item":
     case "pcs":
     case "pack":
+    case "bottle":
+    case "bottles":
+    case "can":
+    case "cans":
+    case "loaf":
+    case "box":
+    case "boxes":
+    case "bunch":
+    case "bunches":
+    case "bag":
+    case "bags":
+    case "tray":
+    case "trays":
+    case "packs":
       // Estimated average weight per item/pack
       return quantity * 0.3;
+    case "dozen":
+      return quantity * 12 * 0.3;
     default:
       // Default: assume it's already in reasonable units
       return quantity * 0.3;

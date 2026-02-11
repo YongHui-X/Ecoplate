@@ -5,6 +5,7 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import { getUser } from "../middleware/auth";
 import { getOrCreateUserPoints, getUserMetrics, getDetailedPointsStats, awardPoints } from "../services/gamification-service";
 import { POINT_VALUES } from "../services/gamification-service";
+import { calculateCo2Saved } from "../utils/co2-calculator";
 import { getBadgeProgress } from "../services/badge-service";
 
 export function registerGamificationRoutes(router: Router) {
@@ -28,7 +29,7 @@ export function registerGamificationRoutes(router: Router) {
         limit: 20,
         with: {
           product: {
-            columns: { productName: true, unit: true },
+            columns: { productName: true, unit: true, category: true },
           },
         },
       });
@@ -41,9 +42,18 @@ export function registerGamificationRoutes(router: Router) {
         })
         .map((i) => {
           const normalizedType = (i.type || "").toLowerCase() as keyof typeof POINT_VALUES;
-          const baseAmount = POINT_VALUES[normalizedType] ?? 0;
-          const scaled = Math.round(baseAmount * (i.quantity ?? 1));
-          const amount = scaled === 0 ? Math.sign(baseAmount) : scaled;
+          const category = i.product?.category || "other";
+          // Stored quantity is already in kg
+          const co2Value = calculateCo2Saved(i.quantity ?? 1, "kg", category);
+          let amount: number;
+          if (normalizedType === "sold") {
+            amount = Math.round(co2Value * 1.5);
+          } else if (normalizedType === "wasted") {
+            amount = -Math.round(co2Value);
+          } else {
+            amount = Math.round(co2Value);
+          }
+          if (amount === 0) amount = normalizedType === "wasted" ? -1 : 1;
 
           return {
             id: i.id,

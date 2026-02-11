@@ -117,3 +117,68 @@ export async function hapticFeedback(type: 'light' | 'medium' | 'heavy' = 'mediu
     console.error('Haptics error:', error);
   }
 }
+
+// Cross-platform storage utilities
+// Uses Capacitor Preferences on native, localStorage on web
+export async function storageGet(key: string): Promise<string | null> {
+  if (isNative) {
+    try {
+      const { Preferences } = await import('@capacitor/preferences');
+      const { value } = await Preferences.get({ key });
+      return value;
+    } catch (error) {
+      console.error('Storage get error:', error);
+      return null;
+    }
+  } else {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+}
+
+export async function storageSet(key: string, value: string): Promise<void> {
+  if (isNative) {
+    try {
+      const { Preferences } = await import('@capacitor/preferences');
+      await Preferences.set({ key, value });
+    } catch (error) {
+      console.error('Storage set error:', error);
+    }
+  } else {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // localStorage not available
+    }
+  }
+}
+
+export async function storageRemove(key: string): Promise<void> {
+  if (isNative) {
+    try {
+      const { Preferences } = await import('@capacitor/preferences');
+      await Preferences.remove({ key });
+    } catch (error) {
+      console.error('Storage remove error:', error);
+    }
+  } else {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // localStorage not available
+    }
+  }
+}
+
+// Synchronous storage get (for initial state) - falls back to localStorage
+// Use this only for getting initial values, prefer async versions otherwise
+export function storageGetSync(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}

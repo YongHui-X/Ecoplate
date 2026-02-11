@@ -3,6 +3,7 @@ import * as schema from "../db/schema";
 import { eq, and, inArray, desc } from "drizzle-orm";
 
 import { notifyStreakMilestone } from "./notification-service";
+import { calculateCo2Saved } from "../utils/co2-calculator";
 
 // Point values for different actions
 export const POINT_VALUES = {
@@ -55,12 +56,32 @@ export async function awardPoints(
   skipMetricRecording?: boolean,
   listingData?: ListingDataForCo2
 ) {
-  const baseValue = POINT_VALUES[action];
-  const scaled = Math.round(baseValue * (quantity ?? 1));
-  // Ensure at least ±1 point (so tiny quantities don't round to zero)
-  const amount = scaled === 0 ? Math.sign(baseValue) : scaled;
+  // Look up product category from DB for CO2-based scoring
+  let category: string = "other";
+  if (productId) {
+    const product = await db.query.products.findFirst({
+      where: eq(schema.products.id, productId),
+      columns: { category: true },
+    });
+    if (product?.category) category = product.category;
+  }
 
-  console.log(`[Points] Awarding ${amount} points to user ${userId} for action '${action}' (quantity: ${quantity}, baseValue: ${baseValue})`);
+  // Callers already pass quantityInKg, so use "kg" as unit
+  const co2Value = calculateCo2Saved(quantity ?? 1, "kg", category);
+  let amount: number;
+  if (action === "sold") {
+    amount = Math.round(co2Value * 1.5);
+  } else if (action === "wasted") {
+    amount = -Math.round(co2Value);
+  } else {
+    amount = Math.round(co2Value);
+  }
+  // Ensure at least ±1 point (so tiny quantities don't round to zero)
+  if (amount === 0) {
+    amount = action === "wasted" ? -1 : 1;
+  }
+
+  console.log(`[Points] Awarding ${amount} points to user ${userId} for action '${action}' (quantity: ${quantity}, category: ${category}, co2Value: ${co2Value})`);
 
   const userPoints = await getOrCreateUserPoints(userId);
 
@@ -214,6 +235,7 @@ export async function getDetailedPointsStats(userId: number) {
   const allInteractions = await db.query.productSustainabilityMetrics.findMany({
     where: eq(schema.productSustainabilityMetrics.userId, userId),
     orderBy: [desc(schema.productSustainabilityMetrics.todayDate)],
+    with: { product: { columns: { category: true } } },
   });
 
   const streakActions = ["consumed", "shared", "sold"];
@@ -254,9 +276,18 @@ export async function getDetailedPointsStats(userId: number) {
 
   for (const interaction of allInteractions) {
     const type = (interaction.type || "").toLowerCase() as keyof typeof POINT_VALUES;
-    const basePoints = POINT_VALUES[type] ?? 0;
-    const scaled = Math.round(basePoints * (interaction.quantity ?? 1));
-    const points = scaled === 0 ? Math.sign(basePoints) : scaled;
+    // CO2-based points: stored quantity is already in kg
+    const category = (interaction as { product?: { category?: string | null } }).product?.category || "other";
+    const co2Value = calculateCo2Saved(interaction.quantity ?? 1, "kg", category);
+    let points: number;
+    if (type === "sold") {
+      points = Math.round(co2Value * 1.5);
+    } else if (type === "wasted") {
+      points = -Math.round(co2Value);
+    } else {
+      points = Math.round(co2Value);
+    }
+    if (points === 0) points = type === "wasted" ? -1 : 1;
     // Use todayDate directly as dateKey — it's already stored as "YYYY-MM-DD"
     const dateKey = interaction.todayDate;
 

@@ -146,7 +146,7 @@ export default function RewardsPage() {
       </div>
 
       {/* Balance Card */}
-      <div className="p-6 mb-6 rounded-2xl shadow-sm text-white" style={{ background: 'linear-gradient(to right, #22c55e, #059669)' }}>
+      <div className="p-6 mb-6 rounded-2xl shadow-sm bg-primary text-primary-foreground">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm opacity-90">Your Balance</p>

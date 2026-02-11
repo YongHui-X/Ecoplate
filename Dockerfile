@@ -34,6 +34,12 @@ RUN bun run build
 # =============================================================================
 FROM oven/bun:1.2.5-alpine AS ecolocker-builder
 
+# Build args for ecolocker environment variables (same as frontend)
+# hadolint ignore=DL3044
+ARG VITE_GOOGLE_MAPS_API_KEY
+# hadolint ignore=DL3044
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
+
 WORKDIR /app/ecolocker
 
 # Copy ecolocker package files

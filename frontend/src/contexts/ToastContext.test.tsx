@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToastProvider, useToast } from './ToastContext';
 
@@ -61,42 +61,39 @@ describe('ToastContext', () => {
       expect(screen.getByTestId('toast-count')).toHaveTextContent('0');
     });
 
-    it('should add toast with success type', async () => {
+    it('should add toast with success type', () => {
       render(
         <ToastProvider>
           <TestComponent />
         </ToastProvider>
       );
 
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      await user.click(screen.getByText('Add Success'));
+      fireEvent.click(screen.getByText('Add Success'));
 
       expect(screen.getByTestId('toast-count')).toHaveTextContent('1');
       expect(screen.getByText(/Test message - success/)).toBeInTheDocument();
     });
 
-    it('should add toast with error type', async () => {
+    it('should add toast with error type', () => {
       render(
         <ToastProvider>
           <TestComponent />
         </ToastProvider>
       );
 
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      await user.click(screen.getByText('Add Error'));
+      fireEvent.click(screen.getByText('Add Error'));
 
       expect(screen.getByText(/Error message - error/)).toBeInTheDocument();
     });
 
-    it('should add toast with default info type', async () => {
+    it('should add toast with default info type', () => {
       render(
         <ToastProvider>
           <TestComponent />
         </ToastProvider>
       );
 
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      await user.click(screen.getByText('Add Info'));
+      fireEvent.click(screen.getByText('Add Info'));
 
       expect(screen.getByText(/Info message - info/)).toBeInTheDocument();
     });
@@ -124,7 +121,7 @@ describe('ToastContext', () => {
       );
     }, 10000);
 
-    it('should allow multiple toasts', async () => {
+    it('should allow multiple toasts', () => {
       // Reset UUID mock to return unique values
       let counter = 0;
       mockUUID.mockImplementation(() => `uuid-${counter++}`);
@@ -135,9 +132,8 @@ describe('ToastContext', () => {
         </ToastProvider>
       );
 
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      await user.click(screen.getByText('Add Success'));
-      await user.click(screen.getByText('Add Error'));
+      fireEvent.click(screen.getByText('Add Success'));
+      fireEvent.click(screen.getByText('Add Error'));
 
       expect(screen.getByTestId('toast-count')).toHaveTextContent('2');
     });

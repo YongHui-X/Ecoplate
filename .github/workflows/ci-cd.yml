@@ -163,6 +163,9 @@ jobs:
     permissions:
       pull-requests: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Install lcov
         run: sudo apt-get update && sudo apt-get install -y lcov
 
@@ -195,8 +198,8 @@ jobs:
           LCOV_ARGS=""
           if [ -f backend-cov/lcov.info ]; then
             LCOV_ARGS="$LCOV_ARGS -a backend-cov/lcov.info"
-            # Generate detailed HTML for backend using genhtml
-            genhtml backend-cov/lcov.info -o combined-report/backend --title "Backend Coverage" --legend || true
+            # Generate detailed HTML for backend using genhtml (source files are in backend/)
+            genhtml backend-cov/lcov.info -o combined-report/backend --title "Backend Coverage" --legend --prefix "" --source-dir backend || true
           fi
           if [ -f frontend-cov/lcov.info ]; then
             LCOV_ARGS="$LCOV_ARGS -a frontend-cov/lcov.info"
@@ -282,117 +285,215 @@ jobs:
 
           # Generate comprehensive HTML dashboard
           REPORT_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+
+          # Helper to get percentage for progress bar (cap at 100)
+          get_pct() {
+            val="$1"
+            if [ "$val" = "N/A" ]; then echo "0"
+            elif [ "$(echo "$val > 100" | bc -l 2>/dev/null || echo 0)" = "1" ]; then echo "100"
+            else echo "$val"
+            fi
+          }
+
           cat > combined-report/index.html << HTMLEOF
           <!DOCTYPE html>
           <html lang="en">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>EcoPlate - Combined Coverage Report</title>
+            <title>EcoPlate Coverage Dashboard</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
             <style>
-              :root { --bg-primary: #0f172a; --bg-secondary: #1e293b; --bg-card: #334155; --text-primary: #f1f5f9; --text-secondary: #94a3b8; --accent: #3b82f6; --good: #22c55e; --okay: #eab308; --poor: #ef4444; --border: #475569; }
-              * { box-sizing: border-box; margin: 0; padding: 0; }
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; min-height: 100vh; }
-              .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-              header { margin-bottom: 2rem; }
-              h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
-              .subtitle { color: var(--text-secondary); font-size: 0.95rem; }
-              .meta { display: flex; gap: 2rem; margin-top: 1rem; font-size: 0.85rem; color: var(--text-secondary); }
-              .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-              .summary-card { background: var(--bg-secondary); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); }
-              .summary-card h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 1rem; }
-              .summary-value { font-size: 2.5rem; font-weight: 700; font-family: 'SF Mono', Monaco, monospace; }
-              .summary-value.good { color: var(--good); }
-              .summary-value.okay { color: var(--okay); }
-              .summary-value.poor { color: var(--poor); }
-              .summary-label { color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem; }
-              .progress-bar { width: 100%; height: 6px; background: var(--bg-primary); border-radius: 3px; overflow: hidden; margin-top: 0.5rem; }
-              .progress-fill { height: 100%; border-radius: 3px; }
-              .progress-fill.good { background: var(--good); }
-              .progress-fill.okay { background: var(--okay); }
-              .progress-fill.poor { background: var(--poor); }
-              .quick-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-              .quick-link { display: flex; align-items: center; gap: 1rem; padding: 1.25rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--text-primary); transition: all 0.2s ease; }
-              .quick-link:hover { border-color: var(--accent); transform: translateY(-2px); }
-              .quick-link-icon { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
-              .quick-link-icon.backend { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
-              .quick-link-icon.frontend { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
-              .quick-link-icon.recommendation { background: linear-gradient(135deg, #22c55e, #10b981); }
-              .quick-link-content h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
-              .quick-link-content p { font-size: 0.85rem; color: var(--text-secondary); }
-              .table-container { background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 2rem; }
-              .table-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
-              .table-header h2 { font-size: 1.1rem; font-weight: 600; }
-              table { width: 100%; border-collapse: collapse; }
-              th, td { padding: 1rem 1.5rem; text-align: left; }
-              th { background: var(--bg-card); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; }
-              tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
-              tr:hover td { background: rgba(59, 130, 246, 0.05); }
-              .metric { font-family: 'SF Mono', Monaco, monospace; font-size: 0.9rem; }
-              .metric.good { color: var(--good); }
-              .metric.okay { color: var(--okay); }
-              .metric.poor { color: var(--poor); }
-              .avg-row { background: var(--bg-card); font-weight: 600; }
-              footer { text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 0.85rem; border-top: 1px solid var(--border); margin-top: 2rem; }
+              :root{--bg-base:#09090b;--bg-surface:#18181b;--bg-elevated:#27272a;--text-primary:#fafafa;--text-secondary:#a1a1aa;--text-muted:#71717a;--border:#27272a;--accent:#22c55e;--good:#22c55e;--okay:#f59e0b;--poor:#ef4444;--radius:16px;--radius-sm:12px}
+              *{box-sizing:border-box;margin:0;padding:0}
+              body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg-base);color:var(--text-primary);line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
+              .page{max-width:1280px;margin:0 auto;padding:48px 24px}
+              .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:48px;flex-wrap:wrap;gap:24px}
+              .brand{display:flex;align-items:center;gap:16px}
+              .logo{width:56px;height:56px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--accent),#16a34a);display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 8px 32px rgba(34,197,94,0.25)}
+              .brand-text h1{font-size:28px;font-weight:700;letter-spacing:-0.5px}
+              .brand-text p{color:var(--text-secondary);font-size:14px;margin-top:2px}
+              .meta-badges{display:flex;gap:12px;flex-wrap:wrap}
+              .badge{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:100px;font-size:13px;color:var(--text-secondary)}
+              .badge code{font-family:'JetBrains Mono',monospace;color:var(--text-primary);font-size:12px}
+              .summary-section{margin-bottom:48px}
+              .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+              .summary-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;position:relative;overflow:hidden}
+              .summary-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0}
+              .summary-card.good::before{background:var(--good)}
+              .summary-card.okay::before{background:var(--okay)}
+              .summary-card.poor::before{background:var(--poor)}
+              .summary-card.na::before{background:var(--text-muted)}
+              .card-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:12px}
+              .card-value{font-family:'JetBrains Mono',monospace;font-size:44px;font-weight:500;line-height:1}
+              .card-value.good{color:var(--good)}
+              .card-value.okay{color:var(--okay)}
+              .card-value.poor{color:var(--poor)}
+              .card-value.na{color:var(--text-muted)}
+              .card-desc{font-size:13px;color:var(--text-secondary);margin-top:8px}
+              .progress-track{width:100%;height:4px;background:var(--bg-elevated);border-radius:2px;margin-top:16px;overflow:hidden}
+              .progress-bar{height:100%;border-radius:2px;transition:width 0.5s ease}
+              .progress-bar.good{background:var(--good)}
+              .progress-bar.okay{background:var(--okay)}
+              .progress-bar.poor{background:var(--poor)}
+              .components-section{margin-bottom:48px}
+              .section-title{font-size:18px;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+              .section-title::before{content:'';width:4px;height:20px;background:var(--accent);border-radius:2px}
+              .component-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+              .component-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;text-decoration:none;color:inherit;transition:all 0.2s ease;display:block}
+              .component-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+              .component-header{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+              .component-icon{width:48px;height:48px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:22px}
+              .component-icon.backend{background:linear-gradient(135deg,#8b5cf6,#6366f1)}
+              .component-icon.frontend{background:linear-gradient(135deg,#06b6d4,#3b82f6)}
+              .component-icon.ml{background:linear-gradient(135deg,#f59e0b,#ef4444)}
+              .component-info h3{font-size:16px;font-weight:600}
+              .component-info p{font-size:13px;color:var(--text-secondary);margin-top:2px}
+              .component-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+              .stat{text-align:center;padding:12px 8px;background:var(--bg-elevated);border-radius:8px}
+              .stat-value{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:500}
+              .stat-value.good{color:var(--good)}
+              .stat-value.okay{color:var(--okay)}
+              .stat-value.poor{color:var(--poor)}
+              .stat-value.na{color:var(--text-muted)}
+              .stat-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-top:4px}
+              .component-footer{display:flex;align-items:center;justify-content:flex-end;margin-top:16px;font-size:13px;color:var(--accent);font-weight:500}
+              .table-section{margin-bottom:48px}
+              .table-wrap{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+              table{width:100%;border-collapse:collapse}
+              th{padding:14px 20px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);background:var(--bg-elevated);border-bottom:1px solid var(--border)}
+              td{padding:16px 20px;font-size:14px;border-bottom:1px solid var(--border)}
+              tr:last-child td{border-bottom:none}
+              tr:hover td{background:rgba(255,255,255,0.02)}
+              .table-metric{font-family:'JetBrains Mono',monospace;font-weight:500}
+              .table-metric.good{color:var(--good)}
+              .table-metric.okay{color:var(--okay)}
+              .table-metric.poor{color:var(--poor)}
+              .table-metric.na{color:var(--text-muted)}
+              .table-link{color:var(--accent);text-decoration:none;font-weight:500}
+              .table-link:hover{text-decoration:underline}
+              .total-row{background:var(--bg-elevated);font-weight:600}
+              .footer{text-align:center;padding-top:32px;border-top:1px solid var(--border)}
+              .footer p{font-size:13px;color:var(--text-muted)}
+              .legend{display:flex;justify-content:center;gap:24px;margin-top:12px;font-size:12px}
+              .legend-item{display:flex;align-items:center;gap:6px;color:var(--text-secondary)}
+              .legend-dot{width:8px;height:8px;border-radius:50%}
+              .legend-dot.good{background:var(--good)}
+              .legend-dot.okay{background:var(--okay)}
+              .legend-dot.poor{background:var(--poor)}
             </style>
           </head>
           <body>
-            <div class="container">
-              <header>
-                <h1>EcoPlate Coverage Report</h1>
-                <p class="subtitle">Combined test coverage with detailed line-by-line analysis</p>
-                <div class="meta"><span>Generated: ${REPORT_DATE}</span></div>
+            <div class="page">
+              <header class="header">
+                <div class="brand">
+                  <div class="logo">🌱</div>
+                  <div class="brand-text">
+                    <h1>EcoPlate</h1>
+                    <p>Test Coverage Dashboard</p>
+                  </div>
+                </div>
+                <div class="meta-badges">
+                  <span class="badge">${REPORT_DATE}</span>
+                  <span class="badge"><code>${SHORT_SHA}</code></span>
+                </div>
               </header>
-              <div class="summary-grid">
-                <div class="summary-card">
-                  <h3>Average Line Coverage</h3>
-                  <div class="summary-value $(get_color ${AVG_LINES})">${AVG_LINES}%</div>
-                  <p class="summary-label">Across all components</p>
-                  <div class="progress-bar"><div class="progress-fill $(get_color ${AVG_LINES})" style="width: ${AVG_LINES}%"></div></div>
+              <section class="summary-section">
+                <div class="summary-grid">
+                  <div class="summary-card $(get_color ${AVG_LINES})">
+                    <div class="card-label">Line Coverage</div>
+                    <div class="card-value $(get_color ${AVG_LINES})">${AVG_LINES}%</div>
+                    <div class="card-desc">Average across all components</div>
+                    <div class="progress-track"><div class="progress-bar $(get_color ${AVG_LINES})" style="width: $(get_pct ${AVG_LINES})%"></div></div>
+                  </div>
+                  <div class="summary-card $(get_color ${AVG_FUNCS})">
+                    <div class="card-label">Function Coverage</div>
+                    <div class="card-value $(get_color ${AVG_FUNCS})">${AVG_FUNCS}%</div>
+                    <div class="card-desc">Functions tested</div>
+                    <div class="progress-track"><div class="progress-bar $(get_color ${AVG_FUNCS})" style="width: $(get_pct ${AVG_FUNCS})%"></div></div>
+                  </div>
+                  <div class="summary-card $(get_color ${AVG_BRANCH})">
+                    <div class="card-label">Branch Coverage</div>
+                    <div class="card-value $(get_color ${AVG_BRANCH})">${AVG_BRANCH}%</div>
+                    <div class="card-desc">Decision branches tested</div>
+                    <div class="progress-track"><div class="progress-bar $(get_color ${AVG_BRANCH})" style="width: $(get_pct ${AVG_BRANCH})%"></div></div>
+                  </div>
                 </div>
-                <div class="summary-card">
-                  <h3>Average Function Coverage</h3>
-                  <div class="summary-value $(get_color ${AVG_FUNCS})">${AVG_FUNCS}%</div>
-                  <p class="summary-label">Functions tested</p>
-                  <div class="progress-bar"><div class="progress-fill $(get_color ${AVG_FUNCS})" style="width: ${AVG_FUNCS}%"></div></div>
+              </section>
+              <section class="components-section">
+                <h2 class="section-title">Component Reports</h2>
+                <div class="component-grid">
+                  <a href="backend/index.html" class="component-card">
+                    <div class="component-header">
+                      <div class="component-icon backend">⚙️</div>
+                      <div class="component-info">
+                        <h3>Backend</h3>
+                        <p>Bun API Server · ${BE_FILES} files</p>
+                      </div>
+                    </div>
+                    <div class="component-stats">
+                      <div class="stat"><div class="stat-value $(get_color ${BE_LINES})">${BE_LINES}%</div><div class="stat-label">Lines</div></div>
+                      <div class="stat"><div class="stat-value $(get_color ${BE_FUNCS})">${BE_FUNCS}%</div><div class="stat-label">Functions</div></div>
+                      <div class="stat"><div class="stat-value $(get_color ${BE_BRANCH})">${BE_BRANCH}%</div><div class="stat-label">Branches</div></div>
+                    </div>
+                    <div class="component-footer">View detailed report →</div>
+                  </a>
+                  <a href="frontend/index.html" class="component-card">
+                    <div class="component-header">
+                      <div class="component-icon frontend">⚛️</div>
+                      <div class="component-info">
+                        <h3>Frontend</h3>
+                        <p>React + Capacitor · ${FE_FILES} files</p>
+                      </div>
+                    </div>
+                    <div class="component-stats">
+                      <div class="stat"><div class="stat-value $(get_color ${FE_LINES})">${FE_LINES}%</div><div class="stat-label">Lines</div></div>
+                      <div class="stat"><div class="stat-value $(get_color ${FE_FUNCS})">${FE_FUNCS}%</div><div class="stat-label">Functions</div></div>
+                      <div class="stat"><div class="stat-value $(get_color ${FE_BRANCH})">${FE_BRANCH}%</div><div class="stat-label">Branches</div></div>
+                    </div>
+                    <div class="component-footer">View detailed report →</div>
+                  </a>
+                  <a href="recommendation/index.html" class="component-card">
+                    <div class="component-header">
+                      <div class="component-icon ml">🧠</div>
+                      <div class="component-info">
+                        <h3>Recommendation Engine</h3>
+                        <p>Python Flask ML API · ${RE_FILES} files</p>
+                      </div>
+                    </div>
+                    <div class="component-stats">
+                      <div class="stat"><div class="stat-value $(get_color ${RE_LINES})">${RE_LINES}%</div><div class="stat-label">Lines</div></div>
+                      <div class="stat"><div class="stat-value $(get_color ${RE_FUNCS})">${RE_FUNCS}%</div><div class="stat-label">Functions</div></div>
+                      <div class="stat"><div class="stat-value $(get_color ${RE_BRANCH})">${RE_BRANCH}%</div><div class="stat-label">Branches</div></div>
+                    </div>
+                    <div class="component-footer">View detailed report →</div>
+                  </a>
                 </div>
-                <div class="summary-card">
-                  <h3>Average Branch Coverage</h3>
-                  <div class="summary-value $(get_color ${AVG_BRANCH})">${AVG_BRANCH}%</div>
-                  <p class="summary-label">Decision branches tested</p>
-                  <div class="progress-bar"><div class="progress-fill $(get_color ${AVG_BRANCH})" style="width: ${AVG_BRANCH}%"></div></div>
+              </section>
+              <section class="table-section">
+                <h2 class="section-title">Coverage Summary</h2>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Component</th><th>Lines</th><th>Functions</th><th>Branches</th><th>Report</th></tr></thead>
+                    <tbody>
+                      <tr><td>Backend (Bun)</td><td class="table-metric $(get_color ${BE_LINES})">${BE_LINES}%</td><td class="table-metric $(get_color ${BE_FUNCS})">${BE_FUNCS}%</td><td class="table-metric $(get_color ${BE_BRANCH})">${BE_BRANCH}%</td><td><a href="backend/index.html" class="table-link">View →</a></td></tr>
+                      <tr><td>Frontend (React)</td><td class="table-metric $(get_color ${FE_LINES})">${FE_LINES}%</td><td class="table-metric $(get_color ${FE_FUNCS})">${FE_FUNCS}%</td><td class="table-metric $(get_color ${FE_BRANCH})">${FE_BRANCH}%</td><td><a href="frontend/index.html" class="table-link">View →</a></td></tr>
+                      <tr><td>Recommendation Engine (Python)</td><td class="table-metric $(get_color ${RE_LINES})">${RE_LINES}%</td><td class="table-metric $(get_color ${RE_FUNCS})">${RE_FUNCS}%</td><td class="table-metric $(get_color ${RE_BRANCH})">${RE_BRANCH}%</td><td><a href="recommendation/index.html" class="table-link">View →</a></td></tr>
+                      <tr class="total-row"><td>Average</td><td class="table-metric">${AVG_LINES}%</td><td class="table-metric">${AVG_FUNCS}%</td><td class="table-metric">${AVG_BRANCH}%</td><td></td></tr>
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-              <h2 style="font-size: 1.25rem; margin-bottom: 1rem;">Detailed Reports (Click to View Line-by-Line Coverage)</h2>
-              <div class="quick-links">
-                <a href="backend/index.html" class="quick-link">
-                  <div class="quick-link-icon backend">⚙️</div>
-                  <div class="quick-link-content"><h4>Backend Coverage</h4><p>Bun API server • ${BE_LINES}% lines • ${BE_FILES} files</p></div>
-                </a>
-                <a href="frontend/index.html" class="quick-link">
-                  <div class="quick-link-icon frontend">🖥️</div>
-                  <div class="quick-link-content"><h4>Frontend Coverage</h4><p>React + Capacitor • ${FE_LINES}% lines • ${FE_FILES} files</p></div>
-                </a>
-                <a href="recommendation/index.html" class="quick-link">
-                  <div class="quick-link-icon recommendation">🤖</div>
-                  <div class="quick-link-content"><h4>Recommendation Engine</h4><p>Python Flask ML API • ${RE_LINES}% lines • ${RE_FILES} files</p></div>
-                </a>
-              </div>
-              <div class="table-container">
-                <div class="table-header"><h2>Coverage by Component</h2></div>
-                <table>
-                  <thead><tr><th>Component</th><th>Lines</th><th>Functions</th><th>Branches</th><th>Detailed Report</th></tr></thead>
-                  <tbody>
-                    <tr><td>Backend (Bun)</td><td class="metric $(get_color ${BE_LINES})">${BE_LINES}%</td><td class="metric $(get_color ${BE_FUNCS})">${BE_FUNCS}%</td><td class="metric $(get_color ${BE_BRANCH})">${BE_BRANCH}%</td><td><a href="backend/index.html" style="color: var(--accent);">View Details →</a></td></tr>
-                    <tr><td>Frontend (React)</td><td class="metric $(get_color ${FE_LINES})">${FE_LINES}%</td><td class="metric $(get_color ${FE_FUNCS})">${FE_FUNCS}%</td><td class="metric $(get_color ${FE_BRANCH})">${FE_BRANCH}%</td><td><a href="frontend/index.html" style="color: var(--accent);">View Details →</a></td></tr>
-                    <tr><td>Recommendation Engine (Python)</td><td class="metric $(get_color ${RE_LINES})">${RE_LINES}%</td><td class="metric $(get_color ${RE_FUNCS})">${RE_FUNCS}%</td><td class="metric $(get_color ${RE_BRANCH})">${RE_BRANCH}%</td><td><a href="recommendation/index.html" style="color: var(--accent);">View Details →</a></td></tr>
-                    <tr class="avg-row"><td>Average</td><td class="metric">${AVG_LINES}%</td><td class="metric">${AVG_FUNCS}%</td><td class="metric">${AVG_BRANCH}%</td><td></td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <footer>
+              </section>
+              <footer class="footer">
                 <p>Generated by EcoPlate CI/CD Pipeline</p>
-                <p style="margin-top: 0.5rem;">Thresholds: <span style="color: var(--good);">≥70% Good</span> • <span style="color: var(--okay);">≥50% Okay</span> • <span style="color: var(--poor);">&lt;50% Needs Work</span></p>
+                <div class="legend">
+                  <span class="legend-item"><span class="legend-dot good"></span> ≥70% Good</span>
+                  <span class="legend-item"><span class="legend-dot okay"></span> ≥50% Okay</span>
+                  <span class="legend-item"><span class="legend-dot poor"></span> &lt;50% Needs work</span>
+                </div>
               </footer>
             </div>
           </body>
