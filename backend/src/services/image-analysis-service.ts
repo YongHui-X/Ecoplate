@@ -40,7 +40,7 @@ export async function identifyIngredients(
 
   console.log("[consumption/identify] Calling OpenAI API...");
   const response = await openai.chat.completions.create({
-    model: "gpt-4.1-micro",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "user",
@@ -201,7 +201,7 @@ export async function analyzeWaste(
   }));
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4.1-micro",
+    model: "gpt-4.1-mini",
     messages: [
       {
         role: "user",
