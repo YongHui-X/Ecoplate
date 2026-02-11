@@ -3,7 +3,7 @@
  */
 
 import config from '../selenium.config';
-import { primaryUser, secondaryUser } from '../fixtures/users';
+import { testUsers } from '../fixtures/users';
 
 const API_BASE = `${config.baseUrl}/api`;
 
@@ -50,7 +50,7 @@ async function apiRequest<T = unknown>(
 /**
  * Login and get auth token
  */
-export async function getAuthToken(email: string = primaryUser.email, password: string = primaryUser.password): Promise<string | null> {
+export async function getAuthToken(email: string = testUsers.primary.email, password: string = testUsers.primary.password): Promise<string | null> {
   const response = await apiRequest<{ token: string }>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
@@ -168,8 +168,8 @@ export async function healthCheck(): Promise<boolean> {
  * Setup test data via API
  */
 export async function setupTestData(): Promise<{ primaryToken: string; secondaryToken: string } | null> {
-  const primaryToken = await getAuthToken(primaryUser.email, primaryUser.password);
-  const secondaryToken = await getAuthToken(secondaryUser.email, secondaryUser.password);
+  const primaryToken = await getAuthToken(testUsers.primary.email, testUsers.primary.password);
+  const secondaryToken = await getAuthToken(testUsers.secondary.email, testUsers.secondary.password);
 
   if (!primaryToken || !secondaryToken) {
     console.error('Failed to get auth tokens for test setup');

@@ -6,7 +6,7 @@ export class EcoLockerLoginPage extends BasePage {
   private passwordInput = By.css('input#password');
   private submitButton = By.css('button[type="submit"]');
   private errorMessage = By.css('[role="alert"]');
-  private pageTitle = By.xpath("//h1[contains(text(), 'EcoLocker')]");
+  private pageTitle = By.xpath("//*[contains(text(), 'EcoLocker')]");
   private ecoPlateRef = By.xpath("//*[contains(text(), 'EcoPlate')]");
 
   async goto(): Promise<void> {

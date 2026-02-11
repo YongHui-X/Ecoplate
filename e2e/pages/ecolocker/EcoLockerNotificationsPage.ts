@@ -13,6 +13,10 @@ export class EcoLockerNotificationsPage extends BasePage {
     await this.navigate('/ecolocker/notifications');
   }
 
+  async waitForPageLoad(timeout = 15000): Promise<void> {
+    await this.waitForElement(this.pageTitle, timeout);
+  }
+
   async isPageTitleVisible(): Promise<boolean> {
     return this.isVisible(this.pageTitle);
   }

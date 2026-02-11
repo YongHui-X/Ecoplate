@@ -19,7 +19,7 @@ describe('EcoLocker Notifications', () => {
 
   beforeEach(async () => {
     await notificationsPage.goto();
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await notificationsPage.waitForPageLoad();
   });
 
   it('should display Notifications page title', async () => {

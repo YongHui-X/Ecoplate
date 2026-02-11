@@ -19,7 +19,7 @@ describe('EcoLocker Orders', () => {
 
   beforeEach(async () => {
     await ordersPage.goto();
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await ordersPage.waitForPageLoad();
   });
 
   it('should display "My Orders" page title', async () => {

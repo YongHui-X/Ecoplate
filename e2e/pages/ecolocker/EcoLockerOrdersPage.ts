@@ -12,6 +12,10 @@ export class EcoLockerOrdersPage extends BasePage {
     await this.navigate('/ecolocker/orders');
   }
 
+  async waitForPageLoad(timeout = 15000): Promise<void> {
+    await this.waitForElement(this.pageTitle, timeout);
+  }
+
   async isPageTitleVisible(): Promise<boolean> {
     return this.isVisible(this.pageTitle);
   }
