@@ -27,7 +27,6 @@ function markerIcon(svg: string): google.maps.Icon {
 interface UseLockerMarkersOptions {
   map: google.maps.Map | null;
   infoWindow: google.maps.InfoWindow | null;
-  isMapLoaded: boolean;
   lockers: Locker[];
   selectable: boolean;
   onInfoWindowRender: (container: HTMLDivElement, locker: Locker, onSelect: () => void) => void;
@@ -36,7 +35,6 @@ interface UseLockerMarkersOptions {
 export function useLockerMarkers({
   map,
   infoWindow,
-  isMapLoaded,
   lockers,
   selectable,
   onInfoWindowRender,
@@ -80,7 +78,7 @@ export function useLockerMarkers({
 
   // Create/update markers when map or lockers change
   useEffect(() => {
-    if (!map || !isMapLoaded || !infoWindow) return;
+    if (!map || !infoWindow) return;
 
     // Clear existing markers
     markersRef.current.forEach((marker) => marker.setMap(null));
@@ -120,7 +118,7 @@ export function useLockerMarkers({
       }
       return prev;
     });
-  }, [map, isMapLoaded, infoWindow, lockers, selectable, selectLocker]);
+  }, [map, infoWindow, lockers, selectable, selectLocker]);
 
   return { selectedLocker, selectLocker, clearSelection };
 }

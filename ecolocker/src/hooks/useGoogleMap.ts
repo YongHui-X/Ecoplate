@@ -32,8 +32,8 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
 
 export function useGoogleMap() {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [infoWindow, setInfoWindow] = useState<google.maps.InfoWindow | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,9 +52,9 @@ export function useGoogleMap() {
 
   // Initialize the map once script is loaded - does NOT depend on user location
   useEffect(() => {
-    if (!isLoaded || !mapRef.current || mapInstanceRef.current) return;
+    if (!isLoaded || !mapRef.current || map) return;
 
-    mapInstanceRef.current = new google.maps.Map(mapRef.current, {
+    setMap(new google.maps.Map(mapRef.current, {
       center: DEFAULT_CENTER,
       zoom: 12,
       disableDefaultUI: false,
@@ -62,15 +62,15 @@ export function useGoogleMap() {
       streetViewControl: false,
       mapTypeControl: false,
       fullscreenControl: true,
-    });
+    }));
 
-    infoWindowRef.current = new google.maps.InfoWindow();
-  }, [isLoaded]);
+    setInfoWindow(new google.maps.InfoWindow());
+  }, [isLoaded, map]);
 
   return {
     mapRef,
-    map: mapInstanceRef.current,
-    infoWindow: infoWindowRef.current,
+    map,
+    infoWindow,
     isLoaded,
     error,
   };

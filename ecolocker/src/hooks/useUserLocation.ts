@@ -9,10 +9,9 @@ const BLUE_DOT_SVG =
 
 interface UseUserLocationOptions {
   map: google.maps.Map | null;
-  isMapLoaded: boolean;
 }
 
-export function useUserLocation({ map, isMapLoaded }: UseUserLocationOptions) {
+export function useUserLocation({ map }: UseUserLocationOptions) {
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +40,7 @@ export function useUserLocation({ map, isMapLoaded }: UseUserLocationOptions) {
 
   // Pan map and add/update blue marker when coordinates arrive
   useEffect(() => {
-    if (!map || !isMapLoaded || !coordinates) return;
+    if (!map || !coordinates) return;
 
     map.panTo(coordinates);
 
@@ -56,7 +55,7 @@ export function useUserLocation({ map, isMapLoaded }: UseUserLocationOptions) {
         icon: { url: BLUE_DOT_SVG },
       });
     }
-  }, [map, isMapLoaded, coordinates]);
+  }, [map, coordinates]);
 
   return { coordinates, loading, error };
 }

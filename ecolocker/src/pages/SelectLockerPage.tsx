@@ -64,8 +64,8 @@ export function SelectLockerPage() {
   const [creating, setCreating] = useState(false);
 
   // Map hooks — independent lifecycle, no overlapping deps
-  const { mapRef, map, infoWindow, isLoaded: isMapLoaded, error: mapLoadError } = useGoogleMap();
-  useUserLocation({ map, isMapLoaded });
+  const { mapRef, map, infoWindow, isLoaded, error: mapLoadError } = useGoogleMap();
+  useUserLocation({ map });
 
   const renderInfoWindow = useCallback(
     (container: HTMLDivElement, locker: Locker, onSelect: () => void) => {
@@ -78,7 +78,6 @@ export function SelectLockerPage() {
   const { selectedLocker } = useLockerMarkers({
     map,
     infoWindow,
-    isMapLoaded,
     lockers,
     selectable: true,
     onInfoWindowRender: renderInfoWindow,
@@ -220,7 +219,7 @@ export function SelectLockerPage() {
 
       {/* Map */}
       <div className="flex-1 relative">
-        {!isMapLoaded && (
+        {!isLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
