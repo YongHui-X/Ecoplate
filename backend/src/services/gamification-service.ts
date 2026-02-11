@@ -128,8 +128,6 @@ export async function awardPoints(
       todayDate: today,
       quantity: quantity ?? 1,
       type: action,
-      // Store pre-calculated CO2 value for dashboard (important when product is deleted)
-      co2Value: co2Value,
     });
   }
 

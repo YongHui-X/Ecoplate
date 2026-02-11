@@ -106,7 +106,7 @@ export default function ConversationPage() {
     setMarkingSold(true);
     try {
       // Pass the buyer's ID from the conversation
-      const result = await marketplaceService.completeListing(
+      await marketplaceService.completeListing(
         conversation.listingId,
         conversation.buyer.id
       );
