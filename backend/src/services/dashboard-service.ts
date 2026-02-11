@@ -4,18 +4,22 @@ import * as schema from "../db/schema";
 
 type Period = "day" | "month" | "annual";
 
+// Category CO2 factors (kg CO2e per kg food) - unified with consumption-service.ts
 const CATEGORY_CO2_FACTORS: Record<string, number> = {
-  meat: 27.0,
-  dairy: 3.2,
-  produce: 1.5,
-  vegetables: 2.0,
-  fruits: 1.1,
-  grains: 1.4,
-  pantry: 1.5,
-  seafood: 6.1,
-  bakery: 1.3,
-  beverages: 0.8,
-  other: 2.5,
+  meat: 15.0,
+  protein: 15.0,
+  dairy: 5.0,
+  produce: 0.5,
+  vegetables: 0.5,
+  fruits: 0.5,
+  grains: 1.2,
+  pantry: 2.0,
+  seafood: 6.0,
+  bakery: 1.0,
+  beverages: 1.0,
+  snacks: 2.5,
+  frozen: 3.0,
+  other: 3.0,
 };
 
 function normalizeCategory(category: string | null): string {

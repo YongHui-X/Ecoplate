@@ -4,70 +4,102 @@ import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import type * as schema from "../db/schema";
 
 // ==================== Emission Factors ====================
-// Source: sustainability_scoring_system.md - kg CO2e per kg food
+// Source: Unified with frontend/src/utils/co2Calculator.ts (kg CO2e per kg food)
 
 export const EMISSION_FACTORS: Record<string, number> = {
-  // Proteins
-  beef: 99.0,
-  lamb: 39.0,
-  pork: 12.0,
-  chicken: 9.0,
-  fish: 13.0,
-  salmon: 13.0,
-  tuna: 13.0,
-  shrimp: 13.0,
-  prawns: 13.0,
-  eggs: 4.5,
+  // Meat & Poultry
+  beef: 27.0,
+  steak: 27.0,
+  lamb: 39.2,
+  pork: 12.1,
+  chicken: 6.9,
+  poultry: 6.9,
+  turkey: 10.9,
+  // Seafood
+  salmon: 6.0,
+  tuna: 6.1,
+  shrimp: 18.0,
+  prawn: 18.0,
+  fish: 5.5,
+  // Dairy & Eggs
+  cheese: 13.5,
+  milk: 3.2,
+  butter: 12.0,
+  yogurt: 2.2,
+  yoghurt: 2.2,
+  egg: 4.8,
+  eggs: 4.8,
+  cream: 7.6,
+  // Grains & Bread
+  rice: 2.7,
+  bread: 0.9,
+  pasta: 1.1,
+  noodle: 1.1,
+  flour: 0.9,
+  cereal: 0.9,
+  oat: 0.9,
+  // Fruits
+  banana: 0.7,
+  apple: 0.3,
+  orange: 0.3,
+  citrus: 0.3,
+  berr: 1.1,
+  avocado: 0.8,
+  mango: 0.8,
+  grape: 1.4,
+  // Vegetables
+  tomato: 1.4,
+  potato: 0.3,
+  carrot: 0.2,
+  lettuce: 0.2,
+  salad: 0.2,
+  broccoli: 0.4,
+  onion: 0.3,
+  cucumber: 0.3,
+  pepper: 0.7,
+  capsicum: 0.7,
+  // Beverages
+  coffee: 4.0,
+  tea: 1.0,
+  juice: 1.1,
+  soda: 0.4,
+  beer: 0.3,
+  wine: 1.3,
+  // Snacks & Processed
+  chocolate: 19.0,
+  cocoa: 19.0,
+  cookie: 2.5,
+  biscuit: 2.5,
+  chips: 2.3,
+  crisp: 2.3,
+  candy: 3.0,
+  sweet: 3.0,
+  // Oils & Condiments
+  oil: 3.0,
+  sauce: 1.5,
+  ketchup: 1.5,
+  // Nuts & Seeds
+  almond: 2.3,
+  nut: 2.3,
+  // Legacy/Other
   tofu: 3.0,
   legumes: 0.9,
   beans: 0.9,
   lentils: 0.9,
-  // Dairy
-  cheese: 13.5,
-  milk: 8.0,
-  yogurt: 5.0,
-  butter: 12.0,
-  // Grains & Starches
-  rice: 4.0,
-  wheat: 1.5,
-  bread: 1.5,
-  pasta: 2.5,
-  potatoes: 0.5,
-  // Vegetables
-  lettuce: 2.0,
-  spinach: 2.0,
-  kale: 2.0,
-  carrots: 0.4,
-  onions: 0.5,
-  garlic: 0.5,
-  tomatoes: 2.0,
-  mushrooms: 2.5,
-  broccoli: 2.0,
-  cabbage: 2.0,
-  peppers: 2.0,
-  // Fruits
-  berries: 1.5,
-  apples: 0.6,
-  bananas: 0.9,
-  oranges: 0.7,
-  lemons: 0.7,
-  mango: 1.5,
-  grapes: 1.5,
-  // Processed
-  canned: 3.0,
-  frozen: 4.0,
-  snacks: 5.0,
 };
 
 export const CATEGORY_FALLBACKS: Record<string, number> = {
   meat: 15.0,
-  dairy: 9.0,
-  produce: 1.5,
-  pantry: 2.5,
-  bakery: 1.5,
-  frozen: 4.0,
+  protein: 15.0,
+  dairy: 5.0,
+  produce: 0.5,
+  grains: 1.2,
   beverages: 1.0,
-  other: 2.0,
+  snacks: 2.5,
+  pantry: 2.0,
+  bakery: 1.0,
+  frozen: 3.0,
+  other: 3.0,
 };
 
 export const DISPOSAL_EMISSION_FACTORS: Record<string, number> = {
