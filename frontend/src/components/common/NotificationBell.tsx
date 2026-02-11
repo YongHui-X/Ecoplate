@@ -7,9 +7,9 @@ import { Notification } from "../../services/notifications";
 function getNotificationIcon(type: Notification["type"]) {
   switch (type) {
     case "expiring_soon":
-      return <Clock className="h-4 w-4 text-orange-500" />;
+      return <Clock className="h-4 w-4 text-warning" />;
     case "badge_unlocked":
-      return <Award className="h-4 w-4 text-green-500" />;
+      return <Award className="h-4 w-4 text-success" />;
     case "streak_milestone":
       return <Flame className="h-4 w-4 text-primary" />;
     case "product_stale":

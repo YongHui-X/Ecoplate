@@ -2,6 +2,42 @@ import '@testing-library/jest-dom';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
+// Mock ResizeObserver for Recharts and other components that use it
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+
+// Suppress Recharts width/height warnings in tests (jsdom limitation)
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+beforeEach(() => {
+  // Suppress Recharts dimension warnings
+  console.error = (...args: unknown[]) => {
+    const message = args[0];
+    if (typeof message === 'string' && message.includes('width') && message.includes('height')) {
+      return;
+    }
+    originalConsoleError.apply(console, args);
+  };
+  console.warn = (...args: unknown[]) => {
+    const message = args[0];
+    if (typeof message === 'string' && message.includes('width') && message.includes('height')) {
+      return;
+    }
+    originalConsoleWarn.apply(console, args);
+  };
+});
+
+afterEach(() => {
+  // Restore console methods
+  console.error = originalConsoleError;
+  console.warn = originalConsoleWarn;
+});
+
 // Setup portal container for Radix UI dialogs before each test
 beforeEach(() => {
   // Create a portal root for Radix UI components (Dialog, Popover, etc.)

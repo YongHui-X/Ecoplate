@@ -209,11 +209,11 @@ export default function CreateListingPage() {
         </CardHeader>
         <CardContent>
           {product && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-700">
+            <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-xl">
+              <p className="text-sm text-primary">
                 <strong>Pre-filled from MyFridge:</strong> {product.productName}
               </p>
-              <p className="text-xs text-blue-600 mt-1">
+              <p className="text-xs text-primary/80 mt-1">
                 Review and update the details below, then add photos and pricing information.
               </p>
             </div>
@@ -263,7 +263,7 @@ export default function CreateListingPage() {
                     <button
                       type="button"
                       onClick={() => removeImage(index)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -274,14 +274,14 @@ export default function CreateListingPage() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center hover:border-primary hover:bg-gray-50 transition-colors"
+                    className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center hover:border-primary hover:bg-muted transition-colors"
                   >
-                    <ImagePlus className="h-6 w-6 text-gray-400" />
-                    <span className="text-xs text-gray-500 mt-1">Add</span>
+                    <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground mt-1">Add</span>
                   </button>
                 )}
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Add up to 5 images. First image will be the cover photo.
               </p>
             </div>
@@ -349,7 +349,7 @@ export default function CreateListingPage() {
             </div>
 
             {/* CO2 Preview */}
-            <Co2PreviewSection category={category} quantity={quantity} unit={unit} />
+            <Co2PreviewSection category={category} quantity={quantity} unit={unit} title={title} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -483,17 +483,19 @@ function Co2PreviewSection({
   category,
   quantity,
   unit,
+  title,
 }: {
   category: string;
   quantity: number;
   unit: string;
+  title: string;
 }) {
   const co2Estimate = useMemo(() => {
     if (!category || !quantity || quantity <= 0) {
       return null;
     }
-    return calculateCo2Preview(quantity, unit, category);
-  }, [category, quantity, unit]);
+    return calculateCo2Preview(quantity, unit, category, title);
+  }, [category, quantity, unit, title]);
 
   if (!co2Estimate) {
     return null;
@@ -508,7 +510,7 @@ function Co2PreviewSection({
       </div>
       <div>
         <p className="text-sm font-medium text-foreground">
-          Estimated CO2 Saved: <span className="text-success">{formattedValue} kg</span>
+          Estimated CO₂ Reduced: <span className="text-success">{formattedValue} kg</span>
         </p>
         <p className="text-xs text-muted-foreground">
           By sharing this food, you're helping reduce emissions from food waste

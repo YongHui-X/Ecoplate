@@ -180,8 +180,8 @@ export default function NotificationsPage() {
                 >
                   <div className={cn(
                     "flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center",
-                    notification.type === "expiring_soon" && "bg-orange-100",
-                    notification.type === "badge_unlocked" && "bg-green-100",
+                    notification.type === "expiring_soon" && "bg-warning/15",
+                    notification.type === "badge_unlocked" && "bg-success/15",
                     notification.type === "streak_milestone" && "bg-primary/10",
                     notification.type === "product_stale" && "bg-muted"
                   )}>

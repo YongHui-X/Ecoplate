@@ -71,18 +71,18 @@ describe("RewardsPage", () => {
       if (url.includes("/api/v1/rewards/balance")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ balance: 1000 }),
+          text: () => Promise.resolve(JSON.stringify({ balance: 1000 })),
         });
       }
       if (url.includes("/api/v1/rewards") && !url.includes("redeem")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockRewards),
+          text: () => Promise.resolve(JSON.stringify(mockRewards)),
         });
       }
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(JSON.stringify({})),
       });
     });
   });
@@ -176,18 +176,18 @@ describe("RewardsPage - Filtering", () => {
       if (url.includes("/api/v1/rewards/balance")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ balance: 1000 }),
+          text: () => Promise.resolve(JSON.stringify({ balance: 1000 })),
         });
       }
       if (url.includes("/api/v1/rewards")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockRewards),
+          text: () => Promise.resolve(JSON.stringify(mockRewards)),
         });
       }
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(JSON.stringify({})),
       });
     });
   });
@@ -252,30 +252,30 @@ describe("RewardsPage - Redemption", () => {
       if (url.includes("/api/v1/rewards/balance")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ balance: 1000 }),
+          text: () => Promise.resolve(JSON.stringify({ balance: 1000 })),
         });
       }
       if (url.includes("/api/v1/rewards/redeem") && options?.method === "POST") {
         return Promise.resolve({
           ok: true,
-          json: () =>
-            Promise.resolve({
+          text: () =>
+            Promise.resolve(JSON.stringify({
               id: 1,
               redemptionCode: "EP-ABC12345",
               pointsSpent: 500,
               reward: mockRewards[0],
-            }),
+            })),
         });
       }
       if (url.includes("/api/v1/rewards")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockRewards),
+          text: () => Promise.resolve(JSON.stringify(mockRewards)),
         });
       }
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(JSON.stringify({})),
       });
     });
   });
@@ -406,7 +406,7 @@ describe("RewardsPage - Error Handling", () => {
     mockFetch.mockImplementation(() => {
       return Promise.resolve({
         ok: false,
-        json: () => Promise.resolve({ error: "Server error" }),
+        text: () => Promise.resolve(JSON.stringify({ error: "Server error" })),
       });
     });
 
@@ -426,22 +426,22 @@ describe("RewardsPage - Error Handling", () => {
       if (url.includes("/api/v1/rewards/balance")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ balance: 1000 }),
+          text: () => Promise.resolve(JSON.stringify({ balance: 1000 })),
         });
       }
       if (url.includes("/api/v1/rewards/redeem") && options?.method === "POST") {
         return Promise.resolve({
           ok: false,
-          json: () => Promise.resolve({ error: "Insufficient points" }),
+          text: () => Promise.resolve(JSON.stringify({ error: "Insufficient points" })),
         });
       }
       if (url.includes("/api/v1/rewards")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockRewards),
+          text: () => Promise.resolve(JSON.stringify(mockRewards)),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
 
     renderWithRouter(<RewardsPage />);
@@ -475,16 +475,16 @@ describe("RewardsPage - Empty State", () => {
       if (url.includes("/api/v1/rewards/balance")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ balance: 0 }),
+          text: () => Promise.resolve(JSON.stringify({ balance: 0 })),
         });
       }
       if (url.includes("/api/v1/rewards")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([]),
+          text: () => Promise.resolve(JSON.stringify([])),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 

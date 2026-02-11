@@ -80,10 +80,10 @@ describe("MyListingsPage", () => {
       if (url.includes("/marketplace/my-listings")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockListings),
+          text: () => Promise.resolve(JSON.stringify(mockListings)),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 
@@ -196,10 +196,10 @@ describe("MyListingsPage - Empty State", () => {
       if (url.includes("/marketplace/my-listings")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([]),
+          text: () => Promise.resolve(JSON.stringify([])),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 

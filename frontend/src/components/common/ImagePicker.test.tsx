@@ -120,7 +120,7 @@ describe("ImagePicker", () => {
     );
 
     const removeButtons = screen.getAllByRole("button", { name: "" }).filter((btn) =>
-      btn.classList.contains("bg-red-600")
+      btn.classList.contains("bg-destructive")
     );
 
     fireEvent.click(removeButtons[0]);

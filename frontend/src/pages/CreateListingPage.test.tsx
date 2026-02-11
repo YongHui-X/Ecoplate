@@ -44,8 +44,8 @@ describe("CreateListingPage", () => {
       if (url.includes("/marketplace/price-recommendation")) {
         return Promise.resolve({
           ok: true,
-          json: () =>
-            Promise.resolve({
+          text: () =>
+            Promise.resolve(JSON.stringify({
               recommended_price: 8.0,
               min_price: 6.0,
               max_price: 10.0,
@@ -55,10 +55,10 @@ describe("CreateListingPage", () => {
               category: "produce",
               urgency_label: "Normal",
               reasoning: "Based on expiry date and category",
-            }),
+            })),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 
@@ -198,7 +198,7 @@ describe("CreateListingPage", () => {
     fireEvent.change(quantityInput, { target: { value: "2" } });
 
     await waitFor(() => {
-      expect(screen.getByText(/Estimated CO2 Saved/)).toBeInTheDocument();
+      expect(screen.getByText(/Estimated CO₂ Reduced/)).toBeInTheDocument();
     });
   });
 });

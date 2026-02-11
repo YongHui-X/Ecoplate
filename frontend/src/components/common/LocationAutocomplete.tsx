@@ -168,11 +168,11 @@ export function LocationAutocomplete({
       {label && (
         <Label htmlFor="location-input">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-destructive ml-1">*</span>}
         </Label>
       )}
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           id="location-input"
           type="text"
@@ -189,31 +189,31 @@ export function LocationAutocomplete({
           required={required}
         />
         {loading && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
         )}
       </div>
 
       {/* Suggestions Dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
           {suggestions.map((suggestion, index) => (
             <button
               key={`${suggestion.lat}-${suggestion.lon}`}
               type="button"
               onClick={() => handleSelectSuggestion(suggestion)}
               className={cn(
-                'w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0',
+                'w-full text-left px-4 py-3 hover:bg-muted transition-colors border-b border-border/50 last:border-b-0',
                 selectedIndex === index && 'bg-primary/5'
               )}
             >
               <div className="flex items-start gap-2">
                 <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-foreground truncate">
                     {formatSuggestion(suggestion)}
                   </p>
                   {suggestion.address.postcode && (
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Postal Code: {suggestion.address.postcode}
                     </p>
                   )}
@@ -226,15 +226,15 @@ export function LocationAutocomplete({
 
       {/* No results message */}
       {showSuggestions && !loading && value.length >= 3 && suggestions.length === 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4">
-          <p className="text-sm text-gray-500 text-center">
+        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg p-4">
+          <p className="text-sm text-muted-foreground text-center">
             No locations found. Try a different search term.
           </p>
         </div>
       )}
 
       {/* Helper text */}
-      <p className="text-xs text-gray-500 mt-1">
+      <p className="text-xs text-muted-foreground mt-1">
         Start typing to search for Singapore addresses, postal codes, or landmarks
       </p>
     </div>

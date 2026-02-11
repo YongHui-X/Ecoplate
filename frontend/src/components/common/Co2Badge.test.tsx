@@ -59,7 +59,7 @@ describe('Co2Badge', () => {
     it('should render with valid co2Saved value', () => {
       render(<Co2Badge co2Saved={5.0} variant="full" />);
 
-      expect(screen.getByText('CO2 Saved')).toBeInTheDocument();
+      expect(screen.getByText('Total CO₂ Reduced')).toBeInTheDocument();
       expect(screen.getByText('5.0 kg')).toBeInTheDocument();
     });
 
@@ -72,7 +72,7 @@ describe('Co2Badge', () => {
     it('should apply custom className', () => {
       render(<Co2Badge co2Saved={5.0} variant="full" className="custom-full" />);
 
-      const container = screen.getByText('CO2 Saved').closest('div');
+      const container = screen.getByText('Total CO₂ Reduced').closest('div');
       expect(container?.parentElement).toHaveClass('custom-full');
     });
   });
@@ -203,6 +203,68 @@ describe('calculateCo2Preview', () => {
       // Unknown unit treated as item: 1 * 0.3 * (2.5 + 0.5) = 0.9
       const result = calculateCo2Preview(1, 'pieces', 'other');
       expect(result).toBe(0.9);
+    });
+  });
+
+  describe('product-specific emission factors', () => {
+    it('should use product-specific factor for grapes (1.4)', () => {
+      // 1kg grapes: 1 * (1.4 + 0.5) = 1.9
+      const result = calculateCo2Preview(1, 'kg', 'produce', 'Fresh Grapes');
+      expect(result).toBe(1.9);
+    });
+
+    it('should use product-specific factor for beef (27.0)', () => {
+      // 1kg beef: 1 * (27.0 + 0.5) = 27.5
+      const result = calculateCo2Preview(1, 'kg', 'meat', 'Ground Beef');
+      expect(result).toBe(27.5);
+    });
+
+    it('should use product-specific factor for chicken (6.9)', () => {
+      // 1kg chicken: 1 * (6.9 + 0.5) = 7.4
+      const result = calculateCo2Preview(1, 'kg', 'meat', 'Chicken Breast');
+      expect(result).toBe(7.4);
+    });
+
+    it('should use product-specific factor for cheese (13.5)', () => {
+      // 1kg cheese: 1 * (13.5 + 0.5) = 14.0
+      const result = calculateCo2Preview(1, 'kg', 'dairy', 'Cheddar Cheese');
+      expect(result).toBe(14);
+    });
+
+    it('should use product-specific factor for chocolate (19.0)', () => {
+      // 1kg chocolate: 1 * (19.0 + 0.5) = 19.5
+      const result = calculateCo2Preview(1, 'kg', 'snacks', 'Dark Chocolate');
+      expect(result).toBe(19.5);
+    });
+
+    it('should use product-specific factor for salmon (6.0)', () => {
+      // 1kg salmon: 1 * (6.0 + 0.5) = 6.5
+      const result = calculateCo2Preview(1, 'kg', 'seafood', 'Fresh Salmon');
+      expect(result).toBe(6.5);
+    });
+
+    it('should use product-specific factor for lamb (39.2)', () => {
+      // 1kg lamb: 1 * (39.2 + 0.5) = 39.7
+      const result = calculateCo2Preview(1, 'kg', 'meat', 'Lamb Chops');
+      expect(result).toBe(39.7);
+    });
+
+    it('should use product-specific factor for shrimp (18.0)', () => {
+      // 1kg shrimp: 1 * (18.0 + 0.5) = 18.5
+      const result = calculateCo2Preview(1, 'kg', 'seafood', 'Frozen Shrimp');
+      expect(result).toBe(18.5);
+    });
+
+    it('should fall back to category when product name has no match', () => {
+      // 1kg unknown produce: 1 * (1.0 + 0.5) = 1.5
+      const result = calculateCo2Preview(1, 'kg', 'produce', 'Exotic Fruit XYZ');
+      expect(result).toBe(1.5);
+    });
+
+    it('should fall back to category when productName is not provided', () => {
+      // 1kg produce without name: 1 * (1.0 + 0.5) = 1.5
+      const result = calculateCo2Preview(1, 'kg', 'produce');
+      expect(result).toBe(1.5);
     });
   });
 });

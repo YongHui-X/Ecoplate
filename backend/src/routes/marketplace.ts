@@ -150,248 +150,287 @@ export function registerMarketplaceRoutes(router: Router) {
 
   // Get all listings (excludes user's own listings - marketplace behavior)
   router.get("/api/v1/marketplace/listings", async (req) => {
-    const user = getUser(req);
-    const url = new URL(req.url);
-    const search = url.searchParams.get("search") || "";
-    const category = url.searchParams.get("category") || "";
+    try {
+      const user = getUser(req);
+      const url = new URL(req.url);
+      const search = url.searchParams.get("search") || "";
+      const category = url.searchParams.get("category") || "";
 
-    const allListings = await db.query.marketplaceListings.findMany({
-      where: and(
-        ne(marketplaceListings.sellerId, user.id),
-        eq(marketplaceListings.status, "active")
-      ),
-      with: {
-        seller: {
-          columns: { id: true, name: true, avatarUrl: true },
+      const allListings = await db.query.marketplaceListings.findMany({
+        where: and(
+          ne(marketplaceListings.sellerId, user.id),
+          eq(marketplaceListings.status, "active")
+        ),
+        with: {
+          seller: {
+            columns: { id: true, name: true, avatarUrl: true },
+          },
         },
-      },
-      orderBy: [desc(marketplaceListings.createdAt)],
-    });
+        orderBy: [desc(marketplaceListings.createdAt)],
+      });
 
-    let filtered = allListings;
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(
-        (l) =>
-          l.title.toLowerCase().includes(searchLower) ||
-          l.description?.toLowerCase().includes(searchLower)
-      );
-    }
-    if (category) {
-      filtered = filtered.filter((l) => l.category === category);
-    }
+      let filtered = allListings;
+      if (search) {
+        const searchLower = search.toLowerCase();
+        filtered = filtered.filter(
+          (l) =>
+            l.title.toLowerCase().includes(searchLower) ||
+            l.description?.toLowerCase().includes(searchLower)
+        );
+      }
+      if (category) {
+        filtered = filtered.filter((l) => l.category === category);
+      }
 
-    return json(filtered);
+      return json(filtered);
+    } catch (e) {
+      console.error("Get listings error:", e);
+      return error("Failed to fetch listings", 500);
+    }
   });
 
   // Get nearby listings (for map view)
   router.get("/api/v1/marketplace/listings/nearby", async (req) => {
-    const user = getUser(req);
-    const url = new URL(req.url);
+    try {
+      const user = getUser(req);
+      const url = new URL(req.url);
 
-    const lat = parseFloat(url.searchParams.get("lat") || "");
-    const lng = parseFloat(url.searchParams.get("lng") || "");
-    const radius = parseFloat(url.searchParams.get("radius") || "10");
+      const lat = parseFloat(url.searchParams.get("lat") || "");
+      const lng = parseFloat(url.searchParams.get("lng") || "");
+      const radius = parseFloat(url.searchParams.get("radius") || "10");
 
-    // Validate coordinates
-    if (isNaN(lat) || isNaN(lng)) {
-      return error("Invalid latitude or longitude", 400);
-    }
+      // Validate coordinates
+      if (isNaN(lat) || isNaN(lng)) {
+        return error("Invalid latitude or longitude", 400);
+      }
 
-    // Validate coordinate bounds (valid lat: -90 to 90, lng: -180 to 180)
-    if (lat < -90 || lat > 90) {
-      return error("Latitude must be between -90 and 90", 400);
-    }
+      // Validate coordinate bounds (valid lat: -90 to 90, lng: -180 to 180)
+      if (lat < -90 || lat > 90) {
+        return error("Latitude must be between -90 and 90", 400);
+      }
 
-    if (lng < -180 || lng > 180) {
-      return error("Longitude must be between -180 and 180", 400);
-    }
+      if (lng < -180 || lng > 180) {
+        return error("Longitude must be between -180 and 180", 400);
+      }
 
-    // Validate radius bounds (0.1km to 100km max to prevent DoS)
-    if (isNaN(radius) || radius < 0.1 || radius > 100) {
-      return error("Radius must be between 0.1 and 100 km", 400);
-    }
+      // Validate radius bounds (0.1km to 100km max to prevent DoS)
+      if (isNaN(radius) || radius < 0.1 || radius > 100) {
+        return error("Radius must be between 0.1 and 100 km", 400);
+      }
 
-    const userLocation: Coordinates = { latitude: lat, longitude: lng };
+      const userLocation: Coordinates = { latitude: lat, longitude: lng };
 
-    const allListings = await db.query.marketplaceListings.findMany({
-      where: and(
-        ne(marketplaceListings.sellerId, user.id),
-        eq(marketplaceListings.status, "active")
-      ),
-      with: {
-        seller: {
-          columns: { id: true, name: true, avatarUrl: true },
+      const allListings = await db.query.marketplaceListings.findMany({
+        where: and(
+          ne(marketplaceListings.sellerId, user.id),
+          eq(marketplaceListings.status, "active")
+        ),
+        with: {
+          seller: {
+            columns: { id: true, name: true, avatarUrl: true },
+          },
         },
-      },
-      orderBy: [desc(marketplaceListings.createdAt)],
-    });
+        orderBy: [desc(marketplaceListings.createdAt)],
+      });
 
-    const listingsWithDistance = allListings
-      .map((listing) => {
-        const coords = parseCoordinates(listing.pickupLocation);
+      const listingsWithDistance = allListings
+        .map((listing) => {
+          const coords = parseCoordinates(listing.pickupLocation);
 
-        if (!coords) {
-          return null;
-        }
+          if (!coords) {
+            return null;
+          }
 
-        const distance = calculateDistance(userLocation, coords);
+          const distance = calculateDistance(userLocation, coords);
 
-        let cleanAddress = listing.pickupLocation;
-        if (listing.pickupLocation?.includes("|")) {
-          cleanAddress = listing.pickupLocation.split("|")[0];
-        }
+          let cleanAddress = listing.pickupLocation;
+          if (listing.pickupLocation?.includes("|")) {
+            cleanAddress = listing.pickupLocation.split("|")[0];
+          }
 
-        return {
-          ...listing,
-          pickupLocation: cleanAddress,
-          coordinates: coords,
-          distance,
-        };
-      })
-      .filter((listing) => listing !== null && listing.distance <= radius)
-      .sort((a, b) => (a!.distance || 0) - (b!.distance || 0));
+          return {
+            ...listing,
+            pickupLocation: cleanAddress,
+            coordinates: coords,
+            distance,
+          };
+        })
+        .filter((listing) => listing !== null && listing.distance <= radius)
+        .sort((a, b) => (a!.distance || 0) - (b!.distance || 0));
 
-    return json(listingsWithDistance);
+      return json(listingsWithDistance);
+    } catch (e) {
+      console.error("Get nearby listings error:", e);
+      return error("Failed to fetch nearby listings", 500);
+    }
   });
 
   // Get user's own listings (as seller)
   router.get("/api/v1/marketplace/my-listings", async (req) => {
-    const user = getUser(req);
+    try {
+      const user = getUser(req);
 
-    const listings = await db.query.marketplaceListings.findMany({
-      where: eq(marketplaceListings.sellerId, user.id),
-      orderBy: [desc(marketplaceListings.createdAt)],
-    });
+      const listings = await db.query.marketplaceListings.findMany({
+        where: eq(marketplaceListings.sellerId, user.id),
+        orderBy: [desc(marketplaceListings.createdAt)],
+      });
 
-    return json(listings);
+      return json(listings);
+    } catch (e) {
+      console.error("Get my listings error:", e);
+      return error("Failed to fetch your listings", 500);
+    }
   });
 
   // Get user's purchase history (as buyer)
   router.get("/api/v1/marketplace/my-purchases", async (req) => {
-    const user = getUser(req);
+    try {
+      const user = getUser(req);
 
-    const purchases = await db.query.marketplaceListings.findMany({
-      where: eq(marketplaceListings.buyerId, user.id),
-      with: {
-        seller: {
-          columns: { id: true, name: true, avatarUrl: true },
+      const purchases = await db.query.marketplaceListings.findMany({
+        where: eq(marketplaceListings.buyerId, user.id),
+        with: {
+          seller: {
+            columns: { id: true, name: true, avatarUrl: true },
+          },
         },
-      },
-      orderBy: [desc(marketplaceListings.completedAt)],
-    });
+        orderBy: [desc(marketplaceListings.completedAt)],
+      });
 
-    return json(purchases);
+      return json(purchases);
+    } catch (e) {
+      console.error("Get my purchases error:", e);
+      return error("Failed to fetch your purchases", 500);
+    }
   });
 
   // Get single listing
   router.get("/api/v1/marketplace/listings/:id", async (req, params) => {
-    const listingId = parseInt(params.id, 10);
+    try {
+      const listingId = parseInt(params.id, 10);
 
-    const listing = await db.query.marketplaceListings.findFirst({
-      where: eq(marketplaceListings.id, listingId),
-      with: {
-        seller: {
-          columns: { id: true, name: true, avatarUrl: true },
+      if (isNaN(listingId) || listingId <= 0) {
+        return error("Invalid listing ID", 400);
+      }
+
+      const listing = await db.query.marketplaceListings.findFirst({
+        where: eq(marketplaceListings.id, listingId),
+        with: {
+          seller: {
+            columns: { id: true, name: true, avatarUrl: true },
+          },
         },
-      },
-    });
+      });
 
-    if (!listing) {
-      return error("Listing not found", 404);
+      if (!listing) {
+        return error("Listing not found", 404);
+      }
+
+      return json(listing);
+    } catch (e) {
+      console.error("Get listing error:", e);
+      return error("Failed to fetch listing", 500);
     }
-
-    return json(listing);
   });
 
   // Get similar listings (recommendation engine)
   router.get("/api/v1/marketplace/listings/:id/similar", async (req, params) => {
-    const user = getUser(req);
-    const listingId = parseInt(params.id, 10);
-    const url = new URL(req.url);
-    const limit = parseInt(url.searchParams.get("limit") || "6", 10);
-
-    const listing = await db.query.marketplaceListings.findFirst({
-      where: eq(marketplaceListings.id, listingId),
-    });
-
-    if (!listing) {
-      return error("Listing not found", 404);
-    }
-
-    // Get all active listings except the current one and user's own
-    const allListings = await db.query.marketplaceListings.findMany({
-      where: and(
-        ne(marketplaceListings.id, listingId),
-        ne(marketplaceListings.sellerId, user.id),
-        eq(marketplaceListings.status, "active")
-      ),
-      with: {
-        seller: {
-          columns: { id: true, name: true, avatarUrl: true },
-        },
-      },
-    });
-
-    if (allListings.length === 0) {
-      return json({ listings: [], fallback: false });
-    }
-
-    // Try to use recommendation engine
-    const recommendationUrl = process.env.RECOMMENDATION_ENGINE_URL || "http://localhost:5000";
-
     try {
-      const response = await fetch(`${recommendationUrl}/api/v1/recommendations/similar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          listing: {
-            id: listing.id,
-            title: listing.title,
-            description: listing.description,
-            category: listing.category,
-            price: listing.price,
-            expiryDate: listing.expiryDate,
-          },
-          candidates: allListings.map((l) => ({
-            id: l.id,
-            title: l.title,
-            description: l.description,
-            category: l.category,
-            price: l.price,
-            expiryDate: l.expiryDate,
-          })),
-          limit,
-        }),
+      const user = getUser(req);
+      const listingId = parseInt(params.id, 10);
+
+      if (isNaN(listingId) || listingId <= 0) {
+        return error("Invalid listing ID", 400);
+      }
+
+      const url = new URL(req.url);
+      const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "6", 10), 1), 20);
+
+      const listing = await db.query.marketplaceListings.findFirst({
+        where: eq(marketplaceListings.id, listingId),
       });
 
-      if (response.ok) {
-        const data = await response.json() as { recommendations: Array<{ id: number; score: number }> };
-        const recommendedIds = data.recommendations.map((r) => r.id);
-        const recommended = recommendedIds
-          .map((id) => allListings.find((l) => l.id === id))
-          .filter(Boolean);
-        return json({ listings: recommended, fallback: false });
+      if (!listing) {
+        return error("Listing not found", 404);
       }
+
+      // Get all active listings except the current one and user's own
+      const allListings = await db.query.marketplaceListings.findMany({
+        where: and(
+          ne(marketplaceListings.id, listingId),
+          ne(marketplaceListings.sellerId, user.id),
+          eq(marketplaceListings.status, "active")
+        ),
+        with: {
+          seller: {
+            columns: { id: true, name: true, avatarUrl: true },
+          },
+        },
+      });
+
+      if (allListings.length === 0) {
+        return json({ listings: [], fallback: false });
+      }
+
+      // Try to use recommendation engine
+      const recommendationUrl = process.env.RECOMMENDATION_ENGINE_URL || "http://localhost:5000";
+
+      try {
+        const response = await fetch(`${recommendationUrl}/api/v1/recommendations/similar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            listing: {
+              id: listing.id,
+              title: listing.title,
+              description: listing.description,
+              category: listing.category,
+              price: listing.price,
+              expiryDate: listing.expiryDate,
+            },
+            candidates: allListings.map((l) => ({
+              id: l.id,
+              title: l.title,
+              description: l.description,
+              category: l.category,
+              price: l.price,
+              expiryDate: l.expiryDate,
+            })),
+            limit,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json() as { recommendations: Array<{ id: number; score: number }> };
+          const recommendedIds = data.recommendations.map((r) => r.id);
+          const recommended = recommendedIds
+            .map((id) => allListings.find((l) => l.id === id))
+            .filter(Boolean);
+          return json({ listings: recommended, fallback: false });
+        }
+      } catch (recError) {
+        console.error("Recommendation engine error:", recError);
+      }
+
+      // Fallback: return listings in same category
+      const sameCategory = allListings
+        .filter((l) => l.category === listing.category)
+        .slice(0, limit);
+
+      if (sameCategory.length >= limit) {
+        return json({ listings: sameCategory, fallback: true });
+      }
+
+      // If not enough in same category, add others
+      const others = allListings
+        .filter((l) => l.category !== listing.category)
+        .slice(0, limit - sameCategory.length);
+
+      return json({ listings: [...sameCategory, ...others], fallback: true });
     } catch (e) {
-      console.error("Recommendation engine error:", e);
+      console.error("Get similar listings error:", e);
+      return error("Failed to fetch similar listings", 500);
     }
-
-    // Fallback: return listings in same category
-    const sameCategory = allListings
-      .filter((l) => l.category === listing.category)
-      .slice(0, limit);
-
-    if (sameCategory.length >= limit) {
-      return json({ listings: sameCategory, fallback: true });
-    }
-
-    // If not enough in same category, add others
-    const others = allListings
-      .filter((l) => l.category !== listing.category)
-      .slice(0, limit - sameCategory.length);
-
-    return json({ listings: [...sameCategory, ...others], fallback: true });
   });
 
   // Get price recommendation for a listing
@@ -446,8 +485,8 @@ export function registerMarketplaceRoutes(router: Router) {
         pickupLocationValue = `${data.pickupLocation}|${data.coordinates.latitude},${data.coordinates.longitude}`;
       }
 
-      // Calculate CO2 saved for this listing
-      const co2Saved = calculateCo2Saved(data.quantity, data.unit, data.category);
+      // Calculate CO2 saved for this listing using product-specific emission factor
+      const co2Saved = calculateCo2Saved(data.quantity, data.unit, data.category, data.title);
 
       // If productId is provided, validate and update the MyFridge product
       let productIdToLink: number | undefined;

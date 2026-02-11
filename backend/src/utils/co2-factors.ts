@@ -200,11 +200,17 @@ function getCo2Factor(category: string | null | undefined): number {
 export function calculateCo2Saved(
   quantity: number,
   unit: string | null | undefined,
-  category: string | null | undefined
+  category: string | null | undefined,
+  productName?: string
 ): number {
   const weightKg = convertToKg(quantity, unit);
-  const categoryFactor = getCo2Factor(category);
-  const totalFactor = categoryFactor + DISPOSAL_EMISSION_FACTORS.landfill;
+
+  // Use product-specific emission factor if productName provided, otherwise fall back to category
+  const emissionFactor = productName
+    ? getEmissionFactor(productName, category || undefined)
+    : getCo2Factor(category);
+
+  const totalFactor = emissionFactor + DISPOSAL_EMISSION_FACTORS.landfill;
 
   const co2Saved = weightKg * totalFactor;
 

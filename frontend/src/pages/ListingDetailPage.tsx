@@ -15,6 +15,7 @@ import { formatDate, getDaysUntilExpiry } from "../lib/utils";
 import { SimilarProducts } from "../components/marketplace/SimilarProducts";
 import { showBadgeToasts } from "../utils/badgeNotification";
 import { Co2Badge } from "../components/common/Co2Badge";
+import { calculateDiscountPercentage } from "../utils/pricing";
 import type { MarketplaceListing } from "../types/marketplace";
 
 export default function ListingDetailPage() {
@@ -23,6 +24,8 @@ export default function ListingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const { user } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -31,12 +34,19 @@ export default function ListingDetailPage() {
     loadListing();
   }, [id]);
 
+  // Reset image loading state when switching images
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+  }, [currentImageIndex]);
+
   const loadListing = async () => {
     try {
       const data = await marketplaceService.getListing(Number(id));
       setListing(data);
-    } catch (error: any) {
-      addToast(error.message || "Failed to load listing", "error");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to load listing";
+      addToast(message, "error");
       navigate("/marketplace");
     } finally {
       setLoading(false);
@@ -53,8 +63,9 @@ export default function ListingDetailPage() {
       await marketplaceService.deleteListing(Number(id));
       addToast("Listing deleted successfully!", "success");
       navigate("/marketplace");
-    } catch (error: any) {
-      addToast(error.message || "Failed to delete listing", "error");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to delete listing";
+      addToast(message, "error");
     } finally {
       setActionLoading(false);
     }
@@ -75,8 +86,9 @@ export default function ListingDetailPage() {
       addToast(`Listing marked as sold! +${result.points.earned} points`, "success");
       showBadgeToasts(result, addToast);
       loadListing();
-    } catch (error: any) {
-      addToast(error.message || "Failed to complete listing", "error");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to complete listing";
+      addToast(message, "error");
     } finally {
       setActionLoading(false);
     }
@@ -96,10 +108,7 @@ export default function ListingDetailPage() {
 
   const isOwner = user?.id === listing.sellerId;
   const daysUntil = getDaysUntilExpiry(listing.expiryDate);
-  const discount =
-    listing.originalPrice && listing.price
-      ? Math.round((1 - listing.price / listing.originalPrice) * 100)
-      : null;
+  const discount = calculateDiscountPercentage(listing.originalPrice, listing.price);
 
   // Get listing images
   const imageUrls = uploadService.getListingImageUrls(listing.images);
@@ -127,24 +136,6 @@ export default function ListingDetailPage() {
     }
   };
 
-  const handleCompletePurchase = async () => {
-    if (!listing) return;
-    if (!window.confirm("Confirm that you've received this item? This will complete the transaction.")) {
-      return;
-    }
-    setActionLoading(true);
-    try {
-      await marketplaceService.buyListing(listing.id);
-      addToast("Purchase completed!", "success");
-      loadListing();
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to complete purchase";
-      addToast(message, "error");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Button variant="ghost" onClick={() => navigate("/marketplace")}>
@@ -157,12 +148,20 @@ export default function ListingDetailPage() {
         <div className="space-y-4">
           {/* Main Image */}
           <div className="relative aspect-square bg-muted rounded-xl overflow-hidden border">
-            {hasImages ? (
+            {hasImages && !imageError ? (
               <>
+                {!imageLoaded && (
+                  <div className="absolute inset-0 skeleton" />
+                )}
                 <img
                   src={imageUrls[currentImageIndex]}
                   alt={`${listing.title} - Image ${currentImageIndex + 1}`}
-                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageError(true)}
+                  className={`w-full h-full object-cover transition-opacity duration-200 ${
+                    imageLoaded ? "opacity-100" : "opacity-0"
+                  }`}
                 />
                 {imageUrls.length > 1 && (
                   <>
@@ -214,6 +213,7 @@ export default function ListingDetailPage() {
                   <img
                     src={url}
                     alt={`Thumbnail ${index + 1}`}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                   />
                 </button>
@@ -452,20 +452,11 @@ export default function ListingDetailPage() {
                     </CardContent>
                   </Card>
                   <Button
-                    onClick={handleCompletePurchase}
-                    disabled={actionLoading}
-                    className="w-full"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Confirm Received
-                  </Button>
-                  <Button
                     onClick={() => {
                       const token = localStorage.getItem("token");
                       window.location.href = getEcoLockerUrl(token!, listing.id);
                     }}
                     disabled={actionLoading}
-                    variant="outline"
                     className="w-full border-primary/50 hover:bg-primary/10"
                   >
                     <Package className="h-4 w-4 mr-2" />

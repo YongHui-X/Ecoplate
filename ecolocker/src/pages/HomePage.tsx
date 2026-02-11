@@ -24,14 +24,14 @@ import { Button } from "../components/ui/button";
 function LockerInfoContent({ locker }: { locker: Locker }) {
   return (
     <div className="min-w-[200px] p-1">
-      <h3 className="font-semibold text-gray-900">{locker.name}</h3>
-      <p className="text-sm text-gray-600">{locker.address}</p>
-      <div className="flex items-center gap-2 mt-2 text-sm text-gray-700">
+      <h3 className="font-semibold text-foreground">{locker.name}</h3>
+      <p className="text-sm text-muted-foreground">{locker.address}</p>
+      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
         <Box className="h-4 w-4" />
         {locker.availableCompartments}/{locker.totalCompartments} available
       </div>
       {locker.operatingHours && (
-        <div className="flex items-center gap-2 text-sm mt-1 text-gray-700">
+        <div className="flex items-center gap-2 text-sm mt-1 text-muted-foreground">
           <Clock className="h-4 w-4" />
           {locker.operatingHours}
         </div>

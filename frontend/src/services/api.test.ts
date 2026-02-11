@@ -46,7 +46,7 @@ describe('api service', () => {
       const mockData = { id: 1, name: 'Test' };
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockData),
+        text: () => Promise.resolve(JSON.stringify(mockData)),
       });
 
       const result = await api.get('/test');
@@ -66,7 +66,7 @@ describe('api service', () => {
       localStorageMock.store.token = 'test-token';
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(JSON.stringify({})),
       });
 
       await api.get('/test');
@@ -85,7 +85,7 @@ describe('api service', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
-        json: () => Promise.resolve({ error: 'Bad request' }),
+        text: () => Promise.resolve(JSON.stringify({ error: 'Bad request' })),
       });
 
       await expect(api.get('/test')).rejects.toThrow(ApiError);
@@ -97,7 +97,7 @@ describe('api service', () => {
       const mockData = { success: true };
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockData),
+        text: () => Promise.resolve(JSON.stringify(mockData)),
       });
 
       const body = { email: 'test@example.com' };
@@ -116,7 +116,7 @@ describe('api service', () => {
     it('should handle POST without body', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({}),
+        text: () => Promise.resolve(JSON.stringify({})),
       });
 
       await api.post('/test');
@@ -135,7 +135,7 @@ describe('api service', () => {
     it('should make PATCH request', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ updated: true }),
+        text: () => Promise.resolve(JSON.stringify({ updated: true })),
       });
 
       await api.patch('/test', { name: 'Updated' });
@@ -153,7 +153,7 @@ describe('api service', () => {
     it('should make PUT request', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ updated: true }),
+        text: () => Promise.resolve(JSON.stringify({ updated: true })),
       });
 
       await api.put('/test', { name: 'Updated' });
@@ -171,7 +171,7 @@ describe('api service', () => {
     it('should make DELETE request', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ deleted: true }),
+        text: () => Promise.resolve(JSON.stringify({ deleted: true })),
       });
 
       await api.delete('/test/1');
@@ -193,7 +193,7 @@ describe('api service', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
-        json: () => Promise.resolve({ error: 'Unauthorized' }),
+        text: () => Promise.resolve(JSON.stringify({ error: 'Unauthorized' })),
       });
 
       await expect(api.get('/test')).rejects.toThrow(ApiError);

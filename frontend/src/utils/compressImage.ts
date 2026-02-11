@@ -1,5 +1,7 @@
 import Compressor from "compressorjs";
 
+const COMPRESSION_TIMEOUT = 5000; // 5 seconds max
+
 /**
  * Convert a base64 data URL to a File without using fetch() (which fails on some mobile webviews).
  */
@@ -16,10 +18,15 @@ function dataUrlToFile(dataUrl: string, filename: string): File {
 
 /**
  * Compress an image file to JPEG with reduced quality and max dimensions.
- * Falls back to the original file if compression fails.
+ * Falls back to the original file if compression fails or times out.
  */
 export async function compressImage(file: File): Promise<File> {
   return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      console.warn("[Compression] Timed out, using original");
+      resolve(file);
+    }, COMPRESSION_TIMEOUT);
+
     try {
       new Compressor(file, {
         quality: 0.7,
@@ -27,6 +34,7 @@ export async function compressImage(file: File): Promise<File> {
         maxHeight: 1920,
         mimeType: "image/jpeg",
         success: (result) => {
+          clearTimeout(timeout);
           const compressedFile = new File(
             [result],
             file.name.replace(/\.\w+$/, ".jpg"),
@@ -40,11 +48,13 @@ export async function compressImage(file: File): Promise<File> {
           resolve(compressedFile);
         },
         error: (err) => {
+          clearTimeout(timeout);
           console.error("[Compression] Failed:", err);
           resolve(file);
         },
       });
     } catch (err) {
+      clearTimeout(timeout);
       console.error("[Compression] Constructor failed:", err);
       resolve(file);
     }

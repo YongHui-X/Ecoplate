@@ -81,16 +81,16 @@ describe("BadgesPage", () => {
       if (url.includes("/gamification/sync-badges") && options?.method === "POST") {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({}),
+          text: () => Promise.resolve(JSON.stringify({})),
         });
       }
       if (url.includes("/gamification/badges")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockBadges),
+          text: () => Promise.resolve(JSON.stringify(mockBadges)),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 
@@ -210,15 +210,15 @@ describe("BadgesPage - Empty State", () => {
     vi.clearAllMocks();
     mockFetch.mockImplementation((url: string, options?: RequestInit) => {
       if (url.includes("/gamification/sync-badges") && options?.method === "POST") {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+        return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
       }
       if (url.includes("/gamification/badges")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ badges: [], totalEarned: 0, totalAvailable: 0 }),
+          text: () => Promise.resolve(JSON.stringify({ badges: [], totalEarned: 0, totalAvailable: 0 })),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 

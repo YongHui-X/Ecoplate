@@ -42,7 +42,18 @@ async function request<T>(
     headers,
   });
 
-  const data = await response.json();
+  // Read response as text first, then parse as JSON
+  // This prevents silent failures when server returns non-JSON (e.g., proxy error pages)
+  const text = await response.text();
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new ApiError(
+      response.status,
+      `Server error (${response.status}): ${text.substring(0, 100) || "Empty response"}`
+    );
+  }
 
   if (!response.ok) {
     // If unauthorized, clear token
@@ -51,7 +62,7 @@ async function request<T>(
       localStorage.removeItem("user");
       window.dispatchEvent(new CustomEvent("auth:unauthorized"));
     }
-    throw new ApiError(response.status, data.error || "Request failed");
+    throw new ApiError(response.status, (data.error as string) || "Request failed");
   }
 
   return data as T;

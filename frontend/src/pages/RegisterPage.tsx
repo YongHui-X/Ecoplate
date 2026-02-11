@@ -62,7 +62,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl text-primary">EcoPlate</CardTitle>
@@ -133,14 +133,14 @@ export default function RegisterPage() {
                     type="button"
                     onClick={() => setSelectedAvatar(avatar.id)}
                     className={cn(
-                      "flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all hover:scale-105",
+                      "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all hover:scale-105",
                       selectedAvatar === avatar.id
                         ? "border-primary bg-primary/10"
-                        : "border-gray-200 hover:border-primary/50"
+                        : "border-border hover:border-primary/50"
                     )}
                   >
                     <span className="text-2xl mb-1">{avatar.emoji}</span>
-                    <span className="text-xs text-gray-600">{avatar.label}</span>
+                    <span className="text-xs text-muted-foreground">{avatar.label}</span>
                   </button>
                 ))}
               </div>
@@ -149,7 +149,7 @@ export default function RegisterPage() {
               {loading ? "Creating account..." : "Create account"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-gray-600">
+          <p className="mt-4 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link to="/login" className="text-primary hover:underline">
               Sign in

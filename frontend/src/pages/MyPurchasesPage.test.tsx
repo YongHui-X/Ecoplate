@@ -76,10 +76,10 @@ describe("MyPurchasesPage", () => {
       if (url.includes("/marketplace/my-purchases")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockPurchases),
+          text: () => Promise.resolve(JSON.stringify(mockPurchases)),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 
@@ -158,10 +158,10 @@ describe("MyPurchasesPage - Empty State", () => {
       if (url.includes("/marketplace/my-purchases")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([]),
+          text: () => Promise.resolve(JSON.stringify([])),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 

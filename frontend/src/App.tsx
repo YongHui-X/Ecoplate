@@ -19,6 +19,7 @@ import AccountPage from "./pages/AccountPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import RewardsPage from "./pages/RewardsPage";
 import MyRedemptionsPage from "./pages/MyRedemptionsPage";
+import EcoLockerRedirectPage from "./pages/EcoLockerRedirectPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -67,6 +68,7 @@ function App() {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="rewards" element={<RewardsPage />} />
         <Route path="rewards/my-redemptions" element={<MyRedemptionsPage />} />
+        <Route path="ecolocker-redirect" element={<EcoLockerRedirectPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>
     </Routes>

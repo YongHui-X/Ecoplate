@@ -99,10 +99,10 @@ describe("MyRedemptionsPage", () => {
       if (url.includes("/rewards/my-redemptions")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(mockRedemptions),
+          text: () => Promise.resolve(JSON.stringify(mockRedemptions)),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 
@@ -231,10 +231,10 @@ describe("MyRedemptionsPage - Empty State", () => {
       if (url.includes("/rewards/my-redemptions")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([]),
+          text: () => Promise.resolve(JSON.stringify([])),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
     });
   });
 

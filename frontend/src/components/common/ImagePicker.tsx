@@ -165,13 +165,13 @@ export function ImagePicker({
 
       {/* Error message */}
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+        <div className="text-sm text-destructive bg-destructive/10 p-2 rounded-xl">
           {error}
         </div>
       )}
 
       {/* Image count */}
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-muted-foreground">
         {images.length} / {maxImages} images
       </div>
 
@@ -181,7 +181,7 @@ export function ImagePicker({
           {images.map((imageUrl, index) => (
             <div
               key={index}
-              className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50"
+              className="relative aspect-square rounded-xl overflow-hidden border border-border bg-muted"
             >
               <img
                 src={uploadService.getImageUrl(imageUrl)}
@@ -191,7 +191,7 @@ export function ImagePicker({
               <button
                 type="button"
                 onClick={() => handleRemoveImage(index)}
-                className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 transition"
+                className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90 transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -202,9 +202,9 @@ export function ImagePicker({
 
       {/* Empty state */}
       {images.length === 0 && (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-          <p className="text-sm text-gray-500">
+        <div className="border-2 border-dashed border-border rounded-xl p-8 text-center">
+          <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">
             No images added yet. Choose from gallery or take a photo.
           </p>
         </div>

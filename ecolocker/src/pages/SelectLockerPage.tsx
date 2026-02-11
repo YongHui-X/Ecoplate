@@ -33,15 +33,15 @@ function LockerInfoContent({
 }) {
   return (
     <div className="min-w-[200px] p-1">
-      <h3 className="font-semibold text-gray-900">{locker.name}</h3>
-      <p className="text-sm text-gray-600">{locker.address}</p>
-      <div className="flex items-center gap-2 mt-2 text-sm text-gray-700">
+      <h3 className="font-semibold text-foreground">{locker.name}</h3>
+      <p className="text-sm text-muted-foreground">{locker.address}</p>
+      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
         <Box className="h-4 w-4" />
         {locker.availableCompartments}/{locker.totalCompartments} available
       </div>
       <button
         onClick={onSelect}
-        className="mt-3 w-full px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+        className="mt-3 w-full px-3 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors"
       >
         Select This Locker
       </button>

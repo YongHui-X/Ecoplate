@@ -14,6 +14,8 @@ import { Plus, Search, MapPin, Clock, List, Map, Package, MessageCircle, Shoppin
 import { getDaysUntilExpiry } from "../lib/utils";
 import MarketplaceMap from "./Marketplace/MarketplaceMap";
 import { Co2Badge } from "../components/common/Co2Badge";
+import { parsePickupLocation } from "../utils/coordinates";
+import { calculateDiscountPercentage } from "../utils/pricing";
 import type { MarketplaceListing, MarketplaceListingWithDistance } from "../types/marketplace";
 import { MARKETPLACE_CATEGORIES } from "../types/marketplace";
 
@@ -33,35 +35,28 @@ export default function MarketplacePage() {
   const loadListings = async () => {
     try {
       const data = await marketplaceService.getListings();
-      console.log("Raw listings from API:", data);
 
-      // Parse coordinates from pickupLocation if stored as "address|lat,lng"
+      // Parse coordinates from pickupLocation using utility function
       const parsedListings = data.map((listing) => {
-        if (listing.pickupLocation && listing.pickupLocation.includes("|")) {
-          const [address, coords] = listing.pickupLocation.split("|");
-          const coordParts = coords.split(",");
-          const lat = parseFloat(coordParts[0]);
-          const lng = parseFloat(coordParts[1]);
+        const parsed = parsePickupLocation(listing.pickupLocation);
 
-          console.log(`Listing ${listing.id}: parsed coords lat=${lat}, lng=${lng} from "${listing.pickupLocation}"`);
-
-          // Only set coordinates if both are valid numbers
-          if (!isNaN(lat) && !isNaN(lng)) {
-            return {
-              ...listing,
-              pickupLocation: address,
-              coordinates: { latitude: lat, longitude: lng },
-            };
-          }
+        if (parsed.coordinates) {
+          return {
+            ...listing,
+            pickupLocation: parsed.address,
+            coordinates: {
+              latitude: parsed.coordinates.lat,
+              longitude: parsed.coordinates.lng,
+            },
+          };
         }
-        console.log(`Listing ${listing.id}: no coordinates found in "${listing.pickupLocation}"`);
         return listing;
       });
 
-      console.log("Parsed listings with coordinates:", parsedListings);
       setListings(parsedListings);
-    } catch (error) {
-      console.error("Failed to load listings:", error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to load listings";
+      console.error("Failed to load listings:", message);
     } finally {
       setLoading(false);
     }
@@ -218,11 +213,10 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const [messagingLoading, setMessagingLoading] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const daysUntil = getDaysUntilExpiry(listing.expiryDate);
-  const discount =
-    listing.originalPrice && listing.price
-      ? Math.round((1 - listing.price / listing.originalPrice) * 100)
-      : null;
+  const discount = calculateDiscountPercentage(listing.originalPrice, listing.price);
 
   // Get first image as thumbnail
   const imageUrls = uploadService.getListingImageUrls(listing.images);
@@ -248,12 +242,22 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
       <Card className="card-hover press-effect overflow-hidden h-full">
         {/* Image */}
         <div className="aspect-square sm:aspect-[4/3] bg-muted relative flex items-center justify-center overflow-hidden">
-          {thumbnailUrl ? (
-            <img
-              src={thumbnailUrl}
-              alt={listing.title}
-              className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-            />
+          {thumbnailUrl && !imageError ? (
+            <>
+              {!imageLoaded && (
+                <div className="absolute inset-0 skeleton" />
+              )}
+              <img
+                src={thumbnailUrl}
+                alt={listing.title}
+                loading="lazy"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+                className={`w-full h-full object-cover transition-all duration-300 hover:scale-105 ${
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            </>
           ) : (
             <div className="text-muted-foreground text-3xl sm:text-5xl">📦</div>
           )}

@@ -8,6 +8,7 @@ import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Skeleton } from "../components/ui/skeleton";
 import { MessageCircle, ShoppingBag, Store, Archive, Package } from "lucide-react";
+import { formatRelativeTime } from "../utils/dateFormatting";
 
 const tabs: { id: ConversationTab; label: string; icon: React.ElementType }[] = [
   { id: "all", label: "All", icon: MessageCircle },
@@ -79,21 +80,6 @@ export default function MessagesPage() {
     return counts;
   }, [conversations]);
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (seconds < 60) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
-  };
 
   const totalUnread = conversations
     .filter((c) => c.listing.status !== "completed")
@@ -203,7 +189,6 @@ export default function MessagesPage() {
               key={conv.id}
               conversation={conv}
               currentUserId={user?.id ?? 0}
-              formatTime={formatTime}
             />
           ))}
         </div>
@@ -215,10 +200,9 @@ export default function MessagesPage() {
 interface ConversationCardProps {
   conversation: Conversation;
   currentUserId: number;
-  formatTime: (dateString: string) => string;
 }
 
-function ConversationCard({ conversation, currentUserId, formatTime }: ConversationCardProps) {
+function ConversationCard({ conversation, currentUserId }: ConversationCardProps) {
   const otherUser =
     conversation.seller.id === currentUserId
       ? conversation.buyer
@@ -307,7 +291,7 @@ function ConversationCard({ conversation, currentUserId, formatTime }: Conversat
                     </div>
                   )}
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {formatTime(lastMessageTime)}
+                    {formatRelativeTime(lastMessageTime)}
                   </span>
                 </div>
               </div>

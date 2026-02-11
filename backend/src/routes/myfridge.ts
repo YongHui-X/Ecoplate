@@ -1,7 +1,7 @@
 import { Router, json, error, parseBody } from "../utils/router";
 import { db } from "../db/connection";
 import { products, productSustainabilityMetrics, pendingConsumptionRecords } from "../db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getUser } from "../middleware/auth";
 import OpenAI from "openai";
@@ -54,7 +54,7 @@ export function registerMyFridgeRoutes(router: Router) {
     return json(userProducts);
   });
 
-  // Add a new product
+  // Add a new product (or update existing if same name exists)
   router.post("/api/v1/myfridge/products", async (req) => {
     try {
       const user = getUser(req);
@@ -64,20 +64,50 @@ export function registerMyFridgeRoutes(router: Router) {
       // Use provided co2Emission, or compute fallback from product name/category
       const co2Emission = data.co2Emission ?? getEmissionFactor(data.productName, data.category);
 
-      const [product] = await db
-        .insert(products)
-        .values({
-          userId: user.id,
-          productName: data.productName,
-          category: data.category,
-          quantity: data.quantity,
-          unit: data.unit,
-          unitPrice: data.unitPrice,
-          purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
-          description: data.description,
-          co2Emission,
-        })
-        .returning();
+      // Check for existing product with same name (case-insensitive)
+      const existing = await db.query.products.findFirst({
+        where: and(
+          eq(products.userId, user.id),
+          sql`lower(${products.productName}) = lower(${data.productName})`
+        ),
+      });
+
+      let product;
+
+      if (existing) {
+        // Update existing product: add quantity, update other fields
+        const newQuantity = (existing.quantity || 0) + data.quantity;
+        const [updated] = await db
+          .update(products)
+          .set({
+            quantity: newQuantity,
+            unitPrice: data.unitPrice ?? existing.unitPrice,
+            category: data.category ?? existing.category,
+            unit: data.unit ?? existing.unit,
+            co2Emission: co2Emission,
+            purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : existing.purchaseDate,
+          })
+          .where(eq(products.id, existing.id))
+          .returning();
+        product = updated;
+      } else {
+        // Create new product
+        const [created] = await db
+          .insert(products)
+          .values({
+            userId: user.id,
+            productName: data.productName,
+            category: data.category,
+            quantity: data.quantity,
+            unit: data.unit,
+            unitPrice: data.unitPrice,
+            purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
+            description: data.description,
+            co2Emission,
+          })
+          .returning();
+        product = created;
+      }
 
       // Log "add" interaction for sustainability tracking (no points awarded)
       const todayDate = new Date().toISOString().split("T")[0];
@@ -224,11 +254,17 @@ export function registerMyFridgeRoutes(router: Router) {
   router.post("/api/v1/myfridge/receipt/scan", async (req) => {
     try {
       const user = getUser(req);
+      console.log("[receipt/scan] User:", user.id);
+
       const body = await parseBody<{ imageBase64: string }>(req);
+      console.log("[receipt/scan] Body received, imageBase64 length:", body?.imageBase64?.length || 0);
 
       if (!body.imageBase64) {
         return error("Image is required", 400);
       }
+
+      const imageSizeMB = (body.imageBase64.length / 1024 / 1024).toFixed(2);
+      console.log(`[receipt/scan] Image size: ${imageSizeMB}MB`);
 
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
@@ -237,6 +273,7 @@ export function registerMyFridgeRoutes(router: Router) {
 
       const openai = new OpenAI({ apiKey });
 
+      console.log("[receipt/scan] Calling OpenAI API...");
       const response = await openai.chat.completions.create({
         model: "gpt-4.1-mini",
         messages: [
@@ -349,10 +386,11 @@ If no food items found or image is not a receipt, return {"items": []}.`,
         },
       });
 
+      console.log("[receipt/scan] OpenAI API response received");
       const content = response.choices[0]?.message?.content || '{"items":[]}';
-      console.log("OpenAI raw response:", content);
-      console.log("Finish reason:", response.choices[0]?.finish_reason);
-      console.log("Refusal:", response.choices[0]?.message?.refusal);
+      console.log("[receipt/scan] OpenAI raw response:", content);
+      console.log("[receipt/scan] Finish reason:", response.choices[0]?.finish_reason);
+      console.log("[receipt/scan] Refusal:", response.choices[0]?.message?.refusal);
       const parsed = JSON.parse(content) as {
         items: Array<{ name: string; quantity: number; unit: string; unitPrice: number }>;
       };
@@ -365,8 +403,30 @@ If no food items found or image is not a receipt, return {"items": []}.`,
       }));
 
       return json({ items: processedItems });
-    } catch (e) {
-      console.error("Receipt scan error:", e);
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string; code?: string; type?: string; error?: { message?: string } };
+      console.error("[receipt/scan] ERROR:", {
+        message: err.message,
+        status: err.status,
+        code: err.code,
+        type: err.type,
+        errorDetail: err.error?.message,
+        fullError: e,
+      });
+
+      // Return more specific error messages
+      if (err.status === 400) {
+        return error("Image could not be processed. Please try a clearer photo.", 400);
+      }
+      if (err.status === 413 || err.message?.includes("too large")) {
+        return error("Image is too large. Please try a smaller image.", 400);
+      }
+      if (err.status === 429) {
+        return error("Too many requests. Please wait a moment and try again.", 429);
+      }
+      if (err.code === "ECONNRESET" || err.code === "ETIMEDOUT" || err.message?.includes("timeout")) {
+        return error("Request timed out. Please try again.", 504);
+      }
       return error("Failed to scan receipt", 500);
     }
   });

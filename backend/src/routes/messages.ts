@@ -59,60 +59,74 @@ export function registerMessageRoutes(router: Router) {
         orderBy: [desc(conversations.updatedAt)],
       });
 
-      // Build response with unread counts (return ALL conversations, frontend filters)
-      const response = await Promise.all(
-        userConversations.map(async (conv) => {
-          const isArchived = conv.listing?.status === "sold";
+      // Get all conversation IDs for non-archived listings
+      const activeConversationIds = userConversations
+        .filter((conv) => conv.listing?.status !== "sold")
+        .map((conv) => conv.id);
 
-          // Count unread messages not sent by this user (only for non-archived)
-          let unreadCount = 0;
-          if (!isArchived) {
-            const unreadResult = await db
-              .select({ count: sql<number>`count(*)` })
-              .from(messages)
-              .where(
-                and(
-                  eq(messages.conversationId, conv.id),
-                  sql`${messages.userId} != ${user.id}`,
-                  eq(messages.isRead, false)
-                )
-              );
-            unreadCount = unreadResult[0]?.count ?? 0;
-          }
+      // Batch query: Get all unread counts in a single query (fixes N+1 problem)
+      const unreadCountsMap = new Map<number, number>();
+      if (activeConversationIds.length > 0) {
+        const unreadCounts = await db
+          .select({
+            conversationId: messages.conversationId,
+            count: sql<number>`count(*)`,
+          })
+          .from(messages)
+          .where(
+            and(
+              sql`${messages.conversationId} IN (${sql.join(
+                activeConversationIds.map((id) => sql`${id}`),
+                sql`, `
+              )})`,
+              sql`${messages.userId} != ${user.id}`,
+              eq(messages.isRead, false)
+            )
+          )
+          .groupBy(messages.conversationId);
 
-          const lastMessage = conv.messages[0] ?? null;
+        for (const row of unreadCounts) {
+          unreadCountsMap.set(row.conversationId, row.count);
+        }
+      }
 
-          const isSeller = conv.sellerId === user.id;
+      // Build response using the pre-fetched unread counts
+      const response = userConversations.map((conv) => {
+        const isArchived = conv.listing?.status === "sold";
+        const unreadCount = isArchived ? 0 : (unreadCountsMap.get(conv.id) ?? 0);
+        const lastMessage = conv.messages[0] ?? null;
+        const isSeller = conv.sellerId === user.id;
 
-          // Map "sold" to "completed" for frontend compatibility
-          const listingWithStatus = conv.listing ? {
-            ...conv.listing,
-            status: conv.listing.status === "sold" ? "completed" : conv.listing.status,
-          } : null;
+        // Map "sold" to "completed" for frontend compatibility
+        const listingWithStatus = conv.listing
+          ? {
+              ...conv.listing,
+              status: conv.listing.status === "sold" ? "completed" : conv.listing.status,
+            }
+          : null;
 
-          return {
-            id: conv.id,
-            listingId: conv.listingId,
-            listing: listingWithStatus,
-            seller: conv.seller,
-            buyer: conv.buyer,
-            role: isSeller ? "selling" : "buying",
-            lastMessage: lastMessage
-              ? {
-                  id: lastMessage.id,
-                  conversationId: lastMessage.conversationId,
-                  userId: lastMessage.userId,
-                  messageText: lastMessage.messageText,
-                  isRead: lastMessage.isRead,
-                  createdAt: lastMessage.createdAt.toISOString(),
-                  user: lastMessage.user,
-                }
-              : null,
-            unreadCount,
-            updatedAt: conv.updatedAt.toISOString(),
-          };
-        })
-      );
+        return {
+          id: conv.id,
+          listingId: conv.listingId,
+          listing: listingWithStatus,
+          seller: conv.seller,
+          buyer: conv.buyer,
+          role: isSeller ? "selling" : "buying",
+          lastMessage: lastMessage
+            ? {
+                id: lastMessage.id,
+                conversationId: lastMessage.conversationId,
+                userId: lastMessage.userId,
+                messageText: lastMessage.messageText,
+                isRead: lastMessage.isRead,
+                createdAt: lastMessage.createdAt.toISOString(),
+                user: lastMessage.user,
+              }
+            : null,
+          unreadCount,
+          updatedAt: conv.updatedAt.toISOString(),
+        };
+      });
 
       return json(response);
     } catch (e) {

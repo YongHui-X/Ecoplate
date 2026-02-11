@@ -70,21 +70,21 @@ export default function MyRedemptionsPage() {
     switch (status) {
       case "pending":
         return (
-          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+          <Badge variant="warning">
             <Clock className="h-3 w-3 mr-1" />
             Pending
           </Badge>
         );
       case "collected":
         return (
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+          <Badge variant="success">
             <CheckCircle className="h-3 w-3 mr-1" />
             Collected
           </Badge>
         );
       case "expired":
         return (
-          <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-300">
+          <Badge variant="outline" className="bg-muted text-muted-foreground">
             <XCircle className="h-3 w-3 mr-1" />
             Expired
           </Badge>

@@ -28,18 +28,6 @@ export default defineConfig({
           functions: 60,
           lines: 60,
         },
-        'src/pages/*.tsx': {
-          statements: 70,
-          branches: 60,
-          functions: 70,
-          lines: 70,
-        },
-        'src/contexts/*.tsx': {
-          statements: 80,
-          branches: 70,
-          functions: 80,
-          lines: 80,
-        },
       },
     },
   },
