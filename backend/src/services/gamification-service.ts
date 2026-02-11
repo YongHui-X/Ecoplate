@@ -56,24 +56,34 @@ export async function awardPoints(
   skipMetricRecording?: boolean,
   listingData?: ListingDataForCo2
 ) {
-  // Look up product from DB for CO2-based scoring
+  // Calculate CO2 value for points
+  let co2Value: number;
   let category: string = "other";
-  let co2Emission: number | null = null;
-  if (productId) {
-    const product = await db.query.products.findFirst({
-      where: eq(schema.products.id, productId),
-      columns: { category: true, co2Emission: true },
-    });
-    if (product?.category) category = product.category;
-    if (product?.co2Emission) co2Emission = product.co2Emission;
+
+  // For sold actions, use the pre-calculated co2Saved from the listing
+  // This is important because the product may have been deleted when listing was created
+  if (action === "sold" && listingData?.co2Saved != null && listingData.co2Saved > 0) {
+    co2Value = listingData.co2Saved;
+  } else {
+    // Look up product from DB for CO2-based scoring
+    let co2Emission: number | null = null;
+    if (productId) {
+      const product = await db.query.products.findFirst({
+        where: eq(schema.products.id, productId),
+        columns: { category: true, co2Emission: true },
+      });
+      if (product?.category) category = product.category;
+      if (product?.co2Emission) co2Emission = product.co2Emission;
+    }
+
+    // Use product's stored co2Emission as single source of truth;
+    // fall back to category-based calculation if not available
+    const qty = quantity ?? 1;
+    co2Value = co2Emission != null
+      ? Math.round(qty * (co2Emission + DISPOSAL_EMISSION_FACTORS.landfill) * 100) / 100
+      : calculateCo2Saved(qty, "kg", category);
   }
 
-  // Use product's stored co2Emission as single source of truth;
-  // fall back to category-based calculation if not available
-  const qty = quantity ?? 1;
-  const co2Value = co2Emission != null
-    ? Math.round(qty * (co2Emission + DISPOSAL_EMISSION_FACTORS.landfill) * 100) / 100
-    : calculateCo2Saved(qty, "kg", category);
   let amount: number;
   if (action === "sold") {
     amount = Math.round(co2Value * 1.5);
@@ -109,6 +119,8 @@ export async function awardPoints(
       todayDate: today,
       quantity: quantity ?? 1,
       type: action,
+      // Store pre-calculated CO2 value for dashboard (important when product is deleted)
+      co2Value: co2Value,
     });
   }
 

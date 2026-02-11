@@ -485,11 +485,11 @@ export function registerMarketplaceRoutes(router: Router) {
         pickupLocationValue = `${data.pickupLocation}|${data.coordinates.latitude},${data.coordinates.longitude}`;
       }
 
-      // Calculate CO2 saved for this listing using product-specific emission factor
-      const co2Saved = calculateCo2Saved(data.quantity, data.unit, data.category, data.title);
-
       // If productId is provided, validate and update the MyFridge product
+      // Also use the product's stored co2Emission for accurate CO2 calculation
       let productIdToLink: number | undefined;
+      let productCo2Emission: number | null = null;
+
       if (data.productId) {
         const product = await db.query.products.findFirst({
           where: and(
@@ -506,6 +506,9 @@ export function registerMarketplaceRoutes(router: Router) {
           return error(`Cannot list more than available quantity (${product.quantity})`, 400);
         }
 
+        // Store the product's CO2 emission factor before potentially deleting it
+        productCo2Emission = product.co2Emission;
+
         const newQuantity = product.quantity - data.quantity;
 
         if (newQuantity <= 0) {
@@ -520,6 +523,19 @@ export function registerMarketplaceRoutes(router: Router) {
         }
 
         productIdToLink = data.productId;
+      }
+
+      // Calculate CO2 saved using product's stored emission factor (if from MyFridge) or title/category lookup
+      // This ensures consistency with MyFridge's CO2 calculation
+      let co2Saved: number;
+      if (productCo2Emission != null) {
+        // Use the same formula as MyFridge: weight × (emission + disposal)
+        const weightKg = convertToKg(data.quantity, data.unit);
+        const DISPOSAL_FACTOR = 0.5; // landfill disposal factor
+        co2Saved = Math.round(weightKg * (productCo2Emission + DISPOSAL_FACTOR) * 100) / 100;
+      } else {
+        // Fallback to title/category-based calculation for listings not from MyFridge
+        co2Saved = calculateCo2Saved(data.quantity, data.unit, data.category, data.title);
       }
 
       const [listing] = await db
