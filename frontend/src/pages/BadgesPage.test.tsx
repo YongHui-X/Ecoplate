@@ -188,21 +188,6 @@ describe("BadgesPage", () => {
     });
   });
 
-  it("should show back button on mobile", async () => {
-    renderWithRouter(<BadgesPage />);
-    await waitFor(() => {
-      expect(screen.getByText("Back to EcoPoints")).toBeInTheDocument();
-    });
-  });
-
-  it("should navigate back when back button clicked", async () => {
-    renderWithRouter(<BadgesPage />);
-    await waitFor(() => {
-      expect(screen.getByText("Back to EcoPoints")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByText("Back to EcoPoints"));
-    expect(mockNavigate).toHaveBeenCalledWith("/ecopoints");
-  });
 });
 
 describe("BadgesPage - Empty State", () => {

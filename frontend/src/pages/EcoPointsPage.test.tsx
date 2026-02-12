@@ -233,20 +233,5 @@ describe("EcoPointsPage", () => {
     });
   });
 
-  it("should display back button on mobile", async () => {
-    renderWithRouter(<EcoBoardPage />);
-    await waitFor(() => {
-      expect(screen.getByText("Back to Dashboard")).toBeInTheDocument();
-    });
-  });
-
-  it("should navigate back when back button clicked", async () => {
-    renderWithRouter(<EcoBoardPage />);
-    await waitFor(() => {
-      expect(screen.getByText("Back to Dashboard")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByText("Back to Dashboard"));
-    expect(mockNavigate).toHaveBeenCalledWith("/");
-  });
 });
 

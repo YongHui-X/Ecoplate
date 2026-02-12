@@ -25,11 +25,10 @@ import {
   ChevronUp,
   Award,
   ChevronRight,
-  ArrowLeft,
   DollarSign,
   Gift,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ACTION_CONFIG, INITIAL_TX_COUNT } from "../constants/gamification";
 
 interface PointsData {
@@ -71,7 +70,6 @@ interface LeaderboardEntry {
 }
 
 export default function EcoBoardPage() {
-  const navigate = useNavigate();
   const [pointsData, setPointsData] = useState<PointsData | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,10 +138,6 @@ export default function EcoBoardPage() {
   return (
       <div className="space-y-6">
         <div>
-          <Button variant="ghost" className="lg:hidden mb-2" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
           <h1 className="text-2xl lg:text-3xl font-bold">EcoPoints</h1>
           <p className="text-muted-foreground">Track your sustainability journey</p>
         </div>
