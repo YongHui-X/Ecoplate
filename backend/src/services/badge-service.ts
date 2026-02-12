@@ -1,7 +1,7 @@
 import { db } from "../db/connection";
 import * as schema from "../db/schema";
 import { eq, and } from "drizzle-orm";
-import { getOrCreateUserPoints } from "./gamification-service";
+import { getOrCreateUserPoints, updateStreak } from "./gamification-service";
 import { notifyBadgeUnlocked } from "./notification-service";
 
 // ==================== Types ====================
@@ -235,7 +235,7 @@ export async function getUserBadgeMetrics(userId: number): Promise<BadgeMetrics>
 
   // Collect unique active dates for streak calculation
   const activeDateSet = new Set<string>();
-  const streakActions = ["consumed", "consume", "shared", "sold"];
+  const streakActions = ["consumed", "consume", "shared", "sold", "badge"];
 
   for (const interaction of interactions) {
     const type = (interaction.type || "").toLowerCase();
@@ -323,6 +323,7 @@ export async function checkAndAwardBadges(
   const earnedBadgeIds = new Set(earnedUserBadges.map((ub) => ub.badgeId));
 
   const newlyAwarded: Array<{ code: string; name: string; pointsAwarded: number }> = [];
+  let totalBonusPoints = 0;
 
   for (const def of BADGE_DEFINITIONS) {
     const dbBadge = badgeByCode.get(def.code);
@@ -342,26 +343,20 @@ export async function checkAndAwardBadges(
         badgeId: dbBadge.id,
       });
 
-      // Award bonus points only if insert succeeded
-      if (dbBadge.pointsAwarded > 0) {
-        const userPoints = await getOrCreateUserPoints(userId);
-        await db
-          .update(schema.userPoints)
-          .set({ totalPoints: userPoints.totalPoints + dbBadge.pointsAwarded })
-          .where(eq(schema.userPoints.userId, userId));
-      }
+      // Accumulate bonus points for a single batch update
+      totalBonusPoints += def.pointsAwarded;
 
       newlyAwarded.push({
         code: def.code,
         name: def.name,
-        pointsAwarded: dbBadge.pointsAwarded,
+        pointsAwarded: def.pointsAwarded,
       });
 
       // Send notification for badge unlock
       await notifyBadgeUnlocked(userId, {
         code: def.code,
         name: def.name,
-        pointsAwarded: dbBadge.pointsAwarded,
+        pointsAwarded: def.pointsAwarded,
       });
     } catch (err) {
       // Unique constraint violation - badge already awarded, skip silently
@@ -372,6 +367,28 @@ export async function checkAndAwardBadges(
       // Re-throw unexpected errors
       throw err;
     }
+  }
+
+  // Batch points update for all newly awarded badges
+  if (totalBonusPoints > 0) {
+    const userPoints = await getOrCreateUserPoints(userId);
+    await db
+      .update(schema.userPoints)
+      .set({ totalPoints: userPoints.totalPoints + totalBonusPoints })
+      .where(eq(schema.userPoints.userId, userId));
+  }
+
+  // Record badge activity for streak tracking
+  if (newlyAwarded.length > 0) {
+    const today = new Date().toISOString().slice(0, 10);
+    await db.insert(schema.productSustainabilityMetrics).values({
+      productId: null,
+      userId,
+      todayDate: today,
+      quantity: 1,
+      type: "badge",
+    });
+    await updateStreak(userId);
   }
 
   return newlyAwarded;

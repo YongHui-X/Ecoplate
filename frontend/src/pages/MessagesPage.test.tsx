@@ -4,6 +4,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import MessagesPage from "./MessagesPage";
 import { AuthProvider } from "../contexts/AuthContext";
+import { WebSocketProvider } from "../contexts/WebSocketContext";
 import { UnreadCountProvider } from "../contexts/UnreadCountContext";
 import { axe } from "../test/accessibility.setup";
 
@@ -112,7 +113,9 @@ function renderWithProviders(ui: React.ReactElement) {
   return render(
     <MemoryRouter>
       <AuthProvider>
-        <UnreadCountProvider>{ui}</UnreadCountProvider>
+        <WebSocketProvider>
+          <UnreadCountProvider>{ui}</UnreadCountProvider>
+        </WebSocketProvider>
       </AuthProvider>
     </MemoryRouter>
   );

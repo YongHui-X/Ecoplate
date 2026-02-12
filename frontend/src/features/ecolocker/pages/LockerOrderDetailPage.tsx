@@ -13,7 +13,7 @@ import {
   Calendar,
   Truck,
 } from "lucide-react";
-import { orderApi } from "../services/locker-api";
+import { orderApi, notificationApi } from "../services/locker-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { useLockerUnread } from "../contexts/LockerUnreadContext";
@@ -58,7 +58,12 @@ export default function LockerOrderDetailPage() {
 
   useEffect(() => {
     if (orderId) {
-      loadOrder(parseInt(orderId, 10));
+      const id = parseInt(orderId, 10);
+      loadOrder(id);
+      // Mark all notifications for this order as read
+      notificationApi.markOrderAsRead(id).then(() => {
+        refreshLockerUnreadCount();
+      }).catch(() => {});
     }
   }, [orderId]);
 

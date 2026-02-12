@@ -1,6 +1,7 @@
-"""Tests for PriceRecommender - price recommendation based on expiry and category."
+"""Tests for PriceRecommender - price recommendation based on expiry and category.
 
-this is for testing the price recommendation""
+This is for testing the price recommendation.
+"""
 
 from app import PriceRecommender, PRICE_FLOOR_RATIO, MAX_DISCOUNT_CAP
 from conftest import days_from_now

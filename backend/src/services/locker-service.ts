@@ -848,6 +848,21 @@ export async function markAllNotificationsAsRead(userId: number) {
 }
 
 /**
+ * Mark all notifications for a specific order as read
+ */
+export async function markOrderNotificationsAsRead(orderId: number, userId: number) {
+  await db
+    .update(schema.lockerNotifications)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(schema.lockerNotifications.orderId, orderId),
+        eq(schema.lockerNotifications.userId, userId)
+      )
+    );
+}
+
+/**
  * Get buyer's orders
  */
 export async function getBuyerOrders(buyerId: number) {

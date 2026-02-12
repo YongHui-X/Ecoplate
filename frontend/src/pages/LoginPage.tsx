@@ -39,8 +39,7 @@ export default function LoginPage() {
   };
 
   return (
-    // <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="min-h-screen flex items-center justify-center bg-primary px-4">
+      <div className="min-h-screen flex items-center justify-center bg-primary px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl text-primary">EcoPlate</CardTitle>

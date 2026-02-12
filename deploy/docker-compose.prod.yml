@@ -33,6 +33,7 @@ services:
       - PORT=3000
       - JWT_SECRET=${JWT_SECRET}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
       - DATABASE_PATH=/app/data/ecoplate.db
       - RECOMMENDATION_ENGINE_URL=http://ecoplate-recommendation:5000
       - TZ=Asia/Singapore

@@ -37,7 +37,7 @@ export function registerGamificationRoutes(router: Router) {
       const transactions = recentInteractions
         .filter((i) => {
           const t = (i.type || "").toLowerCase();
-          return t !== "add" && t !== "shared" && t !== "consumed" && t !== "wasted";
+          return t !== "add" && t !== "shared" && t !== "consumed" && t !== "wasted" && t !== "badge";
         })
         .map((i) => {
           const normalizedType = (i.type || "").toLowerCase() as keyof typeof POINT_VALUES;

@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import AccountPage from "./AccountPage";
 import { AuthProvider } from "../contexts/AuthContext";
 import { ToastProvider } from "../contexts/ToastContext";
+import { LockerUnreadProvider } from "../features/ecolocker/contexts/LockerUnreadContext";
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -87,7 +88,9 @@ function renderWithProviders(ui: React.ReactElement) {
   return render(
     <MemoryRouter>
       <AuthProvider>
-        <ToastProvider>{ui}</ToastProvider>
+        <ToastProvider>
+          <LockerUnreadProvider>{ui}</LockerUnreadProvider>
+        </ToastProvider>
       </AuthProvider>
     </MemoryRouter>
   );

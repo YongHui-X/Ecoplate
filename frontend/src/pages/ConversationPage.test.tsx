@@ -4,6 +4,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ConversationPage from "./ConversationPage";
 import { ToastProvider } from "../contexts/ToastContext";
+import { WebSocketProvider } from "../contexts/WebSocketContext";
 import { UnreadCountProvider } from "../contexts/UnreadCountContext";
 
 // Mock fetch
@@ -110,11 +111,13 @@ function renderWithProviders(ui: React.ReactElement) {
   return render(
     <MemoryRouter initialEntries={["/messages/1"]}>
       <ToastProvider>
-        <UnreadCountProvider>
-          <Routes>
-            <Route path="/messages/:conversationId" element={ui} />
-          </Routes>
-        </UnreadCountProvider>
+        <WebSocketProvider>
+          <UnreadCountProvider>
+            <Routes>
+              <Route path="/messages/:conversationId" element={ui} />
+            </Routes>
+          </UnreadCountProvider>
+        </WebSocketProvider>
       </ToastProvider>
     </MemoryRouter>
   );

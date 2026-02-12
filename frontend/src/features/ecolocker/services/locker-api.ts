@@ -79,6 +79,10 @@ export const notificationApi = {
   markAllAsRead(): Promise<{ success: boolean }> {
     return api.post("/ecolocker/notifications/mark-all-read");
   },
+
+  markOrderAsRead(orderId: number): Promise<{ success: boolean }> {
+    return api.post(`/ecolocker/orders/${orderId}/notifications/read`);
+  },
 };
 
 // Marketplace (for getting listing details in select locker flow)

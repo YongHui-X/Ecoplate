@@ -7,9 +7,22 @@ import { Capacitor } from "@capacitor/core";
 
 // Use relative URLs on web (goes through Vite proxy), full URL on mobile
 const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
-const API_BASE_URL = isNative
-  ? (import.meta.env.VITE_API_URL || "https://18.143.173.20")
-  : "";
+
+// Get the base URL for API calls (with /api/v1)
+// Use HTTP for Android to avoid self-signed certificate issues
+const API_URL = isNative
+  ? (import.meta.env.VITE_API_URL || "http://18.143.173.20/api/v1")
+  : "/api/v1";
+
+// Get the base URL for static assets like images (without /api/v1)
+const getStaticBaseUrl = (): string => {
+  if (!isNative) return "";
+  const apiUrl = import.meta.env.VITE_API_URL || "http://18.143.173.20/api/v1";
+  // Strip /api/v1 suffix to get the base URL for static files
+  return apiUrl.replace(/\/api\/v1\/?$/, "");
+};
+
+const STATIC_BASE_URL = getStaticBaseUrl();
 
 export interface UploadImageResponse {
   imageUrl: string;
@@ -36,7 +49,7 @@ export const uploadService = {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/upload/image`, {
+    const response = await fetch(`${API_URL}/upload/image`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -77,7 +90,7 @@ export const uploadService = {
       throw new Error("Not authenticated");
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/upload/images`, {
+    const response = await fetch(`${API_URL}/upload/images`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -105,9 +118,9 @@ export const uploadService = {
     }
     // Handle URLs that already start with /
     if (imageUrl.startsWith("/")) {
-      return `${API_BASE_URL}${imageUrl}`;
+      return `${STATIC_BASE_URL}${imageUrl}`;
     }
-    return `${API_BASE_URL}/${imageUrl}`;
+    return `${STATIC_BASE_URL}/${imageUrl}`;
   },
 
   /**

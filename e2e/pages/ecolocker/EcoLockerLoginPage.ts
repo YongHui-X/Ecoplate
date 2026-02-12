@@ -1,16 +1,20 @@
 import { By } from 'selenium-webdriver';
 import { BasePage } from '../BasePage';
 
+/**
+ * EcoLocker now uses the main app's login page (/login)
+ * since it's integrated into the main EcoPlate app
+ */
 export class EcoLockerLoginPage extends BasePage {
   private emailInput = By.css('input#email');
   private passwordInput = By.css('input#password');
   private submitButton = By.css('button[type="submit"]');
   private errorMessage = By.css('[role="alert"]');
-  private pageTitle = By.xpath("//*[contains(text(), 'EcoLocker')]");
-  private ecoPlateRef = By.xpath("//*[contains(text(), 'EcoPlate')]");
+  private pageTitle = By.xpath("//*[contains(text(), 'EcoPlate')]");
 
   async goto(): Promise<void> {
-    await this.navigate('/ecolocker/login');
+    // EcoLocker is now part of main app, use main login page
+    await this.navigate('/login');
   }
 
   async login(email: string, password: string): Promise<void> {
@@ -24,7 +28,7 @@ export class EcoLockerLoginPage extends BasePage {
   }
 
   async hasEcoPlateReference(): Promise<boolean> {
-    return this.isVisible(this.ecoPlateRef);
+    return this.isVisible(this.pageTitle);
   }
 
   async isErrorVisible(): Promise<boolean> {

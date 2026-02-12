@@ -92,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("user");
     localStorage.removeItem("ecoplate_unread_count");
     setUser(null);
+    // Dispatch event to notify WebSocket and other contexts that user logged out
+    window.dispatchEvent(new CustomEvent("auth:logout"));
   };
 
   return (

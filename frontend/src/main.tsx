@@ -5,6 +5,7 @@ import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { PointsProvider } from "./contexts/PointsContext";
+import { WebSocketProvider } from "./contexts/WebSocketContext";
 import { UnreadCountProvider } from "./contexts/UnreadCountContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { LockerUnreadProvider } from "./features/ecolocker/contexts/LockerUnreadContext";
@@ -19,15 +20,17 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <PointsProvider>
-            <UnreadCountProvider>
-              <NotificationProvider>
-                <LockerUnreadProvider>
-                  <App />
-                </LockerUnreadProvider>
-              </NotificationProvider>
-            </UnreadCountProvider>
-          </PointsProvider>
+          <WebSocketProvider>
+            <PointsProvider>
+              <UnreadCountProvider>
+                <NotificationProvider>
+                  <LockerUnreadProvider>
+                    <App />
+                  </LockerUnreadProvider>
+                </NotificationProvider>
+              </UnreadCountProvider>
+            </PointsProvider>
+          </WebSocketProvider>
         </AuthProvider>
       </ToastProvider>
     </BrowserRouter>

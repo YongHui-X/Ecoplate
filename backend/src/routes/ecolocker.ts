@@ -311,6 +311,19 @@ export function registerEcoLockerRoutes(router: Router) {
     }
   });
 
+  // Mark all notifications for a specific order as read
+  router.post("/api/v1/ecolocker/orders/:orderId/notifications/read", async (req, params) => {
+    try {
+      const user = getUser(req);
+      const orderId = parseInt(params.orderId, 10);
+      await lockerService.markOrderNotificationsAsRead(orderId, user.id);
+      return json({ success: true });
+    } catch (e) {
+      console.error("Mark order notifications read error:", e);
+      return error("Failed to mark order notifications as read", 500);
+    }
+  });
+
   // Mark all notifications as read
   router.post("/api/v1/ecolocker/notifications/mark-all-read", async (req) => {
     try {

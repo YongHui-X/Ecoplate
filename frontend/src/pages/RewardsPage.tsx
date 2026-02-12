@@ -301,7 +301,7 @@ export default function RewardsPage() {
                 <div className="h-16 w-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
                   {selectedReward.imageUrl ? (
                     <img
-                      src={selectedReward.imageUrl}
+                      src={uploadService.getImageUrl(selectedReward.imageUrl)}
                       alt={selectedReward.name}
                       className="h-full w-full object-cover"
                     />

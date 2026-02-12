@@ -1,5 +1,5 @@
 import { Router, json, error } from "./utils/router";
-import { authMiddleware } from "./middleware/auth";
+import { authMiddleware, verifyToken } from "./middleware/auth";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerMarketplaceRoutes } from "./routes/marketplace";
 import { registerMyFridgeRoutes } from "./routes/myfridge";
@@ -12,10 +12,13 @@ import { registerEcoLockerRoutes } from "./routes/ecolocker";
 import { startLockerJobs } from "./jobs/locker-jobs";
 import { registerNotificationRoutes } from "./routes/notifications";
 import { registerRewardsRoutes } from "./routes/rewards";
+import { registerMapsRoutes } from "./routes/maps";
 import * as schema from "./db/schema";
 import { existsSync } from "fs";
 import { join, resolve } from "path";
 import { db } from "./db/connection";
+import { wsManager, type WSData } from "./services/websocket-manager";
+import { WS_CLIENT_MESSAGES } from "./types/websocket";
 
 // Re-export db for backwards compatibility
 export { db };
@@ -39,6 +42,7 @@ registerUploadRoutes(protectedRouter);
 registerEcoLockerRoutes(protectedRouter);
 registerNotificationRoutes(protectedRouter);
 registerRewardsRoutes(protectedRouter);
+registerMapsRoutes(protectedRouter);
 
 // Health check
 publicRouter.get("/api/v1/health", () => json({ status: "ok" }));
@@ -94,8 +98,8 @@ function addSecurityHeaders(response: Response, isApi: boolean = false, nonce?: 
   headers.set("X-XSS-Protection", "1; mode=block");
   // Referrer policy
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  // Permissions policy
-  headers.set("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+  // Permissions policy - allow geolocation for self (needed for map features)
+  headers.set("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
   // Cross-Origin isolation headers
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
 
@@ -161,14 +165,42 @@ async function serveStatic(path: string): Promise<Response | null> {
 }
 
 // Main server
-const server = Bun.serve({
+const server = Bun.serve<WSData>({
   port: process.env.PORT || 3000,
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
 
     // Block TRACE/TRACK methods
     if (req.method === "TRACE" || req.method === "TRACK") {
       return new Response(null, { status: 405 });
+    }
+
+    // Handle WebSocket upgrade for /ws endpoint
+    if (url.pathname === "/ws") {
+      // Get token from query parameter
+      const token = url.searchParams.get("token");
+      if (!token) {
+        return new Response("Unauthorized: Missing token", { status: 401 });
+      }
+
+      // Verify the token
+      const payload = await verifyToken(token);
+      if (!payload) {
+        return new Response("Unauthorized: Invalid token", { status: 401 });
+      }
+
+      // Upgrade to WebSocket with user data
+      const upgraded = server.upgrade(req, {
+        data: {
+          userId: parseInt(payload.sub, 10),
+          connectedAt: new Date(),
+        } as WSData,
+      });
+
+      if (upgraded) {
+        return undefined; // Bun handles the response
+      }
+      return new Response("WebSocket upgrade failed", { status: 500 });
     }
 
     // Handle CORS preflight — only for API routes
@@ -218,6 +250,35 @@ const server = Bun.serve({
     }
 
     return addSecurityHeaders(error("Not found", 404), false);
+  },
+
+  // WebSocket handlers
+  websocket: {
+    open(ws) {
+      wsManager.addConnection(ws);
+      wsManager.sendConnectionEstablished(ws);
+    },
+
+    message(ws, message) {
+      try {
+        const data = JSON.parse(message.toString());
+        // Handle ping from client
+        if (data.type === WS_CLIENT_MESSAGES.PING) {
+          wsManager.sendPong(ws);
+        }
+      } catch {
+        console.error("[WS] Failed to parse message:", message);
+      }
+    },
+
+    close(ws) {
+      wsManager.removeConnection(ws);
+    },
+
+    drain(ws) {
+      // Called when the socket is ready to receive more data
+      console.log(`[WS] Socket drain for user ${ws.data.userId}`);
+    },
   },
 });
 

@@ -1,84 +1,52 @@
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { LocationAutocomplete } from "./LocationAutocomplete";
 
-// Mock the googleMaps utility module
-vi.mock("../../utils/googleMaps", () => ({
-  loadGoogleMapsScript: vi.fn(() => Promise.resolve()),
-  isGoogleMapsConfigured: vi.fn(() => true),
-}));
-
-// Mock Google Places predictions
+// Mock predictions from backend
 const mockPredictions = [
   {
-    place_id: "place1",
+    placeId: "place1",
     description: "123 Orchard Road, Singapore 238840",
-    structured_formatting: {
-      main_text: "123 Orchard Road",
-      secondary_text: "Singapore 238840",
-    },
+    mainText: "123 Orchard Road",
+    secondaryText: "Singapore 238840",
   },
   {
-    place_id: "place2",
+    placeId: "place2",
     description: "Marina Bay Sands, Singapore 018956",
-    structured_formatting: {
-      main_text: "Marina Bay Sands",
-      secondary_text: "Singapore 018956",
-    },
+    mainText: "Marina Bay Sands",
+    secondaryText: "Singapore 018956",
   },
 ];
 
-// Mock place details
+// Mock place details from backend
 const mockPlaceDetails = {
-  formatted_address: "123 Orchard Road, Singapore 238840",
-  geometry: {
-    location: {
-      lat: () => 1.3048,
-      lng: () => 103.8318,
-    },
-  },
+  address: "123 Orchard Road, Singapore 238840",
+  latitude: 1.3048,
+  longitude: 103.8318,
 };
+
+// Mock the mapsService module
+const mockGetAutocompleteSuggestions = vi.fn();
+const mockGetPlaceDetails = vi.fn();
+
+vi.mock("../../services/maps", () => ({
+  mapsService: {
+    getAutocompleteSuggestions: (...args: unknown[]) => mockGetAutocompleteSuggestions(...args),
+    getPlaceDetails: (...args: unknown[]) => mockGetPlaceDetails(...args),
+  },
+}));
 
 describe("LocationAutocomplete", () => {
   const mockOnChange = vi.fn();
-  let mockGetPlacePredictions: ReturnType<typeof vi.fn>;
-  let mockGetDetails: ReturnType<typeof vi.fn>;
-
-  beforeAll(() => {
-    // Mock Google Maps API key
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY = "test-api-key";
-  });
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    // Create mock functions for Google Places API
-    mockGetPlacePredictions = vi.fn((request, callback) => {
-      callback(mockPredictions, "OK");
-    });
-
-    mockGetDetails = vi.fn((request, callback) => {
-      callback(mockPlaceDetails, "OK");
-    });
-
-    // Setup Google Maps mock - must use function() not arrow function for constructors
-    (window as any).google = {
-      maps: {
-        places: {
-          AutocompleteService: vi.fn(function() {
-            return { getPlacePredictions: mockGetPlacePredictions };
-          }),
-          PlacesService: vi.fn(function() {
-            return { getDetails: mockGetDetails };
-          }),
-          PlacesServiceStatus: {
-            OK: "OK",
-          },
-        },
-      },
-    };
+    // Default mock implementations
+    mockGetAutocompleteSuggestions.mockResolvedValue(mockPredictions);
+    mockGetPlaceDetails.mockResolvedValue(mockPlaceDetails);
   });
 
   afterEach(() => {
@@ -88,9 +56,7 @@ describe("LocationAutocomplete", () => {
   it("should render with default placeholder", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).toBeInTheDocument();
-    });
+    expect(screen.getByPlaceholderText("Enter pickup location")).toBeInTheDocument();
   });
 
   it("should render with custom placeholder", async () => {
@@ -102,9 +68,7 @@ describe("LocationAutocomplete", () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Custom placeholder")).toBeInTheDocument();
-    });
+    expect(screen.getByPlaceholderText("Custom placeholder")).toBeInTheDocument();
   });
 
   it("should render with label", async () => {
@@ -112,9 +76,7 @@ describe("LocationAutocomplete", () => {
       <LocationAutocomplete value="" onChange={mockOnChange} label="Pickup Location" />
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("Pickup Location")).toBeInTheDocument();
-    });
+    expect(screen.getByText("Pickup Location")).toBeInTheDocument();
   });
 
   it("should render required indicator when required", async () => {
@@ -127,17 +89,11 @@ describe("LocationAutocomplete", () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("*")).toBeInTheDocument();
-    });
+    expect(screen.getByText("*")).toBeInTheDocument();
   });
 
   it("should call onChange when input changes", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard" } });
@@ -148,19 +104,13 @@ describe("LocationAutocomplete", () => {
   it("should display helper text", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Start typing to search for Singapore addresses or landmarks")
-      ).toBeInTheDocument();
-    });
+    expect(
+      screen.getByText("Start typing to search for Singapore addresses or landmarks")
+    ).toBeInTheDocument();
   });
 
   it("should not fetch suggestions for short queries", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Or" } });
@@ -168,33 +118,26 @@ describe("LocationAutocomplete", () => {
     vi.advanceTimersByTime(500);
 
     await waitFor(() => {
-      expect(mockGetPlacePredictions).not.toHaveBeenCalled();
+      expect(mockGetAutocompleteSuggestions).not.toHaveBeenCalled();
     });
   });
 
   it("should fetch suggestions after debounce delay", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
-
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
 
-    vi.advanceTimersByTime(350);
+    // Advance timers and flush pending promises
+    await vi.advanceTimersByTimeAsync(350);
 
     await waitFor(() => {
-      expect(mockGetPlacePredictions).toHaveBeenCalled();
+      expect(mockGetAutocompleteSuggestions).toHaveBeenCalled();
     });
   });
 
   it("should display suggestions dropdown", async () => {
     render(<LocationAutocomplete value="Orchard" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
@@ -210,10 +153,6 @@ describe("LocationAutocomplete", () => {
   it("should display secondary text in suggestions", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
-
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
 
@@ -227,10 +166,6 @@ describe("LocationAutocomplete", () => {
   it("should call onChange with coordinates when suggestion selected", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
-
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
 
@@ -240,23 +175,24 @@ describe("LocationAutocomplete", () => {
       expect(screen.getByText("123 Orchard Road")).toBeInTheDocument();
     });
 
+    // Use real timers for the async click handler
+    vi.useRealTimers();
     fireEvent.click(screen.getByText("123 Orchard Road").closest("button")!);
 
     await waitFor(() => {
-      expect(mockGetDetails).toHaveBeenCalled();
+      expect(mockGetPlaceDetails).toHaveBeenCalledWith("place1");
       expect(mockOnChange).toHaveBeenCalledWith(
         "123 Orchard Road, Singapore 238840",
         { latitude: 1.3048, longitude: 103.8318 }
       );
     });
+
+    // Restore fake timers for other tests
+    vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   it("should close suggestions on escape key", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
@@ -275,15 +211,9 @@ describe("LocationAutocomplete", () => {
   });
 
   it("should show no results message when no suggestions found", async () => {
-    mockGetPlacePredictions.mockImplementation((request, callback) => {
-      callback([], "ZERO_RESULTS");
-    });
+    mockGetAutocompleteSuggestions.mockResolvedValue([]);
 
     render(<LocationAutocomplete value="xyz" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "nonexistent location xyz" } });
@@ -298,15 +228,10 @@ describe("LocationAutocomplete", () => {
   });
 
   it("should show loading indicator while fetching", async () => {
-    mockGetPlacePredictions.mockImplementation(() => {
-      // Never call the callback to simulate loading
-    });
+    // Never resolve to simulate loading
+    mockGetAutocompleteSuggestions.mockReturnValue(new Promise(() => {}));
 
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
@@ -327,10 +252,6 @@ describe("LocationAutocomplete", () => {
       </div>
     );
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
-
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
 
@@ -348,16 +269,10 @@ describe("LocationAutocomplete", () => {
   });
 
   it("should handle fetch error gracefully", async () => {
-    mockGetPlacePredictions.mockImplementation((request, callback) => {
-      callback(null, "REQUEST_DENIED");
-    });
+    mockGetAutocompleteSuggestions.mockRejectedValue(new Error("Network error"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
@@ -365,8 +280,33 @@ describe("LocationAutocomplete", () => {
     vi.advanceTimersByTime(350);
 
     await waitFor(() => {
-      // Should not crash and should clear suggestions
+      // Should not crash and should show no results
       expect(screen.queryByText("123 Orchard Road")).not.toBeInTheDocument();
+    });
+
+    consoleSpy.mockRestore();
+  });
+
+  it("should fallback to description when place details fails", async () => {
+    mockGetPlaceDetails.mockRejectedValue(new Error("Network error"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(<LocationAutocomplete value="" onChange={mockOnChange} />);
+
+    const input = screen.getByPlaceholderText("Enter pickup location");
+    fireEvent.change(input, { target: { value: "Orchard Road" } });
+
+    vi.advanceTimersByTime(350);
+
+    await waitFor(() => {
+      expect(screen.getByText("123 Orchard Road")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("123 Orchard Road").closest("button")!);
+
+    await waitFor(() => {
+      // Should fallback to description without coordinates
+      expect(mockOnChange).toHaveBeenCalledWith("123 Orchard Road, Singapore 238840");
     });
 
     consoleSpy.mockRestore();
@@ -377,46 +317,20 @@ describe("LocationAutocomplete", () => {
       <LocationAutocomplete value="Test Location" onChange={mockOnChange} />
     );
 
-    await waitFor(() => {
-      const input = screen.getByPlaceholderText("Enter pickup location");
-      expect(input).toHaveValue("Test Location");
-    });
+    const input = screen.getByPlaceholderText("Enter pickup location");
+    expect(input).toHaveValue("Test Location");
   });
 });
 
 describe("LocationAutocomplete - Keyboard Navigation", () => {
   const mockOnChange = vi.fn();
-  let mockGetPlacePredictions: ReturnType<typeof vi.fn>;
-  let mockGetDetails: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    mockGetPlacePredictions = vi.fn((request, callback) => {
-      callback(mockPredictions, "OK");
-    });
-
-    mockGetDetails = vi.fn((request, callback) => {
-      callback(mockPlaceDetails, "OK");
-    });
-
-    // Must use function() not arrow function for constructors
-    (window as any).google = {
-      maps: {
-        places: {
-          AutocompleteService: vi.fn(function() {
-            return { getPlacePredictions: mockGetPlacePredictions };
-          }),
-          PlacesService: vi.fn(function() {
-            return { getDetails: mockGetDetails };
-          }),
-          PlacesServiceStatus: {
-            OK: "OK",
-          },
-        },
-      },
-    };
+    mockGetAutocompleteSuggestions.mockResolvedValue(mockPredictions);
+    mockGetPlaceDetails.mockResolvedValue(mockPlaceDetails);
   });
 
   afterEach(() => {
@@ -425,10 +339,6 @@ describe("LocationAutocomplete - Keyboard Navigation", () => {
 
   it("should navigate down with ArrowDown key", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
@@ -448,10 +358,6 @@ describe("LocationAutocomplete - Keyboard Navigation", () => {
 
   it("should navigate up with ArrowUp key", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
@@ -476,10 +382,6 @@ describe("LocationAutocomplete - Keyboard Navigation", () => {
   it("should select suggestion with Enter key", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
 
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
-
     const input = screen.getByPlaceholderText("Enter pickup location");
     fireEvent.change(input, { target: { value: "Orchard Road" } });
 
@@ -493,16 +395,12 @@ describe("LocationAutocomplete - Keyboard Navigation", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() => {
-      expect(mockGetDetails).toHaveBeenCalled();
+      expect(mockGetPlaceDetails).toHaveBeenCalledWith("place1");
     });
   });
 
   it("should show suggestions when input focused with existing suggestions", async () => {
     render(<LocationAutocomplete value="" onChange={mockOnChange} />);
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText("Enter pickup location")).not.toBeDisabled();
-    });
 
     const input = screen.getByPlaceholderText("Enter pickup location");
 

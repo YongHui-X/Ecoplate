@@ -71,10 +71,15 @@ vi.mock("../services/api", () => ({
     post: vi.fn((url: string) => {
       if (url.includes("/rewards/redeem")) {
         return Promise.resolve({
-          id: 1,
-          redemptionCode: "EP-ABC12345",
+          quantity: 1,
           pointsSpent: 500,
           reward: mockRewards[0],
+          redemptions: [
+            {
+              id: 1,
+              redemptionCode: "EP-ABC12345",
+            },
+          ],
         });
       }
       return Promise.resolve({});
@@ -268,7 +273,7 @@ describe("RewardsPage - Redemption", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Your Balance:")).toBeInTheDocument();
-      expect(screen.getByText("Cost:")).toBeInTheDocument();
+      expect(screen.getByText("Cost (1x):")).toBeInTheDocument();
       expect(screen.getByText("Remaining:")).toBeInTheDocument();
     });
   });

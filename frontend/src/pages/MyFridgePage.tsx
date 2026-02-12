@@ -2299,7 +2299,7 @@ function TrackConsumptionModal({
         console.error("Failed to refresh points:", error);
       }
       console.log("[FE:confirm] Success! Moving to waste-input step");
-      addToast("Ingredients confirmed! Eco points awarded.", "success");
+      addToast("Ingredients confirmed!", "success");
 
       if (fileInputRef.current) fileInputRef.current.value = "";
       setStep("waste-input");

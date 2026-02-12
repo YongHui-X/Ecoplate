@@ -1,6 +1,7 @@
 /**
  * Shared Google Maps script loader utility.
- * Ensures the script is only loaded once across all components.
+ * Used only for map rendering in MarketplaceMap.
+ * Location autocomplete now uses backend proxy to Google Places API.
  */
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -8,29 +9,9 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 let loadPromise: Promise<void> | null = null;
 
 /**
- * Wait for Google Maps Places library to be available
- */
-function waitForPlaces(timeout = 10000): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const startTime = Date.now();
-
-    const check = () => {
-      if (window.google?.maps?.places) {
-        resolve();
-      } else if (Date.now() - startTime > timeout) {
-        reject(new Error("Timeout waiting for Google Maps Places library"));
-      } else {
-        setTimeout(check, 100);
-      }
-    };
-
-    check();
-  });
-}
-
-/**
- * Load Google Maps JavaScript API with Places library.
+ * Load Google Maps JavaScript API.
  * This function ensures the script is only loaded once.
+ * Used for map rendering, not for Places API calls (those go through backend).
  */
 export function loadGoogleMapsScript(): Promise<void> {
   // Return existing promise if already loading/loaded
@@ -38,8 +19,8 @@ export function loadGoogleMapsScript(): Promise<void> {
     return loadPromise;
   }
 
-  // Already fully loaded with Places
-  if (window.google?.maps?.places) {
+  // Already fully loaded
+  if (window.google?.maps) {
     return Promise.resolve();
   }
 
@@ -48,25 +29,34 @@ export function loadGoogleMapsScript(): Promise<void> {
     const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
 
     if (existingScript) {
-      // Script exists - wait for Places library to be available
-      waitForPlaces()
-        .then(resolve)
-        .catch(reject);
+      // Script exists - wait for google.maps to be available
+      const check = () => {
+        if (window.google?.maps) {
+          resolve();
+        } else {
+          setTimeout(check, 100);
+        }
+      };
+      check();
       return;
     }
 
-    // Load new script with Places library
+    // Load new script (without places library - not needed for map display only)
     const script = document.createElement("script");
     script.id = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`;
     script.async = true;
     script.defer = true;
 
     script.onload = () => {
-      // Wait for Places to be fully initialized
-      waitForPlaces()
-        .then(resolve)
-        .catch(reject);
+      const check = () => {
+        if (window.google?.maps) {
+          resolve();
+        } else {
+          setTimeout(check, 100);
+        }
+      };
+      check();
     };
 
     script.onerror = () => reject(new Error("Failed to load Google Maps"));

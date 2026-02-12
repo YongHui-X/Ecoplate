@@ -3,16 +3,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { MapPin, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { loadGoogleMapsScript } from '../../utils/googleMaps';
-
-interface PlacePrediction {
-  place_id: string;
-  description: string;
-  structured_formatting: {
-    main_text: string;
-    secondary_text: string;
-  };
-}
+import { mapsService, type PlacePrediction } from '../../services/maps';
 
 interface LocationAutocompleteProps {
   value: string;
@@ -24,8 +15,8 @@ interface LocationAutocompleteProps {
 }
 
 /**
- * Location autocomplete component using Google Places API
- * Provides address suggestions as user types
+ * Location autocomplete component using backend proxy to Google Places API.
+ * Provides address suggestions as user types.
  */
 export function LocationAutocomplete({
   value,
@@ -39,29 +30,8 @@ export function LocationAutocomplete({
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [isLoaded, setIsLoaded] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
-  const dummyDivRef = useRef<HTMLDivElement | null>(null);
-
-  // Load Google Maps script
-  useEffect(() => {
-    loadGoogleMapsScript()
-      .then(() => {
-        setIsLoaded(true);
-        autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
-        // PlacesService requires a map or div element
-        if (!dummyDivRef.current) {
-          dummyDivRef.current = document.createElement('div');
-        }
-        placesServiceRef.current = new google.maps.places.PlacesService(dummyDivRef.current);
-      })
-      .catch((err) => {
-        console.error('Failed to load Google Maps:', err);
-      });
-  }, []);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -75,9 +45,9 @@ export function LocationAutocomplete({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch location suggestions from Google Places
+  // Fetch location suggestions from backend
   const fetchSuggestions = useCallback(async (query: string) => {
-    if (query.length < 3 || !autocompleteServiceRef.current) {
+    if (query.length < 3) {
       setSuggestions([]);
       return;
     }
@@ -85,25 +55,14 @@ export function LocationAutocomplete({
     setLoading(true);
 
     try {
-      autocompleteServiceRef.current.getPlacePredictions(
-        {
-          input: query,
-          componentRestrictions: { country: 'sg' }, // Limit to Singapore
-        },
-        (predictions, status) => {
-          setLoading(false);
-          if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-            setSuggestions(predictions);
-            setShowSuggestions(true);
-          } else {
-            setSuggestions([]);
-            setShowSuggestions(true); // Show "no results" message
-          }
-        }
-      );
+      const predictions = await mapsService.getAutocompleteSuggestions(query);
+      setSuggestions(predictions);
+      setShowSuggestions(true);
     } catch (error) {
       console.error('Failed to fetch location suggestions:', error);
       setSuggestions([]);
+      setShowSuggestions(true); // Show "no results" message
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -125,33 +84,22 @@ export function LocationAutocomplete({
   };
 
   // Handle suggestion selection - get coordinates from place details
-  const handleSelectSuggestion = (suggestion: PlacePrediction) => {
-    if (!placesServiceRef.current) {
+  const handleSelectSuggestion = async (suggestion: PlacePrediction) => {
+    try {
+      const details = await mapsService.getPlaceDetails(suggestion.placeId);
+      onChange(details.address, {
+        latitude: details.latitude,
+        longitude: details.longitude,
+      });
+    } catch (error) {
+      console.error('Failed to fetch place details:', error);
+      // Fallback to description without coordinates
       onChange(suggestion.description);
-      setShowSuggestions(false);
-      setSuggestions([]);
-      return;
     }
 
-    placesServiceRef.current.getDetails(
-      {
-        placeId: suggestion.place_id,
-        fields: ['geometry', 'formatted_address'],
-      },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-          onChange(place.formatted_address || suggestion.description, {
-            latitude: place.geometry.location.lat(),
-            longitude: place.geometry.location.lng(),
-          });
-        } else {
-          onChange(suggestion.description);
-        }
-        setShowSuggestions(false);
-        setSuggestions([]);
-        setSelectedIndex(-1);
-      }
-    );
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSelectedIndex(-1);
   };
 
   // Keyboard navigation
@@ -204,7 +152,6 @@ export function LocationAutocomplete({
           placeholder={placeholder}
           className="pl-10 pr-10"
           required={required}
-          disabled={!isLoaded}
         />
         {loading && (
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
@@ -216,7 +163,7 @@ export function LocationAutocomplete({
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
           {suggestions.map((suggestion, index) => (
             <button
-              key={suggestion.place_id}
+              key={suggestion.placeId}
               type="button"
               onClick={() => handleSelectSuggestion(suggestion)}
               className={cn(
@@ -228,10 +175,10 @@ export function LocationAutocomplete({
                 <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">
-                    {suggestion.structured_formatting.main_text}
+                    {suggestion.mainText}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {suggestion.structured_formatting.secondary_text}
+                    {suggestion.secondaryText}
                   </p>
                 </div>
               </div>

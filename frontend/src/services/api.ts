@@ -3,7 +3,8 @@ const getApiBase = (): string => {
     (window as any).Capacitor !== undefined;
 
   if (isCapacitor) {
-    const url = import.meta.env.VITE_API_URL || 'https://18.143.173.20/api/v1';
+    // Use HTTP to avoid self-signed certificate issues on Android
+    const url = import.meta.env.VITE_API_URL || 'http://18.143.173.20/api/v1';
     console.log('[API] Capacitor mode, using:', url);
     return url;
   }

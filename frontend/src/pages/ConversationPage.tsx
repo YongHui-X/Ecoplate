@@ -1,11 +1,16 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { messageService, ConversationDetail } from "../services/messages";
+import { messageService, ConversationDetail, Message } from "../services/messages";
 import { marketplaceService } from "../services/marketplace";
 import { uploadService } from "../services/upload";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { useUnreadCount } from "../contexts/UnreadCountContext";
+import {
+  useWebSocket,
+  WS_EVENTS,
+  type NewMessagePayload,
+} from "../contexts/WebSocketContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader } from "../components/ui/card";
@@ -37,19 +42,66 @@ export default function ConversationPage() {
   const { user } = useAuth();
   const { addToast } = useToast();
   const { refreshUnreadCount } = useUnreadCount();
+  const { subscribe, isConnected } = useWebSocket();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMessageCount = useRef(0);
 
   useEffect(() => {
     loadConversation();
-    const interval = setInterval(loadConversation, 5000);
+    // Increase polling interval since WebSocket handles real-time updates
+    // Keep polling as fallback when WebSocket is not connected
+    const pollingInterval = isConnected ? 30000 : 5000;
+    const interval = setInterval(loadConversation, pollingInterval);
     const timeInterval = setInterval(() => setCurrentTime(Date.now()), 60000);
     return () => {
       clearInterval(interval);
       clearInterval(timeInterval);
     };
-  }, [conversationId]);
+  }, [conversationId, isConnected]);
+
+  // Subscribe to WebSocket new message events for this conversation
+  useEffect(() => {
+    const unsubscribe = subscribe<NewMessagePayload>(
+      WS_EVENTS.NEW_MESSAGE,
+      (payload) => {
+        // Only handle messages for the current conversation
+        if (payload.conversationId !== Number(conversationId)) {
+          return;
+        }
+
+        // Add the new message to the conversation
+        setConversation((prev) => {
+          if (!prev) return prev;
+
+          // Check if message already exists (avoid duplicates)
+          const messageExists = prev.messages.some(
+            (m) => m.id === payload.message.id
+          );
+          if (messageExists) return prev;
+
+          // Add new message at the beginning (messages are sorted desc by createdAt)
+          return {
+            ...prev,
+            messages: [payload.message as Message, ...prev.messages],
+          };
+        });
+
+        // Show notification for messages from other users
+        if (payload.senderId !== user?.id) {
+          setNewMessageAlert(true);
+          addToast(`${payload.senderName}: ${payload.message.messageText.slice(0, 50)}${payload.message.messageText.length > 50 ? '...' : ''}`, "info");
+          setTimeout(() => setNewMessageAlert(false), 3000);
+        }
+
+        // Mark messages as read since we're viewing the conversation
+        messageService.markAsRead(Number(conversationId));
+        refreshUnreadCount();
+      }
+    );
+
+    return unsubscribe;
+  }, [conversationId, subscribe, user?.id, addToast, refreshUnreadCount]);
 
   useEffect(() => {
     if (conversation?.messages) {

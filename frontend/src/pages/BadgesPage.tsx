@@ -131,11 +131,16 @@ export default function BadgesPage() {
   const loadBadges = async () => {
     try {
       // First, sync badges to award any newly earned ones
-      await api.post("/gamification/sync-badges", {});
+      const syncResult = await api.post<{ newBadges: Array<{ name: string; pointsAwarded: number }> }>("/gamification/sync-badges", {});
 
       // Then fetch the updated badges list
       const data = await api.get<BadgesResponse>("/gamification/badges");
       setBadges(data.badges);
+
+      // If new badges were awarded, notify points context to refresh
+      if (syncResult.newBadges?.length > 0) {
+        window.dispatchEvent(new Event("points:updated"));
+      }
     } catch (error) {
       console.error("Failed to load badges:", error);
     } finally {

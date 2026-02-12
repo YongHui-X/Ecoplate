@@ -76,7 +76,6 @@ export default function LockerOrdersPage() {
       <LockerTabs />
 
       <div className="p-4">
-        <h1 className="text-xl font-semibold mb-4">My Orders</h1>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4">

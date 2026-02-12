@@ -132,7 +132,7 @@ export async function awardPoints(
   }
 
   // Only update streak for sold actions
-  const streakActions = ["sold"];
+  const streakActions = ["sold", "badge"];
   if (streakActions.includes(action)) {
     await updateStreak(userId);
   }
@@ -181,7 +181,7 @@ export async function updateStreak(userId: number) {
   yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
   const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
 
-  const streakActions = ["sold"];
+  const streakActions = ["sold", "badge"];
 
   // Fetch all qualifying interactions for this user
   const allInteractions = await db.query.productSustainabilityMetrics.findMany({
@@ -263,7 +263,7 @@ export async function getDetailedPointsStats(userId: number) {
     with: { product: { columns: { category: true, co2Emission: true } } },
   });
 
-  const streakActions = ["sold"];
+  const streakActions = ["sold", "badge"];
   const now = new Date();
 
   // Use UTC date strings to match how todayDate is stored

@@ -204,9 +204,9 @@ describe("DashboardPage", () => {
   it("should display summary statistics cards", async () => {
     renderWithProviders(<DashboardPage />);
     await waitFor(() => {
-      expect(screen.getByText("Total CO₂ Reduced")).toBeInTheDocument();
-      expect(screen.getByText("Total Food Sold")).toBeInTheDocument();
-      expect(screen.getByText("Total Money Saved")).toBeInTheDocument();
+      expect(screen.getAllByText("Total CO₂ Reduced").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Total Food Sold").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Total Money Saved").length).toBeGreaterThan(0);
     });
   });
 

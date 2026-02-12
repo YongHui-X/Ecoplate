@@ -13,6 +13,8 @@ import {
   isUserParticipant,
   getListingForConversation,
 } from "../services/conversation-service";
+import { wsManager } from "../services/websocket-manager";
+import type { NewMessagePayload } from "../types/websocket";
 
 const sendMessageSchema = z.object({
   conversationId: z.number().optional(),
@@ -342,6 +344,53 @@ export function registerMessageRoutes(router: Router) {
           },
         },
       });
+
+      // Get conversation details for WebSocket notification
+      const conversationForWS = await db.query.conversations.findFirst({
+        where: eq(conversations.id, targetConversationId),
+        with: {
+          listing: {
+            columns: { title: true },
+          },
+          seller: {
+            columns: { id: true },
+          },
+          buyer: {
+            columns: { id: true },
+          },
+        },
+      });
+
+      // Broadcast to the recipient via WebSocket
+      if (conversationForWS && messageWithUser) {
+        const recipientId =
+          conversationForWS.seller.id === user.id
+            ? conversationForWS.buyer.id
+            : conversationForWS.seller.id;
+
+        const wsPayload: NewMessagePayload = {
+          conversationId: targetConversationId,
+          message: {
+            id: messageWithUser.id,
+            conversationId: messageWithUser.conversationId,
+            userId: messageWithUser.userId,
+            messageText: messageWithUser.messageText,
+            isRead: messageWithUser.isRead,
+            createdAt: messageWithUser.createdAt.toISOString(),
+            user: messageWithUser.user!,
+          },
+          senderId: user.id,
+          senderName: user.name,
+          listingTitle: conversationForWS.listing?.title ?? "Unknown",
+        };
+
+        // Send new message event
+        wsManager.sendNewMessage(recipientId, wsPayload);
+
+        // Send updated unread count to recipient
+        const newUnreadCount = await getUnreadCountForUser(recipientId);
+        wsManager.sendUnreadCountUpdate(recipientId, newUnreadCount);
+      }
 
       return json({
         id: messageWithUser!.id,
