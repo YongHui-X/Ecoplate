@@ -34,7 +34,8 @@ const demoUsers = [
   { email: "nancy@demo.com", password: DEMO_PASSWORD, name: "Nancy Yeo", userLocation: "Hougang, Singapore 530222" },
   { email: "oliver@demo.com", password: DEMO_PASSWORD, name: "Oliver Seah", userLocation: "Bukit Batok, Singapore 650333" },
   { email: "paula@demo.com", password: DEMO_PASSWORD, name: "Paula Ng", userLocation: "Choa Chu Kang, Singapore 680444" },
-  { email: "quincy@demo.com", password: DEMO_PASSWORD, name: "Quincy Wee", userLocation: "Marine Parade, Singapore 440555" },
+  { email: "" +
+        "", password: DEMO_PASSWORD, name: "Quincy Wee", userLocation: "Marine Parade, Singapore 440555" },
   { email: "rachel@demo.com", password: DEMO_PASSWORD, name: "Rachel Sim", userLocation: "Geylang, Singapore 380666" },
   { email: "samuel@demo.com", password: DEMO_PASSWORD, name: "Samuel Foo", userLocation: "Kallang, Singapore 330777" },
   { email: "tina@demo.com", password: DEMO_PASSWORD, name: "Tina Loh", userLocation: "Novena, Singapore 320888" },

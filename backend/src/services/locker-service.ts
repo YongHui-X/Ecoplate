@@ -351,14 +351,14 @@ export async function confirmRiderPickup(
     orderId,
     "points_earned",
     "EcoPoints Earned!",
-    `You earned ${pointsResult.amount} EcoPoints for this sale!`
+    "You earned EcoPoints for this sale!"
   );
 
   await createMainNotification(
     order.sellerId,
     "locker_points_earned",
     "EcoLocker: EcoPoints Earned!",
-    `You earned ${pointsResult.amount} EcoPoints for your sale!`,
+    "You earned EcoPoints for your sale!",
     orderId
   );
 
