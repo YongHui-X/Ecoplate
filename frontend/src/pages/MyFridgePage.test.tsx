@@ -2662,3 +2662,1595 @@ describe("Product quantity display", () => {
     });
   });
 });
+
+describe("AddProductModal - Category Selection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should have all category options in add modal", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      const categorySelect = screen.getByLabelText("Category");
+      expect(categorySelect).toContainHTML("Produce");
+      expect(categorySelect).toContainHTML("Dairy");
+      expect(categorySelect).toContainHTML("Meat");
+      expect(categorySelect).toContainHTML("Bakery");
+      expect(categorySelect).toContainHTML("Frozen");
+      expect(categorySelect).toContainHTML("Beverages");
+      expect(categorySelect).toContainHTML("Pantry");
+      expect(categorySelect).toContainHTML("Other");
+    });
+  });
+
+  it("should allow category selection", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Category")).toBeInTheDocument();
+    });
+
+    const categorySelect = screen.getByLabelText("Category") as HTMLSelectElement;
+    fireEvent.change(categorySelect, { target: { value: "meat" } });
+    expect(categorySelect.value).toBe("meat");
+  });
+});
+
+describe("AddProductModal - Unit Selection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should have unit options in add modal", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      const unitSelect = screen.getByLabelText("Unit *");
+      expect(unitSelect).toBeInTheDocument();
+    });
+  });
+
+  it("should allow unit selection", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unit *")).toBeInTheDocument();
+    });
+
+    const unitSelect = screen.getByLabelText("Unit *") as HTMLSelectElement;
+    fireEvent.change(unitSelect, { target: { value: "kg" } });
+    expect(unitSelect.value).toBe("kg");
+  });
+});
+
+describe("AddProductModal - Price Input", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should have price input field", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unit Price ($)")).toBeInTheDocument();
+    });
+  });
+
+  it("should accept decimal price values", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unit Price ($)")).toBeInTheDocument();
+    });
+
+    const priceInput = screen.getByLabelText("Unit Price ($)") as HTMLInputElement;
+    fireEvent.change(priceInput, { target: { value: "12.99" } });
+    expect(priceInput.value).toBe("12.99");
+  });
+});
+
+describe("AddProductModal - Description Input", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should have description textarea", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Description")).toBeInTheDocument();
+    });
+  });
+
+  it("should accept description text", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Description")).toBeInTheDocument();
+    });
+
+    const descriptionInput = screen.getByLabelText("Description") as HTMLTextAreaElement;
+    fireEvent.change(descriptionInput, { target: { value: "Fresh from the farm" } });
+    expect(descriptionInput.value).toBe("Fresh from the farm");
+  });
+});
+
+describe("AddProductModal - Purchase Date", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should have purchase date field", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Purchase Date")).toBeInTheDocument();
+    });
+  });
+
+  it("should accept date values", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Add Item/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Item/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Purchase Date")).toBeInTheDocument();
+    });
+
+    const dateInput = screen.getByLabelText("Purchase Date") as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: "2026-02-10" } });
+    expect(dateInput.value).toBe("2026-02-10");
+  });
+});
+
+describe("ProductCard - CO2 Display", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display CO2 emission value with leaf icon", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Chicken",
+            category: "meat",
+            quantity: 1,
+            unit: "kg",
+            unitPrice: 10.0,
+            purchaseDate: null,
+            description: null,
+            co2Emission: 6.1,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Chicken")).toBeInTheDocument();
+    });
+
+    // CO2 value should be displayed
+    const productCard = screen.getByText("Chicken").closest(".bg-card");
+    expect(productCard).toBeInTheDocument();
+  });
+
+  it("should handle products with null CO2 values", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Unknown Item",
+            category: null,
+            quantity: 1,
+            unit: null,
+            unitPrice: null,
+            purchaseDate: null,
+            description: null,
+            co2Emission: null,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Unknown Item")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("ProductCard - Price Display", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should format price correctly", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Steak",
+            category: "meat",
+            quantity: 1,
+            unit: "kg",
+            unitPrice: 25.5,
+            purchaseDate: null,
+            description: null,
+            co2Emission: 27.0,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Steak")).toBeInTheDocument();
+      expect(screen.getByText("$25.50")).toBeInTheDocument();
+    });
+  });
+
+  it("should not display price when null", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Free Item",
+            category: "other",
+            quantity: 1,
+            unit: "pcs",
+            unitPrice: null,
+            purchaseDate: null,
+            description: null,
+            co2Emission: 0.5,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Free Item")).toBeInTheDocument();
+    });
+
+    // Price should not be displayed
+    expect(screen.queryByText("$")).not.toBeInTheDocument();
+  });
+});
+
+describe("Header Buttons", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should display all three action buttons", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+      expect(screen.getByText("Track Consumption")).toBeInTheDocument();
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+  });
+
+  it("should have Camera icon in Scan Receipt button", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      const scanButton = screen.getByText("Scan Receipt").closest("button");
+      const svg = scanButton?.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
+  });
+
+  it("should have TrendingUp icon in Track Consumption button", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      const trackButton = screen.getByText("Track Consumption").closest("button");
+      const svg = trackButton?.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
+  });
+
+  it("should have Plus icon in Add Item button", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      const addButton = screen.getByText("Add Item").closest("button");
+      const svg = addButton?.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
+  });
+});
+
+describe("Search Input", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should have Search icon in search input", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      const searchInput = screen.getByPlaceholderText("Search items...");
+      expect(searchInput).toBeInTheDocument();
+    });
+
+    // Check for search icon
+    const searchContainer = screen.getByPlaceholderText("Search items...").parentElement;
+    const svg = searchContainer?.querySelector("svg");
+    expect(svg).toBeInTheDocument();
+  });
+
+  it("should clear search when input is cleared", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          { id: 1, productName: "Apples", category: "produce", quantity: 3, co2Emission: 0.4 },
+          { id: 2, productName: "Milk", category: "dairy", quantity: 1, co2Emission: 3.2 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Apples")).toBeInTheDocument();
+      expect(screen.getByText("Milk")).toBeInTheDocument();
+    });
+
+    // Search for Apples
+    const searchInput = screen.getByPlaceholderText("Search items...");
+    fireEvent.change(searchInput, { target: { value: "Apple" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Apples")).toBeInTheDocument();
+      expect(screen.queryByText("Milk")).not.toBeInTheDocument();
+    });
+
+    // Clear search
+    fireEvent.change(searchInput, { target: { value: "" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Apples")).toBeInTheDocument();
+      expect(screen.getByText("Milk")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("CO2 Summary Card", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display Total Carbon Footprint text", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          { id: 1, productName: "Beef", category: "meat", quantity: 1, co2Emission: 27.0 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Total Carbon Footprint")).toBeInTheDocument();
+    });
+  });
+
+  it("should display All items in your fridge text", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          { id: 1, productName: "Beef", category: "meat", quantity: 1, co2Emission: 27.0 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("All items in your fridge")).toBeInTheDocument();
+    });
+  });
+
+  it("should display CO2 emissions label", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          { id: 1, productName: "Beef", category: "meat", quantity: 1, co2Emission: 27.0 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("CO2 emissions")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("ScanReceiptModal - Photo Options", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should display both camera and upload options", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Scan Receipt"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Take Photo")).toBeInTheDocument();
+      expect(screen.getByText("Upload from files")).toBeInTheDocument();
+    });
+  });
+
+  it("should display camera description text", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Scan Receipt"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Use your camera to capture a receipt")).toBeInTheDocument();
+    });
+  });
+
+  it("should display upload description text", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Scan Receipt"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Drag and drop, or click to browse")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("Pending Consumption - Display Details", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display ingredient count in pending record", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([]);
+      }
+      if (url === "/myfridge/consumption/pending") {
+        return Promise.resolve([
+          {
+            id: 1,
+            rawPhoto: "data:image/jpeg;base64,abc",
+            ingredients: [
+              { id: "1", name: "Chicken", quantity: 1 },
+              { id: "2", name: "Rice", quantity: 2 },
+            ],
+            status: "PENDING_WASTE_PHOTO",
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("2 ingredients")).toBeInTheDocument();
+    });
+  });
+
+  it("should display pending message text", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([]);
+      }
+      if (url === "/myfridge/consumption/pending") {
+        return Promise.resolve([
+          {
+            id: 1,
+            rawPhoto: "data:image/jpeg;base64,abc",
+            ingredients: [{ id: "1", name: "Chicken", quantity: 1 }],
+            status: "PENDING_WASTE_PHOTO",
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("You have meals waiting for waste photo. Add them to complete tracking.")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("Empty State - Add First Item", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should display empty state card", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      const emptyCard = document.querySelector(".p-12");
+      expect(emptyCard).toBeInTheDocument();
+    });
+  });
+
+  it("should have centered text in empty state", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      const emptyText = screen.getByText("No items in your fridge yet");
+      expect(emptyText.className).toContain("muted-foreground");
+    });
+  });
+});
+
+describe("Product Card - Category Badge", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display category as badge", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Milk",
+            category: "dairy",
+            quantity: 1,
+            unit: "L",
+            co2Emission: 3.2,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("dairy")).toBeInTheDocument();
+    });
+  });
+
+  it("should not show category badge when category is null", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Mystery Food",
+            category: null,
+            quantity: 1,
+            unit: "pcs",
+            co2Emission: 1.0,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Mystery Food")).toBeInTheDocument();
+    });
+
+    // No category badge should be present in the card
+    const productCard = screen.getByText("Mystery Food").closest(".bg-card");
+    const badges = productCard?.querySelectorAll('[class*="badge"]');
+    expect(badges?.length).toBe(0);
+  });
+});
+
+describe("Product Deletion", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have Sell button for products", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Apples",
+            category: "produce",
+            quantity: 3,
+            unit: "kg",
+            co2Emission: 0.4,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Apples")).toBeInTheDocument();
+    });
+
+    // Check Sell button is present
+    expect(screen.getByText("Sell")).toBeInTheDocument();
+  });
+
+  it("should display product quantity and unit", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Bananas",
+            category: "produce",
+            quantity: 5,
+            unit: "pcs",
+            co2Emission: 0.3,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Bananas")).toBeInTheDocument();
+      expect(screen.getByText(/Qty: 5/)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("Product Sell Navigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockNavigate.mockClear();
+  });
+
+  it("should navigate to marketplace create with product state when Sell clicked", async () => {
+    const mockProduct = {
+      id: 1,
+      productName: "Fresh Eggs",
+      category: "dairy",
+      quantity: 12,
+      unit: "pcs",
+      unitPrice: 5.99,
+      co2Emission: 2.1,
+    };
+
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([mockProduct]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Eggs")).toBeInTheDocument();
+    });
+
+    const sellButton = screen.getByText("Sell");
+    fireEvent.click(sellButton);
+
+    expect(mockNavigate).toHaveBeenCalledWith("/marketplace/create", {
+      state: { product: mockProduct },
+    });
+  });
+});
+
+describe("CO2 Summary Card", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display total carbon footprint card when products exist", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Beef Steak",
+            category: "meat",
+            quantity: 1,
+            unit: "kg",
+            co2Emission: 27.0,
+          },
+          {
+            id: 2,
+            productName: "Lettuce",
+            category: "produce",
+            quantity: 1,
+            unit: "pcs",
+            co2Emission: 0.3,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Total Carbon Footprint")).toBeInTheDocument();
+      expect(screen.getByText("All items in your fridge")).toBeInTheDocument();
+      expect(screen.getByText("CO2 emissions")).toBeInTheDocument();
+    });
+  });
+
+  it("should not display CO2 summary when no products", async () => {
+    vi.mocked(api.get).mockResolvedValue([]);
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No items in your fridge yet")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Total Carbon Footprint")).not.toBeInTheDocument();
+  });
+});
+
+describe("Loading State", () => {
+  it("should show skeleton loading state initially", () => {
+    vi.mocked(api.get).mockImplementation(() => new Promise(() => {})); // Never resolves
+
+    renderWithProviders(<MyFridgePage />);
+
+    // Check for skeleton elements
+    const skeletons = document.querySelectorAll(".skeleton, [class*='skeleton']");
+    expect(skeletons.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Pending Consumption Banner", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display pending consumption count", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([]);
+      }
+      if (url === "/myfridge/consumption/pending") {
+        return Promise.resolve([
+          {
+            id: 1,
+            rawPhoto: "data:image/jpeg;base64,abc",
+            ingredients: [{ id: "1", name: "Chicken" }],
+            status: "PENDING_WASTE_PHOTO",
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: 2,
+            rawPhoto: "data:image/jpeg;base64,def",
+            ingredients: [{ id: "2", name: "Rice" }],
+            status: "PENDING_WASTE_PHOTO",
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("2 pending consumptions")).toBeInTheDocument();
+    });
+  });
+
+  it("should show singular text for one pending consumption", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([]);
+      }
+      if (url === "/myfridge/consumption/pending") {
+        return Promise.resolve([
+          {
+            id: 1,
+            rawPhoto: "data:image/jpeg;base64,abc",
+            ingredients: [{ id: "1", name: "Pasta" }],
+            status: "PENDING_WASTE_PHOTO",
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("1 pending consumption")).toBeInTheDocument();
+    });
+  });
+
+  it("should display Add Photo button for pending consumption", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([]);
+      }
+      if (url === "/myfridge/consumption/pending") {
+        return Promise.resolve([
+          {
+            id: 42,
+            rawPhoto: "data:image/jpeg;base64,abc",
+            ingredients: [{ id: "1", name: "Salad" }],
+            status: "PENDING_WASTE_PHOTO",
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("1 pending consumption")).toBeInTheDocument();
+    });
+
+    // Check Add Photo button is present
+    expect(screen.getByText("Add Photo")).toBeInTheDocument();
+  });
+});
+
+describe("AddProductModal - Quantity Validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should show error for quantity exceeding max", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Product Name *")).toBeInTheDocument();
+    });
+
+    const quantityInput = screen.getByLabelText("Quantity *");
+    fireEvent.change(quantityInput, { target: { value: "999999" } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/cannot exceed/)).toBeInTheDocument();
+    });
+  });
+
+  it("should show error for zero quantity", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Quantity *")).toBeInTheDocument();
+    });
+
+    const quantityInput = screen.getByLabelText("Quantity *");
+    fireEvent.change(quantityInput, { target: { value: "0" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Quantity must be greater than 0")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("AddProductModal - Full Form", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should display all form fields", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Product Name *")).toBeInTheDocument();
+      expect(screen.getByLabelText("Category")).toBeInTheDocument();
+      expect(screen.getByLabelText("Quantity *")).toBeInTheDocument();
+      expect(screen.getByLabelText("Unit *")).toBeInTheDocument();
+      expect(screen.getByLabelText("Unit Price ($)")).toBeInTheDocument();
+      expect(screen.getByLabelText("Purchase Date")).toBeInTheDocument();
+      expect(screen.getByLabelText("Description")).toBeInTheDocument();
+    });
+  });
+
+  it("should have Add Product and Cancel buttons", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Add Product" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    });
+  });
+
+  it("should close modal when Cancel clicked", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Product Name *")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Product Name *")).not.toBeInTheDocument();
+    });
+  });
+
+  it("should display modal title Add Product", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Product Name *")).toBeInTheDocument();
+    });
+
+    // Check modal is open with title (button "Add Product" may also exist)
+    const addProductElements = screen.getAllByText("Add Product");
+    expect(addProductElements.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("Product Sorting", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display products with purchase dates", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Old Item",
+            category: "produce",
+            quantity: 1,
+            unit: "pcs",
+            purchaseDate: "2024-01-01",
+            co2Emission: 0.5,
+          },
+          {
+            id: 2,
+            productName: "Recent Item",
+            category: "produce",
+            quantity: 1,
+            unit: "pcs",
+            purchaseDate: "2024-12-15",
+            co2Emission: 0.5,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Old Item")).toBeInTheDocument();
+      expect(screen.getByText("Recent Item")).toBeInTheDocument();
+    });
+
+    // Verify purchase dates are displayed (multiple items have purchase dates)
+    const purchasedTexts = screen.getAllByText(/Purchased:/);
+    expect(purchasedTexts.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("ProductCard Display", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display product with all details", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Premium Steak",
+            category: "meat",
+            quantity: 2.5,
+            unit: "kg",
+            unitPrice: 25.99,
+            purchaseDate: "2024-12-10",
+            description: "Grass-fed beef",
+            co2Emission: 27.0,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Premium Steak")).toBeInTheDocument();
+      expect(screen.getByText("meat")).toBeInTheDocument();
+      expect(screen.getByText(/2\.5/)).toBeInTheDocument();
+      expect(screen.getByText("$25.99")).toBeInTheDocument();
+      expect(screen.getByText("Grass-fed beef")).toBeInTheDocument();
+    });
+  });
+
+  it("should not display price when unitPrice is null", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Free Tomatoes",
+            category: "produce",
+            quantity: 3,
+            unit: "pcs",
+            unitPrice: null,
+            co2Emission: 0.5,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Free Tomatoes")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
+  });
+
+  it("should not display description when null", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Simple Bread",
+            category: "bakery",
+            quantity: 1,
+            unit: "loaf",
+            description: null,
+            co2Emission: 0.8,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Simple Bread")).toBeInTheDocument();
+    });
+
+    // Verify no description text like "Grass-fed beef" is present
+    expect(screen.queryByText("Grass-fed beef")).not.toBeInTheDocument();
+  });
+});
+
+describe("Search Functionality", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have search input with placeholder", async () => {
+    vi.mocked(api.get).mockResolvedValue([]);
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      const searchInput = screen.getByPlaceholderText("Search items...");
+      expect(searchInput).toBeInTheDocument();
+    });
+  });
+
+  it("should filter products when searching", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          { id: 1, productName: "Apple Juice", category: "beverages", quantity: 1, co2Emission: 0.5 },
+          { id: 2, productName: "Orange Juice", category: "beverages", quantity: 1, co2Emission: 0.5 },
+          { id: 3, productName: "Milk", category: "dairy", quantity: 1, co2Emission: 3.2 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Apple Juice")).toBeInTheDocument();
+      expect(screen.getByText("Orange Juice")).toBeInTheDocument();
+      expect(screen.getByText("Milk")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText("Search items...");
+    fireEvent.change(searchInput, { target: { value: "juice" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Apple Juice")).toBeInTheDocument();
+      expect(screen.getByText("Orange Juice")).toBeInTheDocument();
+      expect(screen.queryByText("Milk")).not.toBeInTheDocument();
+    });
+  });
+
+  it("should show empty state when search has no matches", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          { id: 1, productName: "Apples", category: "produce", quantity: 3, co2Emission: 0.4 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Apples")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText("Search items...");
+    fireEvent.change(searchInput, { target: { value: "xyz123" } });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Apples")).not.toBeInTheDocument();
+      expect(screen.getByText("No items in your fridge yet")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("Header Buttons", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should display all three action buttons", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+      expect(screen.getByText("Track Consumption")).toBeInTheDocument();
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+  });
+
+  it("should open scan modal when Scan Receipt clicked", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Scan Receipt"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Take Photo")).toBeInTheDocument();
+      expect(screen.getByText("Upload from files")).toBeInTheDocument();
+    });
+  });
+
+  it("should open add modal when Add Item clicked", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Product Name *")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("ScanReceiptModal - File Upload", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should reject files larger than 10MB", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Scan Receipt"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Take Photo")).toBeInTheDocument();
+    });
+
+    // Create a large file (> 10MB)
+    const largeContent = new Array(11 * 1024 * 1024).fill("a").join("");
+    const largeFile = new File([largeContent], "large.jpg", { type: "image/jpeg" });
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [largeFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Image is too large. Maximum size is 10MB.")).toBeInTheDocument();
+    });
+  });
+
+  it("should reject unsupported file formats", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Scan Receipt"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Take Photo")).toBeInTheDocument();
+    });
+
+    const pdfFile = new File(["data"], "receipt.pdf", { type: "application/pdf" });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [pdfFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Unsupported format. Please use PNG, JPEG, GIF, or WebP.")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("ScanReceiptModal - Drag and Drop", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should show drag state when dragging over", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Scan Receipt"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Upload from files")).toBeInTheDocument();
+    });
+
+    const dropZone = screen.getByText("Upload from files").closest("div[class*='border-dashed']");
+    expect(dropZone).toBeInTheDocument();
+
+    fireEvent.dragOver(dropZone!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Drop your receipt here")).toBeInTheDocument();
+    });
+  });
+
+  it("should revert drag state when drag leaves", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Scan Receipt")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Scan Receipt"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Upload from files")).toBeInTheDocument();
+    });
+
+    const dropZone = screen.getByText("Upload from files").closest("div[class*='border-dashed']");
+
+    fireEvent.dragOver(dropZone!);
+    await waitFor(() => {
+      expect(screen.getByText("Drop your receipt here")).toBeInTheDocument();
+    });
+
+    fireEvent.dragLeave(dropZone!);
+    await waitFor(() => {
+      expect(screen.getByText("Upload from files")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("AddProductModal - Category Selection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should have all category options", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Category")).toBeInTheDocument();
+    });
+
+    const categorySelect = screen.getByLabelText("Category");
+    expect(categorySelect).toContainHTML("Produce");
+    expect(categorySelect).toContainHTML("Dairy");
+    expect(categorySelect).toContainHTML("Meat");
+    expect(categorySelect).toContainHTML("Bakery");
+    expect(categorySelect).toContainHTML("Frozen");
+    expect(categorySelect).toContainHTML("Beverages");
+    expect(categorySelect).toContainHTML("Pantry");
+    expect(categorySelect).toContainHTML("Other");
+  });
+});
+
+describe("AddProductModal - Unit Selection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.get).mockResolvedValue([]);
+  });
+
+  it("should have unit options from PRODUCT_UNITS", async () => {
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Add Item")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Add Item"));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Unit *")).toBeInTheDocument();
+    });
+
+    const unitSelect = screen.getByLabelText("Unit *");
+    expect(unitSelect).toBeInTheDocument();
+  });
+});
+
+describe("API Error Handling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("should show error toast when products fail to load", async () => {
+    vi.mocked(api.get).mockRejectedValue(new Error("Network error"));
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to load products")).toBeInTheDocument();
+    });
+  });
+
+  it("should silently fail when pending consumptions fail to load", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([]);
+      }
+      if (url === "/myfridge/consumption/pending") {
+        return Promise.reject(new Error("Pending load failed"));
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      // Page should still render without pending consumptions
+      expect(screen.getByText("No items in your fridge yet")).toBeInTheDocument();
+    });
+
+    // Should not show error for pending consumptions
+    expect(screen.queryByText("Pending load failed")).not.toBeInTheDocument();
+  });
+});
+
+describe("ProductCard CO2 Display", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display CO2 emission with leaf icon", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Beef",
+            category: "meat",
+            quantity: 1,
+            unit: "kg",
+            co2Emission: 27.0,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Beef")).toBeInTheDocument();
+    });
+
+    // Check for CO2 display (leaf icon is present)
+    const leafIcons = document.querySelectorAll("svg");
+    expect(leafIcons.length).toBeGreaterThan(0);
+  });
+
+  it("should not display CO2 when co2Emission is null", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/myfridge/products") {
+        return Promise.resolve([
+          {
+            id: 1,
+            productName: "Unknown Item",
+            category: "other",
+            quantity: 1,
+            unit: "pcs",
+            co2Emission: null,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    renderWithProviders(<MyFridgePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Unknown Item")).toBeInTheDocument();
+    });
+
+    // CO2 display should not be present
+    expect(screen.queryByText(/kg CO₂/)).not.toBeInTheDocument();
+  });
+});

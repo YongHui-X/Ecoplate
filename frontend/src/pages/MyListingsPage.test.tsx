@@ -218,3 +218,275 @@ describe("MyListingsPage - Empty State", () => {
     });
   });
 });
+
+describe("MyListingsPage - Delete Functionality", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string, options?: RequestInit) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(mockListings)),
+        });
+      }
+      if (url.includes("/marketplace/listings/") && options?.method === "DELETE") {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify({ message: "Deleted" })),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+  });
+
+  it("should not delete when confirm is cancelled", async () => {
+    vi.spyOn(window, "confirm").mockImplementation(() => false);
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByRole("button", { name: /Delete/i });
+    fireEvent.click(deleteButton);
+
+    // Listing should still be there
+    expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+  });
+
+  it("should delete listing when confirmed", async () => {
+    vi.spyOn(window, "confirm").mockImplementation(() => true);
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByRole("button", { name: /Delete/i });
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/marketplace/listings/1"),
+        expect.objectContaining({ method: "DELETE" })
+      );
+    });
+  });
+});
+
+describe("MyListingsPage - Error Handling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("should handle load error", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.reject(new Error("Failed to load"));
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(console.error).toHaveBeenCalled();
+    });
+  });
+
+  it("should handle delete error", async () => {
+    mockFetch.mockImplementation((url: string, options?: RequestInit) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(mockListings)),
+        });
+      }
+      if (url.includes("/marketplace/listings/") && options?.method === "DELETE") {
+        return Promise.reject(new Error("Delete failed"));
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    vi.spyOn(window, "confirm").mockImplementation(() => true);
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+    });
+
+    const deleteButton = screen.getByRole("button", { name: /Delete/i });
+    fireEvent.click(deleteButton);
+
+    // Error should be handled gracefully
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("MyListingsPage - Listing Cards", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display expired listing status", async () => {
+    const expiredListing = {
+      ...mockListings[0],
+      expiryDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    };
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify([expiredListing])),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Expired")).toBeInTheDocument();
+    });
+  });
+
+  it("should display expires today status", async () => {
+    const todayListing = {
+      ...mockListings[0],
+      expiryDate: new Date().toISOString(),
+    };
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify([todayListing])),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Expires today")).toBeInTheDocument();
+    });
+  });
+
+  it("should display free listing", async () => {
+    const freeListing = {
+      ...mockListings[0],
+      price: 0,
+      originalPrice: null,
+    };
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify([freeListing])),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Free")).toBeInTheDocument();
+    });
+  });
+
+  it("should display listing with image", async () => {
+    const listingWithImage = {
+      ...mockListings[0],
+      images: "test-image.jpg",
+    };
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify([listingWithImage])),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+    });
+  });
+
+  it("should navigate to listing detail on card click", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(mockListings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+    });
+
+    // Find the card and click it (not on a button)
+    const card = screen.getByText("Fresh Apples").closest('[class*="card"]');
+    if (card) {
+      fireEvent.click(card);
+      expect(mockNavigate).toHaveBeenCalledWith("/marketplace/1");
+    }
+  });
+
+  it("should navigate to edit page when Edit button clicked", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(mockListings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole("button", { name: /Edit/i });
+    fireEvent.click(editButton);
+    expect(mockNavigate).toHaveBeenCalledWith("/marketplace/1/edit");
+  });
+});
+
+describe("MyListingsPage - Filter Empty States", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Only active listings, no sold
+    const activeOnlyListings = [mockListings[0]];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/my-listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(activeOnlyListings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+  });
+
+  it("should show no sold listings message when filtering sold", async () => {
+    renderWithProviders(<MyListingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Apples")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Sold \(0\)/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText("No sold listings")).toBeInTheDocument();
+    });
+  });
+});

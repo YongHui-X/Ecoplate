@@ -563,3 +563,294 @@ describe("CreateListingPage - Buttons State", () => {
     expect(cancelButton).not.toBeDisabled();
   });
 });
+
+describe("CreateListingPage - Unit Select Options", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have unit dropdown with multiple options", () => {
+    renderWithProviders(<CreateListingPage />);
+    const unitSelect = screen.getByLabelText("Unit");
+    expect(unitSelect).toBeInTheDocument();
+
+    // Check for common unit options
+    expect(unitSelect).toContainHTML("pcs");
+    expect(unitSelect).toContainHTML("kg");
+  });
+
+  it("should default unit to pcs", () => {
+    renderWithProviders(<CreateListingPage />);
+    const unitSelect = screen.getByLabelText("Unit") as HTMLSelectElement;
+    expect(unitSelect.value).toBe("pcs");
+  });
+
+  it("should default quantity to 1", () => {
+    renderWithProviders(<CreateListingPage />);
+    const quantityInput = screen.getByLabelText("Quantity") as HTMLInputElement;
+    expect(quantityInput.value).toBe("1");
+  });
+});
+
+describe("CreateListingPage - Form Fields Visibility", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display all required form sections", () => {
+    renderWithProviders(<CreateListingPage />);
+
+    expect(screen.getByLabelText("Title *")).toBeInTheDocument();
+    expect(screen.getByLabelText("Description")).toBeInTheDocument();
+    expect(screen.getByLabelText("Category")).toBeInTheDocument();
+    expect(screen.getByLabelText("Expiry Date")).toBeInTheDocument();
+    expect(screen.getByLabelText("Quantity")).toBeInTheDocument();
+    expect(screen.getByLabelText("Unit")).toBeInTheDocument();
+    expect(screen.getByLabelText("Original Price ($)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Selling Price ($)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Pickup Instructions")).toBeInTheDocument();
+  });
+
+  it("should have placeholder text for title", () => {
+    renderWithProviders(<CreateListingPage />);
+    const titleInput = screen.getByLabelText("Title *");
+    expect(titleInput).toHaveAttribute("placeholder", "e.g., Fresh Organic Apples");
+  });
+
+  it("should have placeholder text for price", () => {
+    renderWithProviders(<CreateListingPage />);
+    const priceInput = screen.getByLabelText("Selling Price ($)");
+    expect(priceInput).toHaveAttribute("placeholder", "Leave empty for free");
+  });
+
+  it("should have placeholder text for original price", () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    expect(originalPriceInput).toHaveAttribute("placeholder", "0.00");
+  });
+});
+
+describe("CreateListingPage - Input Constraints", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have minimum quantity of 0.1", () => {
+    renderWithProviders(<CreateListingPage />);
+    const quantityInput = screen.getByLabelText("Quantity");
+    expect(quantityInput).toHaveAttribute("min", "0.1");
+  });
+
+  it("should have quantity step of 0.1", () => {
+    renderWithProviders(<CreateListingPage />);
+    const quantityInput = screen.getByLabelText("Quantity");
+    expect(quantityInput).toHaveAttribute("step", "0.1");
+  });
+
+  it("should have minimum price of 0", () => {
+    renderWithProviders(<CreateListingPage />);
+    const priceInput = screen.getByLabelText("Selling Price ($)");
+    expect(priceInput).toHaveAttribute("min", "0");
+  });
+
+  it("should have price step of 0.01", () => {
+    renderWithProviders(<CreateListingPage />);
+    const priceInput = screen.getByLabelText("Selling Price ($)");
+    expect(priceInput).toHaveAttribute("step", "0.01");
+  });
+});
+
+describe("CreateListingPage - Description Textarea", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have placeholder for description", () => {
+    renderWithProviders(<CreateListingPage />);
+    const descriptionInput = screen.getByLabelText("Description");
+    expect(descriptionInput).toHaveAttribute("placeholder", "Describe your item...");
+  });
+
+  it("should allow multiline description input", () => {
+    renderWithProviders(<CreateListingPage />);
+    const descriptionInput = screen.getByLabelText("Description");
+    expect(descriptionInput.tagName.toLowerCase()).toBe("textarea");
+  });
+});
+
+describe("CreateListingPage - Pickup Instructions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have placeholder for pickup instructions", () => {
+    renderWithProviders(<CreateListingPage />);
+    const instructionsInput = screen.getByLabelText("Pickup Instructions");
+    expect(instructionsInput).toHaveAttribute(
+      "placeholder",
+      "e.g., Available evenings after 6pm, call before pickup"
+    );
+  });
+
+  it("should be a textarea element", () => {
+    renderWithProviders(<CreateListingPage />);
+    const instructionsInput = screen.getByLabelText("Pickup Instructions");
+    expect(instructionsInput.tagName.toLowerCase()).toBe("textarea");
+  });
+});
+
+describe("CreateListingPage - Back Navigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have back button with ArrowLeft icon", () => {
+    renderWithProviders(<CreateListingPage />);
+    const backButton = screen.getByText("Back to Marketplace").closest("button");
+    expect(backButton).toBeInTheDocument();
+
+    const svg = backButton?.querySelector("svg");
+    expect(svg).toBeInTheDocument();
+  });
+
+  it("should render back button as ghost variant", () => {
+    renderWithProviders(<CreateListingPage />);
+    const backButton = screen.getByText("Back to Marketplace").closest("button");
+    // Ghost variant in shadcn applies hover:bg-muted styling instead of "ghost" class
+    expect(backButton?.className).toContain("hover:bg-muted");
+  });
+});
+
+describe("CreateListingPage - Card Structure", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should wrap form in a Card component", () => {
+    renderWithProviders(<CreateListingPage />);
+    const card = document.querySelector(".max-w-2xl");
+    expect(card).toBeInTheDocument();
+  });
+
+  it("should display Create Listing as card title", () => {
+    renderWithProviders(<CreateListingPage />);
+    const titles = screen.getAllByText("Create Listing");
+    // One in card header, one in submit button
+    expect(titles.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("CreateListingPage - No Recommendation Without Price", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation(() => {
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+  });
+
+  it("should not show price recommendation without original price", () => {
+    renderWithProviders(<CreateListingPage />);
+    expect(screen.queryByText("Suggested Price")).not.toBeInTheDocument();
+  });
+
+  it("should not show recommendation loading without original price", () => {
+    renderWithProviders(<CreateListingPage />);
+    expect(screen.queryByText("Getting price recommendation...")).not.toBeInTheDocument();
+  });
+});
+
+describe("CreateListingPage - Category Values", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should set category value when selected", () => {
+    renderWithProviders(<CreateListingPage />);
+    const categorySelect = screen.getByLabelText("Category") as HTMLSelectElement;
+
+    fireEvent.change(categorySelect, { target: { value: "produce" } });
+    expect(categorySelect.value).toBe("produce");
+
+    fireEvent.change(categorySelect, { target: { value: "frozen" } });
+    expect(categorySelect.value).toBe("frozen");
+  });
+});
+
+describe("CreateListingPage - Price Fields", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should allow decimal prices", () => {
+    renderWithProviders(<CreateListingPage />);
+    const priceInput = screen.getByLabelText("Selling Price ($)") as HTMLInputElement;
+
+    fireEvent.change(priceInput, { target: { value: "12.99" } });
+    expect(priceInput.value).toBe("12.99");
+  });
+
+  it("should allow decimal original prices", () => {
+    renderWithProviders(<CreateListingPage />);
+    const originalPriceInput = screen.getByLabelText("Original Price ($)") as HTMLInputElement;
+
+    fireEvent.change(originalPriceInput, { target: { value: "19.50" } });
+    expect(originalPriceInput.value).toBe("19.50");
+  });
+});
+
+describe("CreateListingPage - Expiry Date Field", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should be a date type input", () => {
+    renderWithProviders(<CreateListingPage />);
+    const expiryInput = screen.getByLabelText("Expiry Date");
+    expect(expiryInput).toHaveAttribute("type", "date");
+  });
+
+  it("should accept date values", () => {
+    renderWithProviders(<CreateListingPage />);
+    const expiryInput = screen.getByLabelText("Expiry Date") as HTMLInputElement;
+
+    fireEvent.change(expiryInput, { target: { value: "2026-06-15" } });
+    expect(expiryInput.value).toBe("2026-06-15");
+  });
+});
+
+describe("CreateListingPage - Form Layout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should have buttons in a flex container", () => {
+    renderWithProviders(<CreateListingPage />);
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    const submitButton = screen.getByRole("button", { name: "Create Listing" });
+
+    // Both buttons should have flex-1 class for equal width
+    expect(cancelButton.className).toContain("flex-1");
+    expect(submitButton.className).toContain("flex-1");
+  });
+});
+
+describe("CreateListingPage - Image Upload Section", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display max images text", () => {
+    renderWithProviders(<CreateListingPage />);
+    expect(screen.getByText("Product Images (Max 5)")).toBeInTheDocument();
+  });
+
+  it("should display cover photo instruction", () => {
+    renderWithProviders(<CreateListingPage />);
+    expect(screen.getByText("Add up to 5 images. First image will be the cover photo.")).toBeInTheDocument();
+  });
+
+  it("should show Add text in upload button", () => {
+    renderWithProviders(<CreateListingPage />);
+    expect(screen.getByText("Add")).toBeInTheDocument();
+  });
+});

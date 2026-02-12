@@ -256,3 +256,116 @@ describe("EditListingPage - Form Validation", () => {
     });
   });
 });
+
+describe("EditListingPage - Form Interactions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should update description textarea", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      const descInput = screen.getByLabelText(/Description/i);
+      expect(descInput).toBeInTheDocument();
+    });
+
+    const descInput = screen.getByLabelText(/Description/i);
+    fireEvent.change(descInput, { target: { value: "Updated description" } });
+    expect(descInput).toHaveValue("Updated description");
+  });
+
+  it("should update quantity input", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      const qtyInput = screen.getByLabelText(/Quantity/i);
+      expect(qtyInput).toBeInTheDocument();
+    });
+
+    const qtyInput = screen.getByLabelText(/Quantity/i);
+    fireEvent.change(qtyInput, { target: { value: "10" } });
+    expect(qtyInput).toHaveValue(10);
+  });
+
+  it("should update selling price input", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Selling Price ($)")).toBeInTheDocument();
+    });
+
+    const priceInput = screen.getByLabelText("Selling Price ($)");
+    fireEvent.change(priceInput, { target: { value: "15" } });
+    expect(priceInput).toHaveValue(15);
+  });
+
+  it("should update original price input", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Original Price ($)")).toBeInTheDocument();
+    });
+
+    const originalPriceInput = screen.getByLabelText("Original Price ($)");
+    fireEvent.change(originalPriceInput, { target: { value: "20" } });
+    expect(originalPriceInput).toHaveValue(20);
+  });
+});
+
+describe("EditListingPage - Error Handling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display edit form when listing loads successfully", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Edit Listing")).toBeInTheDocument();
+      expect(screen.getByLabelText(/Title/i)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("EditListingPage - Category Selection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display category select with current value", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      const categorySelect = screen.getByLabelText("Category");
+      expect(categorySelect).toBeInTheDocument();
+    });
+  });
+
+  it("should have category options available", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      const categorySelect = screen.getByLabelText("Category");
+      expect(categorySelect).toContainHTML("Produce");
+      expect(categorySelect).toContainHTML("Dairy");
+      expect(categorySelect).toContainHTML("Bakery");
+    });
+  });
+});
+
+describe("EditListingPage - Unit Selection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display unit select with current value", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      const unitSelect = screen.getByLabelText("Unit");
+      expect(unitSelect).toBeInTheDocument();
+    });
+  });
+
+  it("should have unit options available", async () => {
+    renderWithProviders(<EditListingPage />);
+    await waitFor(() => {
+      const unitSelect = screen.getByLabelText("Unit");
+      expect(unitSelect).toContainHTML("kg");
+      expect(unitSelect).toContainHTML("pcs");
+    });
+  });
+});

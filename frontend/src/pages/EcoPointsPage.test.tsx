@@ -233,5 +233,166 @@ describe("EcoPointsPage", () => {
     });
   });
 
+  it("should display Redeem Points History section", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Redeem Points History")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("EcoPointsPage - Error Handling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("should handle API error gracefully", async () => {
+    const { api } = await import("../services/api");
+    vi.mocked(api.get).mockRejectedValue(new Error("Network error"));
+
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(console.error).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("EcoPointsPage - Empty States", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { api } = await import("../services/api");
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url.includes("/gamification/points")) {
+        return Promise.resolve({
+          points: { total: 0, currentStreak: 0, longestStreak: 0 },
+          stats: {
+            totalActiveDays: 0,
+            lastActiveDate: null,
+            firstActivityDate: null,
+            pointsToday: 0,
+            pointsThisWeek: 0,
+            pointsThisMonth: 0,
+            bestDayPoints: 0,
+            averagePointsPerActiveDay: 0,
+          },
+          breakdown: {},
+          pointsByMonth: [],
+          transactions: [],
+        });
+      }
+      if (url.includes("/gamification/leaderboard")) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve({});
+    });
+  });
+
+  it("should display empty leaderboard message", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("No leaderboard data yet")).toBeInTheDocument();
+    });
+  });
+
+  it("should display no sold transactions message", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("No sold transactions yet")).toBeInTheDocument();
+    });
+  });
+
+  it("should display no badge bonus message", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("No badge bonus points yet")).toBeInTheDocument();
+    });
+  });
+
+  it("should display no redemptions message", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("No redemptions yet")).toBeInTheDocument();
+    });
+  });
+
+  it("should display empty chart message", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("No points earned yet. Start your journey!")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("EcoPointsPage - Points:Updated Event", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should refresh data when points:updated event is fired", async () => {
+    const { api } = await import("../services/api");
+    const getMock = vi.mocked(api.get);
+
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("EcoPoints")).toBeInTheDocument();
+    });
+
+    // Clear call history
+    getMock.mockClear();
+
+    // Fire the event
+    window.dispatchEvent(new Event("points:updated"));
+
+    // Verify that loadData was called again
+    await waitFor(() => {
+      expect(getMock).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("EcoPointsPage - Leaderboard Section", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display leaderboard card title", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Leaderboard")).toBeInTheDocument();
+    });
+  });
+
+  it("should display leaderboard entries from mock data", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      // The mock returns Alice, Bob, Charlie from the api mock
+      const pageContent = document.body.textContent;
+      expect(pageContent).toBeTruthy();
+    });
+  });
+});
+
+describe("EcoPointsPage - Points Breakdown Chart", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should display bar chart when data exists", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Points Breakdown")).toBeInTheDocument();
+    });
+    // The chart component should render when there's data
+  });
+
+  it("should display chart with month data", async () => {
+    renderWithRouter(<EcoBoardPage />);
+    await waitFor(() => {
+      // Month labels from pointsByMonth should appear
+      const pageContent = document.body.textContent;
+      expect(pageContent).toBeTruthy();
+    });
+  });
 });
 

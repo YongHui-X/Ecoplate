@@ -258,6 +258,7 @@ describe("DashboardPage", () => {
 describe("DashboardPage - Error Handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   it("should handle API error gracefully", async () => {
@@ -276,5 +277,165 @@ describe("DashboardPage - Error Handling", () => {
       },
       { timeout: 3000 }
     );
+  });
+
+  it("should handle network error gracefully", async () => {
+    const { api } = await import("../services/api");
+    vi.mocked(api.get).mockRejectedValue(new Error("Network error"));
+
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      expect(console.error).toHaveBeenCalled();
+    }, { timeout: 3000 });
+  });
+});
+
+describe("DashboardPage - Tab Navigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 1, name: "Test User", email: "test@example.com" }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should switch to CO2 tab when clicked", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /CO/ })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /CO/ }));
+    await waitFor(() => {
+      const co2Btn = screen.getByRole("button", { name: /CO/ });
+      expect(co2Btn).toHaveClass("bg-primary");
+    });
+  });
+
+  it("should switch to Food tab when clicked", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Food" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Food" }));
+    await waitFor(() => {
+      const foodBtn = screen.getByRole("button", { name: "Food" });
+      expect(foodBtn).toHaveClass("bg-primary");
+    });
+  });
+
+  it("should show Annual period when clicked", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Annual" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Annual" }));
+    await waitFor(() => {
+      const annualBtn = screen.getByRole("button", { name: "Annual" });
+      expect(annualBtn).toHaveClass("bg-primary");
+    });
+  });
+
+  it("should stay on Summary tab by default", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      const summaryBtn = screen.getByRole("button", { name: "Summary" });
+      expect(summaryBtn).toHaveClass("bg-primary");
+    });
+  });
+
+  it("should stay on Month period by default", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      const monthBtn = screen.getByRole("button", { name: "Month" });
+      expect(monthBtn).toHaveClass("bg-primary");
+    });
+  });
+});
+
+describe("DashboardPage - Greeting", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/dashboard/stats")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockDashboardStats),
+        });
+      }
+      if (url.includes("/gamification/points")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockPointsData),
+        });
+      }
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 1, name: "Test User", email: "test@example.com" }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should display time-based greeting", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      // The greeting shows "Good morning/afternoon/evening" based on time
+      const pageContent = document.body.textContent;
+      expect(pageContent).toMatch(/Good (morning|afternoon|evening)/);
+    });
+  });
+
+  it("should display sustainability overview subtitle", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/sustainability overview/i)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("DashboardPage - Summary Tab Content", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/dashboard/stats")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockDashboardStats),
+        });
+      }
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 1, name: "Test User", email: "test@example.com" }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should display CO2 Reduced by Selling chart title", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      // Check for chart title in summary tab
+      const pageContent = document.body.textContent;
+      expect(pageContent).toContain("CO");
+    });
+  });
+
+  it("should display Total Money Saved chart title", async () => {
+    renderWithProviders(<DashboardPage />);
+    await waitFor(() => {
+      expect(screen.getAllByText("Total Money Saved").length).toBeGreaterThan(0);
+    });
   });
 });

@@ -254,3 +254,206 @@ describe("MarketplacePage - Empty State", () => {
     expect(results).toHaveNoViolations();
   });
 });
+
+describe("MarketplacePage - Error Handling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("should handle API error gracefully", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(console.error).toHaveBeenCalledWith("Failed to load listings:", "Network error");
+    });
+  });
+
+  it("should handle non-Error exceptions", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.reject("String error");
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(console.error).toHaveBeenCalledWith("Failed to load listings:", "Failed to load listings");
+    });
+  });
+});
+
+describe("MarketplacePage - Listing Card Interactions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(mockListings)),
+        });
+      }
+      if (url.includes("/messages/conversation")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify({ id: 1 })),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+  });
+
+  it("should display listing without images correctly", async () => {
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      // Milk 1L listing has no images
+      expect(screen.getByText("Milk 1L")).toBeInTheDocument();
+    });
+  });
+
+  it("should display free listing correctly", async () => {
+    const freeListings = [
+      {
+        ...mockListings[0],
+        price: 0,
+        originalPrice: null,
+      },
+    ];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(freeListings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Free")).toBeInTheDocument();
+    });
+  });
+
+  it("should display expired listing indicator", async () => {
+    const expiredListings = [
+      {
+        ...mockListings[0],
+        expiryDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+      },
+    ];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(expiredListings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Expired")).toBeInTheDocument();
+    });
+  });
+
+  it("should display today expiry indicator", async () => {
+    const todayListings = [
+      {
+        ...mockListings[0],
+        expiryDate: new Date().toISOString(),
+      },
+    ];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(todayListings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Today")).toBeInTheDocument();
+    });
+  });
+
+  it("should display listing without seller", async () => {
+    const noSellerListings = [
+      {
+        ...mockListings[0],
+        seller: null,
+      },
+    ];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(noSellerListings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Organic Apples")).toBeInTheDocument();
+    });
+  });
+
+  it("should display listing without co2Saved", async () => {
+    const noCo2Listings = [
+      {
+        ...mockListings[0],
+        co2Saved: null,
+      },
+    ];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(noCo2Listings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Organic Apples")).toBeInTheDocument();
+    });
+  });
+
+  it("should display listing without category", async () => {
+    const noCategoryListings = [
+      {
+        ...mockListings[0],
+        category: null,
+      },
+    ];
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/marketplace/listings")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(noCategoryListings)),
+        });
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({})) });
+    });
+
+    renderWithProviders(<MarketplacePage />);
+    await waitFor(() => {
+      expect(screen.getByText("Fresh Organic Apples")).toBeInTheDocument();
+    });
+  });
+});
