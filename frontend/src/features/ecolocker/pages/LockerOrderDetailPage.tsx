@@ -104,9 +104,10 @@ export default function LockerOrderDetailPage() {
     setActionLoading(true);
 
     try {
-      const updatedOrder = await orderApi.confirmRiderPickup(order.id);
-      setOrder(updatedOrder);
-      addToast("Pickup confirmed! Rider is on the way.", "success");
+      const result = await orderApi.confirmRiderPickup(order.id);
+      setOrder(result.order);
+      addToast(`Pickup confirmed! You earned ${result.pointsAwarded} EcoPoints!`, "success");
+      window.dispatchEvent(new Event("points:updated"));
       refreshLockerUnreadCount();
     } catch (err) {
       addToast(getErrorMessage(err), "error");

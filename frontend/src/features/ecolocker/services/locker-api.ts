@@ -46,14 +46,14 @@ export const orderApi = {
     return api.post(`/ecolocker/orders/${orderId}/schedule`, { pickupTime });
   },
 
-  confirmRiderPickup(orderId: number): Promise<LockerOrder> {
+  confirmRiderPickup(orderId: number): Promise<{ order: LockerOrder; pointsAwarded: number }> {
     return api.post(`/ecolocker/orders/${orderId}/confirm-pickup`);
   },
 
   verifyPin(
     orderId: number,
     pin: string
-  ): Promise<{ order: LockerOrder; pointsAwarded: number }> {
+  ): Promise<{ order: LockerOrder }> {
     return api.post(`/ecolocker/orders/${orderId}/verify-pin`, { pin });
   },
 

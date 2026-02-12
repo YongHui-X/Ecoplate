@@ -297,7 +297,7 @@ export async function setPickupTime(
 export async function confirmRiderPickup(
   orderId: number,
   sellerId: number
-): Promise<{ success: boolean; order?: typeof schema.lockerOrders.$inferSelect; error?: string }> {
+): Promise<{ success: boolean; order?: typeof schema.lockerOrders.$inferSelect; pointsAwarded?: number; error?: string }> {
   const order = await db.query.lockerOrders.findFirst({
     where: and(
       eq(schema.lockerOrders.id, orderId),
@@ -305,6 +305,7 @@ export async function confirmRiderPickup(
     ),
     with: {
       locker: true,
+      listing: true,
     },
   });
 
@@ -329,6 +330,12 @@ export async function confirmRiderPickup(
     .where(eq(schema.lockerOrders.id, orderId))
     .returning();
 
+  // Award points to seller
+  const pointsResult = await awardPoints(order.sellerId, "sold", null, 1, undefined, {
+    co2Saved: order.listing?.co2Saved || null,
+    buyerId: order.buyerId,
+  });
+
   // Notify buyer
   await createNotification(
     order.buyerId,
@@ -338,10 +345,27 @@ export async function confirmRiderPickup(
     `Your item has been picked up by the delivery rider and is on its way to the locker. You'll receive a PIN when it's ready for pickup.`
   );
 
+  // Notify seller about points earned
+  await createNotification(
+    order.sellerId,
+    orderId,
+    "points_earned",
+    "EcoPoints Earned!",
+    `You earned ${pointsResult.amount} EcoPoints for this sale!`
+  );
+
+  await createMainNotification(
+    order.sellerId,
+    "locker_points_earned",
+    "EcoLocker: EcoPoints Earned!",
+    `You earned ${pointsResult.amount} EcoPoints for your sale!`,
+    orderId
+  );
+
   // Start delivery simulation
   simulateDelivery(orderId);
 
-  return { success: true, order: updatedOrder };
+  return { success: true, order: updatedOrder, pointsAwarded: pointsResult.amount };
 }
 
 /**
@@ -431,7 +455,7 @@ export async function verifyPin(
   orderId: number,
   buyerId: number,
   pin: string
-): Promise<{ success: boolean; order?: typeof schema.lockerOrders.$inferSelect; pointsAwarded?: number; error?: string }> {
+): Promise<{ success: boolean; order?: typeof schema.lockerOrders.$inferSelect; error?: string }> {
   const order = await db.query.lockerOrders.findFirst({
     where: and(
       eq(schema.lockerOrders.id, orderId),
@@ -439,7 +463,6 @@ export async function verifyPin(
     ),
     with: {
       locker: true,
-      listing: true,
     },
   });
 
@@ -490,12 +513,6 @@ export async function verifyPin(
       .where(eq(schema.lockers.id, order.locker.id));
   }
 
-  // Award points to seller
-  const pointsResult = await awardPoints(order.sellerId, "sold", null, 1, undefined, {
-    co2Saved: order.listing?.co2Saved || null,
-    buyerId: order.buyerId,
-  });
-
   // Notify both parties (locker notifications)
   await createNotification(
     order.buyerId,
@@ -510,7 +527,7 @@ export async function verifyPin(
     orderId,
     "order_complete",
     "Order Complete!",
-    `Your item has been picked up. You earned ${pointsResult.amount} EcoPoints!`
+    `Your item has been picked up by the buyer. Transaction complete!`
   );
 
   // Dual-write to main notifications for bell
@@ -526,11 +543,11 @@ export async function verifyPin(
     order.sellerId,
     "locker_pickup_complete",
     "EcoLocker: Order Complete!",
-    `Your item has been picked up. You earned ${pointsResult.amount} EcoPoints!`,
+    `Your item has been picked up by the buyer. Transaction complete!`,
     orderId
   );
 
-  return { success: true, order: updatedOrder, pointsAwarded: pointsResult.amount };
+  return { success: true, order: updatedOrder };
 }
 
 /**

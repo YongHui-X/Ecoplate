@@ -214,7 +214,7 @@ export function registerEcoLockerRoutes(router: Router) {
         return error(result.error || "Failed to confirm pickup", 400);
       }
 
-      return json(result.order);
+      return json({ order: result.order, pointsAwarded: result.pointsAwarded });
     } catch (e) {
       console.error("Confirm pickup error:", e);
       return error("Failed to confirm pickup", 500);
@@ -235,10 +235,7 @@ export function registerEcoLockerRoutes(router: Router) {
         return error(result.error || "Failed to verify PIN", 400);
       }
 
-      return json({
-        order: result.order,
-        pointsAwarded: result.pointsAwarded,
-      });
+      return json({ order: result.order });
     } catch (e) {
       if (e instanceof z.ZodError) {
         return error(e.errors[0].message, 400);

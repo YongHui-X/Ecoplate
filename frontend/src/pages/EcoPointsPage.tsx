@@ -103,6 +103,7 @@ export default function EcoBoardPage() {
       setLeaderboard(leaderboardData);
     } catch (error) {
       console.error("Failed to load gamification data:", error);
+
     } finally {
       setLoading(false);
     }

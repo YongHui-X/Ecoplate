@@ -1152,7 +1152,7 @@ describe("POST /api/v1/ecolocker/orders/:id/verify-pin", () => {
         .where(eq(schema.lockerOrders.id, orderId))
         .returning();
 
-      return json({ order: updated, pointsAwarded: 10 });
+      return json({ order: updated });
     });
 
     const res = await makeRequest(router, "POST", `/api/v1/ecolocker/orders/${order.id}/verify-pin`, {
@@ -1160,9 +1160,8 @@ describe("POST /api/v1/ecolocker/orders/:id/verify-pin", () => {
     });
 
     expect(res.status).toBe(200);
-    const data = res.data as { order: { status: string }; pointsAwarded: number };
+    const data = res.data as { order: { status: string } };
     expect(data.order.status).toBe("collected");
-    expect(data.pointsAwarded).toBe(10);
   });
 
   test("returns 400 for incorrect PIN", async () => {
@@ -1311,14 +1310,15 @@ describe("POST /api/v1/ecolocker/orders/:id/confirm-pickup", () => {
         .where(eq(schema.lockerOrders.id, orderId))
         .returning();
 
-      return json(updated);
+      return json({ order: updated, pointsAwarded: 10 });
     });
 
     const res = await makeRequest(sellerRouter, "POST", `/api/v1/ecolocker/orders/${order.id}/confirm-pickup`);
 
     expect(res.status).toBe(200);
-    const data = res.data as { status: string; riderPickedUpAt: string };
-    expect(data.status).toBe("in_transit");
-    expect(data.riderPickedUpAt).toBeDefined();
+    const data = res.data as { order: { status: string; riderPickedUpAt: string }; pointsAwarded: number };
+    expect(data.order.status).toBe("in_transit");
+    expect(data.order.riderPickedUpAt).toBeDefined();
+    expect(data.pointsAwarded).toBe(10);
   });
 });
