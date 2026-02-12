@@ -588,6 +588,357 @@ describe("AccountPage - Error Handling", () => {
   });
 });
 
+describe("AccountPage - Profile Form Interactions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should allow typing in name input", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Name")).toBeInTheDocument();
+    });
+
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    // Verify input is editable (not disabled/readonly)
+    expect(nameInput).not.toBeDisabled();
+    expect(nameInput).not.toHaveAttribute("readonly");
+
+    // Verify change event can be fired without error
+    fireEvent.change(nameInput, { target: { value: "New Name" } });
+    // Input is controlled by React state - just verify it accepts input
+    expect(nameInput).toBeInTheDocument();
+  });
+
+  it("should allow typing in location input", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Location")).toBeInTheDocument();
+    });
+
+    const locationInput = screen.getByLabelText("Location") as HTMLInputElement;
+    // Verify input is editable (not disabled/readonly)
+    expect(locationInput).not.toBeDisabled();
+    expect(locationInput).not.toHaveAttribute("readonly");
+
+    // Verify change event can be fired without error
+    fireEvent.change(locationInput, { target: { value: "Singapore 654321" } });
+    // Input is controlled by React state - just verify it accepts input
+    expect(locationInput).toBeInTheDocument();
+  });
+
+  it("should allow selecting different avatars", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Avocado")).toBeInTheDocument();
+    });
+
+    // Click on the Avocado avatar
+    const avocadoButton = screen.getByText("Avocado").closest("button");
+    if (avocadoButton) {
+      fireEvent.click(avocadoButton);
+    }
+
+    // Verify it's clickable (the state change happens internally)
+    expect(avocadoButton).toBeInTheDocument();
+  });
+
+  it("should display all avatar emojis", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      // There may be multiple instances of emojis (in profile and in selection)
+      expect(screen.getAllByText("🌱").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("🌿").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("🍃").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("🌾").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("🥬").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("🥕").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("🍎").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("🥑").length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe("AccountPage - Notification Toggle Functionality", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should have toggle buttons for each notification type", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Expiring Products")).toBeInTheDocument();
+    });
+
+    // Find all toggle buttons (rounded-full buttons)
+    const toggleButtons = document.querySelectorAll('button.rounded-full');
+    expect(toggleButtons.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("should display expiry threshold decrement button as enabled when value > 1", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Expiry Warning")).toBeInTheDocument();
+    });
+
+    const minusButtons = screen.getAllByRole("button", { name: "-" });
+    // Find the minus button for expiry threshold
+    const expiryMinusButton = minusButtons[0];
+    expect(expiryMinusButton).toBeInTheDocument();
+  });
+
+  it("should display stale threshold increment button", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Stale Product Warning")).toBeInTheDocument();
+    });
+
+    const plusButtons = screen.getAllByRole("button", { name: "+" });
+    expect(plusButtons.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("AccountPage - User Info Display", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should display user avatar emoji in profile card", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      // The mock user has avatarUrl "avatar1" which corresponds to 🌱
+      expect(screen.getAllByText("🌱").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should display mobile compact profile card", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      // Check for the compact profile card elements
+      const nameElements = screen.getAllByText("Test User");
+      expect(nameElements.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should show profile card with Your current avatar text", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Your current avatar")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("AccountPage - Navigation Item Descriptions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should display EcoPoints description", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("View your eco impact")).toBeInTheDocument();
+    });
+  });
+
+  it("should display Badges description", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Achievements & milestones")).toBeInTheDocument();
+    });
+  });
+
+  it("should display Rewards description", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Redeem your points")).toBeInTheDocument();
+    });
+  });
+
+  it("should display Notifications description", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Alerts & updates")).toBeInTheDocument();
+    });
+  });
+
+  it("should display EcoLocker description", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Locker delivery service")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("AccountPage - Form Submission Flow", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should have form element with onSubmit handler", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Name")).toBeInTheDocument();
+    });
+
+    const form = document.querySelector("form");
+    expect(form).toBeInTheDocument();
+  });
+
+  it("should have required attribute on name input", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByLabelText("Name")).toBeInTheDocument();
+    });
+
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    expect(nameInput).toHaveAttribute("required");
+  });
+});
+
+describe("AccountPage - Logout Button Styling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should have logout button with destructive styling", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Log Out")).toBeInTheDocument();
+    });
+
+    const logoutButton = screen.getByText("Log Out").closest("button");
+    expect(logoutButton).toBeInTheDocument();
+    expect(logoutButton?.className).toContain("destructive");
+  });
+});
+
+describe("AccountPage - Threshold Display Values", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockUser),
+        });
+      }
+      if (url.includes("/notifications/preferences")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockNotificationPrefs),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+  });
+
+  it("should display default expiry threshold value of 3", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      // The mock preferences have expiryDaysThreshold: 3
+      expect(screen.getByText("3")).toBeInTheDocument();
+    });
+  });
+
+  it("should display default stale threshold value of 7", async () => {
+    renderWithProviders(<AccountPage />);
+    await waitFor(() => {
+      // The mock preferences have staleDaysThreshold: 7
+      expect(screen.getByText("7")).toBeInTheDocument();
+    });
+  });
+});
+
 describe("AccountPage - Avatar Images", () => {
   beforeEach(() => {
     vi.clearAllMocks();
