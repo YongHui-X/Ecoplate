@@ -7,7 +7,7 @@ export default function LockerTabs() {
   const isOrders = pathname.startsWith("/ecolocker/orders");
 
   return (
-    <div className="flex gap-2 p-4 pb-0">
+    <div className="flex gap-2 p-4">
       <Button
         variant={!isOrders ? "default" : "outline"}
         size="sm"
