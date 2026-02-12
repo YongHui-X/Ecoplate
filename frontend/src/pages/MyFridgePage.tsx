@@ -35,6 +35,7 @@ import { formatCO2, getCO2ColorClass, calculateTotalCO2, calculateProductCO2 } f
 import { calculateCO2Emission } from "../utils/co2Calculator";
 import { PRODUCT_UNITS } from "../constants/units";
 import { compressImage, compressBase64 } from "../utils/compressImage";
+import { showBadgeToasts } from "../utils/badgeNotification";
 
 interface Product {
   id: number;
@@ -2269,7 +2270,7 @@ function TrackConsumptionModal({
       console.log("[FE:confirm] ProductIds:", ingredients.map(ing => ing.productId));
       if (matchedIngredients.length > 0) {
         console.log("[FE:confirm] Calling confirm-ingredients...");
-        const response = await api.post<{ interactionIds: number[] }>("/consumption/confirm-ingredients", {
+        const response = await api.post<{ interactionIds: number[]; newBadges?: Array<{ name: string; pointsAwarded: number }> }>("/consumption/confirm-ingredients", {
           ingredients: matchedIngredients.map(ing => ({
             productId: ing.productId,
             productName: ing.name,
@@ -2290,6 +2291,12 @@ function TrackConsumptionModal({
           }
           return ing;
         }));
+
+        // Show badge toasts and refresh points if badges were awarded
+        if (response.newBadges?.length) {
+          showBadgeToasts(response, addToast);
+          window.dispatchEvent(new Event("points:updated"));
+        }
       }
 
       // Refresh points after confirming ingredients
@@ -2632,6 +2639,7 @@ function TrackConsumptionModal({
           sustainabilityRating: string;
         };
         success: boolean;
+        newBadges?: Array<{ name: string; pointsAwarded: number }>;
       }>("/consumption/confirm-waste", {
         ingredients: ingredients.filter(ing => ing.productId > 0).map(ing => ({
           productId: ing.productId,
@@ -2653,6 +2661,12 @@ function TrackConsumptionModal({
       });
 
       setWasteMetrics(response.metrics);
+
+      // Show badge toasts and refresh points if badges were awarded
+      if (response.newBadges?.length) {
+        showBadgeToasts(response, addToast);
+        window.dispatchEvent(new Event("points:updated"));
+      }
 
       // Refresh points after confirming waste
       try {

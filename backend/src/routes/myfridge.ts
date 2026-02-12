@@ -240,10 +240,15 @@ export function registerMyFridgeRoutes(router: Router) {
           type: data.type,
         });
 
+        // Check and award any newly earned badges after recording metrics
+        const { checkAndAwardBadges } = await import("../services/badge-service");
+        const newBadges = await checkAndAwardBadges(user.id);
+
         return json({
           message: "Product interaction logged",
           pointsChange: 0,
           newQuantity,
+          newBadges,
         });
       }
 

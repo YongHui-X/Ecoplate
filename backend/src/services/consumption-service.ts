@@ -183,7 +183,7 @@ export async function confirmIngredients(
   userId: number,
   ingredients: IngredientInput[],
   pendingRecordId?: number
-): Promise<{ interactionIds: number[]; success: boolean }> {
+): Promise<{ interactionIds: number[]; success: boolean; newBadges: Array<{ code: string; name: string; pointsAwarded: number }> }> {
   const interactionIds: number[] = [];
   const todayDate = new Date().toISOString().split("T")[0];
 
@@ -223,7 +223,10 @@ export async function confirmIngredients(
       .where(eq(pendingConsumptionRecords.id, pendingRecordId));
   }
 
-  return { interactionIds, success: true };
+  const { checkAndAwardBadges } = await import("./badge-service");
+  const newBadges = await checkAndAwardBadges(userId);
+
+  return { interactionIds, success: true, newBadges };
 }
 
 export async function confirmWaste(
@@ -232,7 +235,7 @@ export async function confirmWaste(
   ingredients: IngredientInput[],
   wasteItems: Array<{ productId: number; productName: string; quantityWasted: number }>,
   pendingRecordId?: number
-): Promise<{ metrics: WasteMetrics; success: boolean }> {
+): Promise<{ metrics: WasteMetrics; success: boolean; newBadges: Array<{ code: string; name: string; pointsAwarded: number }> }> {
   const todayDate = new Date().toISOString().split("T")[0];
 
   for (const ing of ingredients) {
@@ -280,5 +283,8 @@ export async function confirmWaste(
       .where(eq(pendingConsumptionRecords.id, pendingRecordId));
   }
 
-  return { metrics, success: true };
+  const { checkAndAwardBadges } = await import("./badge-service");
+  const newBadges = await checkAndAwardBadges(userId);
+
+  return { metrics, success: true, newBadges };
 }
