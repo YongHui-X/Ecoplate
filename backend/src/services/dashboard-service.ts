@@ -572,19 +572,18 @@ export async function getFoodStats(userId: number, period: Period = "month") {
   const wasteRate =
     consumedPlusWasted > 0 ? Math.round((totalWasted / consumedPlusWasted) * 1000) / 10 : 0;
 
-  const categoryMap = new Map<string, number>();
+  const typeMap = new Map<string, number>();
   for (const m of metrics) {
-    if (m.productId == null) continue;
-    const product = productMap.get(m.productId);
-    const catLabel = capitalizeCategory(product?.category ?? null);
-    categoryMap.set(
-      catLabel,
-      (categoryMap.get(catLabel) || 0) + (m.quantity ?? 0)
+    const typeLabel = capitalizeCategory(m.type ?? "other");
+    typeMap.set(
+      typeLabel,
+      (typeMap.get(typeLabel) || 0) + (m.quantity ?? 0)
     );
   }
 
-  const foodByCategory = Array.from(categoryMap.entries())
+  const foodByCategory = Array.from(typeMap.entries())
     .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+    .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value);
 
   const savedTrendMap = new Map<string, number>();

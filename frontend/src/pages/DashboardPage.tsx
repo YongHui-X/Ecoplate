@@ -1066,18 +1066,18 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {/* Food by Category Pie + Trend */}
+        {/* Food by Type Pie + Trend */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <h3 className="text-sm sm:text-base font-semibold">
-                  Food by Category
+                  Food by Type
                 </h3>
                 <div className="group relative">
                   <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
                   <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                    Distribution of your food consumption by category
+                    Breakdown of food by action type (consumed, wasted, shared, sold)
                   </div>
                 </div>
               </div>
