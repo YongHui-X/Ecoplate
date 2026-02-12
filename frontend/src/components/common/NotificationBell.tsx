@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Clock, Award, Flame, AlertCircle, CheckCheck, X } from "lucide-react";
+import { Bell, Clock, Award, Flame, AlertCircle, CheckCheck, X, Package } from "lucide-react";
 import { useNotifications } from "../../contexts/NotificationContext";
 import { Notification } from "../../services/notifications";
 
@@ -14,6 +14,11 @@ function getNotificationIcon(type: Notification["type"]) {
       return <Flame className="h-4 w-4 text-primary" />;
     case "product_stale":
       return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
+    case "locker_payment_received":
+    case "locker_item_delivered":
+    case "locker_pickup_complete":
+    case "locker_order_cancelled":
+      return <Package className="h-4 w-4 text-primary" />;
     default:
       return <Bell className="h-4 w-4" />;
   }
@@ -108,6 +113,12 @@ export default function NotificationBell() {
         break;
       case "product_stale":
         navigate("/myfridge");
+        break;
+      case "locker_payment_received":
+      case "locker_item_delivered":
+      case "locker_pickup_complete":
+      case "locker_order_cancelled":
+        navigate(`/ecolocker/orders/${notification.relatedId}`);
         break;
     }
   };

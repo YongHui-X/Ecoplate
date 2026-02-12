@@ -3,7 +3,7 @@ import { api } from "./api";
 export interface Notification {
   id: number;
   userId: number;
-  type: "expiring_soon" | "badge_unlocked" | "streak_milestone" | "product_stale";
+  type: "expiring_soon" | "badge_unlocked" | "streak_milestone" | "product_stale" | "locker_payment_received" | "locker_item_delivered" | "locker_pickup_complete" | "locker_order_cancelled";
   title: string;
   message: string;
   relatedId: number | null;

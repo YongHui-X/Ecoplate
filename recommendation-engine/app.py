@@ -1,5 +1,6 @@
 # Recommendation Engine for EcoPlate
 # Flask API for similar product recommendations
+# This is recommendation engine for ecoplate
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS

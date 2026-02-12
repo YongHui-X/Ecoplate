@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useUnreadCount } from "../contexts/UnreadCountContext";
+import { useLockerUnread } from "../features/ecolocker/contexts/LockerUnreadContext";
 import {
   Home,
   Refrigerator,
@@ -68,6 +69,7 @@ const AVATAR_MAP: Record<string, string> = {
 export default function Layout() {
   const { user, logout } = useAuth();
   const { unreadCount } = useUnreadCount();
+  const { lockerUnreadCount } = useLockerUnread();
   const navigate = useNavigate();
   const location = useLocation();
   const [, forceUpdate] = useState(0);
@@ -133,6 +135,11 @@ export default function Layout() {
                 {item.to === "/messages" && unreadCount > 0 && (
                   <span className="ml-auto bg-destructive text-destructive-foreground text-xs font-bold h-5 min-w-[20px] flex items-center justify-center rounded-full px-1.5">
                     {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+                {item.to === "/ecolocker" && lockerUnreadCount > 0 && (
+                  <span className="ml-auto bg-destructive text-destructive-foreground text-xs font-bold h-5 min-w-[20px] flex items-center justify-center rounded-full px-1.5">
+                    {lockerUnreadCount > 99 ? "99+" : lockerUnreadCount}
                   </span>
                 )}
               </NavLink>

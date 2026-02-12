@@ -55,21 +55,21 @@ interface RedemptionResult {
 
 export default function RewardsPage() {
   const navigate = useNavigate();
-  const [rewards, setRewards] = useState<Reward[]>([]);
-  const [balance, setBalance] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
-  const [quantity, setQuantity] = useState(1);
-  const [redeeming, setRedeeming] = useState(false);
-  const [redemptionResult, setRedemptionResult] = useState<RedemptionResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "food" | "apparel">("all");
+  const [rewards, setRewards] = useState<Reward[]>([]);                        // rewards list
+  const [balance, setBalance] = useState<number>(0);                           // ecopoints balance
+  const [loading, setLoading] = useState(true);                                // loading mode
+  const [selectedReward, setSelectedReward] = useState<Reward | null>(null);   // selected reward
+  const [quantity, setQuantity] = useState(1);                                 // redeem quantity
+  const [redeeming, setRedeeming] = useState(false);                           // redeem request
+  const [redemptionResult, setRedemptionResult] = useState<RedemptionResult | null>(null); // redeem result
+  const [error, setError] = useState<string | null>(null);                     // error msg
+  const [filter, setFilter] = useState<"all" | "food" | "apparel">("all");     // category filter
 
-  useEffect(() => {
+  useEffect(() => { // get data when loading page
     fetchRewardsAndBalance();
   }, []);
 
-  const fetchRewardsAndBalance = async () => {
+  const fetchRewardsAndBalance = async () => { // get rewards and ecopoints
     try {
       setLoading(true);
 
@@ -87,53 +87,58 @@ export default function RewardsPage() {
     }
   };
 
+  // redeem logic
   const handleRedeem = async () => {
-    if (!selectedReward) return;
+    if (!selectedReward) return; // avoid commit twice
 
     setRedeeming(true);
     setError(null);
 
-    try {
+    try { // send request
       const data = await api.post<RedemptionResult>("/rewards/redeem", {
         rewardId: selectedReward.id,
         quantity
       });
 
-      setRedemptionResult(data);
-      setBalance((prev) => prev - data.totalPointsSpent);
+      setRedemptionResult(data);                          // save results, success pop up ui
+      setBalance((prev) => prev - data.totalPointsSpent); // deduct ecopoints
 
       setRewards((prev) =>
         prev.map((r) =>
           r.id === selectedReward.id ? { ...r, stock: r.stock - quantity } : r
         )
-      );
+      );// update stock
 
-      window.dispatchEvent(new Event("points:updated"));
+      window.dispatchEvent(new Event("points:updated")); // boardcast (success / fail)
     } catch (err: any) {
       setError(err.message || "Failed to redeem reward. Please try again.");
     } finally {
       setRedeeming(false);
     }
   };
-
+ 
   const closeDialog = () => {
     setSelectedReward(null);
     setQuantity(1);
     setRedemptionResult(null);
     setError(null);
-  };
+  }; // close pop up ui
 
-  const totalCost = selectedReward ? selectedReward.pointsCost * quantity : 0;
+  // The largest number can user buy for each voucher
+  // selectedReward.stock -> stock limit
+  // Math.floor(balance / pointsCost) -> ecopoints limit
+  // 10 -> quantity limit
+  const totalCost = selectedReward ? selectedReward.pointsCost * quantity : 0; // total points cost
   const maxQuantity = selectedReward
     ? Math.min(selectedReward.stock, Math.floor(balance / selectedReward.pointsCost), 10)
     : 1;
 
-  const filteredRewards = rewards.filter((r) => {
+  const filteredRewards = rewards.filter((r) => { //category filter
     if (filter === "all") return true;
     return r.category === filter;
   });
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryIcon = (category: string) => { // category ui
     return category === "apparel" ? (
       <Shirt className="h-4 w-4" />
     ) : (

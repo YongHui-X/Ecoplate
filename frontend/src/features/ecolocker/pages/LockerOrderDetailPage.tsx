@@ -16,6 +16,7 @@ import {
 import { orderApi } from "../services/locker-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
+import { useLockerUnread } from "../contexts/LockerUnreadContext";
 import { getErrorMessage } from "../utils/network";
 import type { LockerOrder } from "../types";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export default function LockerOrderDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const { refreshLockerUnreadCount } = useLockerUnread();
 
   const [order, setOrder] = useState<LockerOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +102,7 @@ export default function LockerOrderDetailPage() {
       const updatedOrder = await orderApi.confirmRiderPickup(order.id);
       setOrder(updatedOrder);
       addToast("Pickup confirmed! Rider is on the way.", "success");
+      refreshLockerUnreadCount();
     } catch (err) {
       addToast(getErrorMessage(err), "error");
     } finally {
@@ -118,6 +121,7 @@ export default function LockerOrderDetailPage() {
       const updatedOrder = await orderApi.cancel(order.id, reason);
       setOrder(updatedOrder);
       addToast("Order cancelled", "info");
+      refreshLockerUnreadCount();
     } catch (err) {
       addToast(getErrorMessage(err), "error");
     } finally {

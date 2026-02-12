@@ -8,6 +8,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { notificationApi } from "../services/locker-api";
+import { useLockerUnread } from "../contexts/LockerUnreadContext";
 import type { LockerNotification } from "../types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { formatDateTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 export default function LockerNotificationsPage() {
+  const { refreshLockerUnreadCount } = useLockerUnread();
   const [notifications, setNotifications] = useState<LockerNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -41,6 +43,7 @@ export default function LockerNotificationsPage() {
       setNotifications((prev) =>
         prev.map((n) => ({ ...n, isRead: true }))
       );
+      refreshLockerUnreadCount();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to mark as read");
     }
@@ -52,6 +55,7 @@ export default function LockerNotificationsPage() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
       );
+      refreshLockerUnreadCount();
     } catch (err) {
       console.error("Failed to mark as read:", err);
     }

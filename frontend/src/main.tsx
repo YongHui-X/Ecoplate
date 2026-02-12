@@ -7,6 +7,7 @@ import { ToastProvider } from "./contexts/ToastContext";
 import { PointsProvider } from "./contexts/PointsContext";
 import { UnreadCountProvider } from "./contexts/UnreadCountContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { LockerUnreadProvider } from "./features/ecolocker/contexts/LockerUnreadContext";
 import { initializeCapacitor } from "./services/capacitor";
 import "./index.css";
 
@@ -21,7 +22,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <PointsProvider>
             <UnreadCountProvider>
               <NotificationProvider>
-                <App />
+                <LockerUnreadProvider>
+                  <App />
+                </LockerUnreadProvider>
               </NotificationProvider>
             </UnreadCountProvider>
           </PointsProvider>

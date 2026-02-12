@@ -3,6 +3,7 @@ import * as schema from "../db/schema";
 import { eq, and, lt, or, inArray, desc } from "drizzle-orm";
 import { calculateDistance, parseCoordinates, type Coordinates } from "../utils/distance";
 import { awardPoints, POINT_VALUES } from "./gamification-service";
+import { createNotification as createMainNotification } from "./notification-service";
 
 // Constants
 const RESERVATION_TIMEOUT_MINUTES = 30;
@@ -225,13 +226,22 @@ export async function processPayment(
     .where(eq(schema.lockerOrders.id, orderId))
     .returning();
 
-  // Notify seller
+  // Notify seller (locker notifications)
   await createNotification(
     order.sellerId,
     orderId,
     "payment_received",
     "Payment Received",
     `Buyer has paid for the order. Please schedule a pickup time.`
+  );
+
+  // Dual-write to main notifications for bell
+  await createMainNotification(
+    order.sellerId,
+    "locker_payment_received",
+    "EcoLocker: Payment Received",
+    `Buyer has paid for the order. Please schedule a pickup time.`,
+    orderId
   );
 
   return { success: true, order: updatedOrder };
@@ -395,13 +405,22 @@ async function completeDelivery(orderId: number) {
     })
     .where(eq(schema.lockerOrders.id, orderId));
 
-  // Notify buyer with PIN
+  // Notify buyer with PIN (locker notifications)
   await createNotification(
     order.buyerId,
     orderId,
     "item_delivered",
     "Item Ready for Pickup!",
     `Your item is ready at ${order.locker?.name}. Your pickup PIN is: ${pickupPin}. Valid for 24 hours.`
+  );
+
+  // Dual-write to main notifications for bell
+  await createMainNotification(
+    order.buyerId,
+    "locker_item_delivered",
+    "EcoLocker: Item Ready for Pickup!",
+    `Your item is ready at ${order.locker?.name}. Check EcoLocker for your pickup PIN.`,
+    orderId
   );
 }
 
@@ -477,7 +496,7 @@ export async function verifyPin(
     buyerId: order.buyerId,
   });
 
-  // Notify both parties
+  // Notify both parties (locker notifications)
   await createNotification(
     order.buyerId,
     orderId,
@@ -492,6 +511,23 @@ export async function verifyPin(
     "order_complete",
     "Order Complete!",
     `Your item has been picked up. You earned ${pointsResult.amount} EcoPoints!`
+  );
+
+  // Dual-write to main notifications for bell
+  await createMainNotification(
+    order.buyerId,
+    "locker_pickup_complete",
+    "EcoLocker: Pickup Complete!",
+    `Thank you for using EcoLocker! You've helped save food from going to waste.`,
+    orderId
+  );
+
+  await createMainNotification(
+    order.sellerId,
+    "locker_pickup_complete",
+    "EcoLocker: Order Complete!",
+    `Your item has been picked up. You earned ${pointsResult.amount} EcoPoints!`,
+    orderId
   );
 
   return { success: true, order: updatedOrder, pointsAwarded: pointsResult.amount };
@@ -563,7 +599,7 @@ export async function cancelOrder(
     deliveryTimers.delete(orderId);
   }
 
-  // Notify both parties
+  // Notify other party (locker notifications)
   const cancelledBy = userId === order.buyerId ? "buyer" : "seller";
   const otherParty = userId === order.buyerId ? order.sellerId : order.buyerId;
 
@@ -573,6 +609,15 @@ export async function cancelOrder(
     "order_cancelled",
     "Order Cancelled",
     `The order has been cancelled by the ${cancelledBy}. Reason: ${reason}`
+  );
+
+  // Dual-write to main notifications for bell
+  await createMainNotification(
+    otherParty,
+    "locker_order_cancelled",
+    "EcoLocker: Order Cancelled",
+    `The order has been cancelled by the ${cancelledBy}. Reason: ${reason}`,
+    orderId
   );
 
   return { success: true, order: updatedOrder };

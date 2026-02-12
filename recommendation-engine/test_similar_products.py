@@ -1,4 +1,6 @@
-"""Tests for SimilarProductsMatcher - multi-factor similarity scoring."""
+"""Tests for SimilarProductsMatcher - multi-factor similarity scoring.
+
+This is testing the similarity product"""
 
 from app import SimilarProductsMatcher
 

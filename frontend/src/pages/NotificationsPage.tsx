@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Clock, Award, Flame, AlertCircle, Trash2, CheckCheck, Filter } from "lucide-react";
+import { Bell, Clock, Award, Flame, AlertCircle, Trash2, CheckCheck, Filter, Package } from "lucide-react";
 import { useNotifications } from "../contexts/NotificationContext";
 import { Notification } from "../services/notifications";
 import { Button } from "../components/ui/button";
@@ -18,6 +18,11 @@ function getNotificationIcon(type: Notification["type"]) {
       return <Flame className="h-5 w-5 text-primary" />;
     case "product_stale":
       return <AlertCircle className="h-5 w-5 text-muted-foreground" />;
+    case "locker_payment_received":
+    case "locker_item_delivered":
+    case "locker_pickup_complete":
+    case "locker_order_cancelled":
+      return <Package className="h-5 w-5 text-primary" />;
     default:
       return <Bell className="h-5 w-5" />;
   }
@@ -91,6 +96,12 @@ export default function NotificationsPage() {
         break;
       case "product_stale":
         navigate("/myfridge");
+        break;
+      case "locker_payment_received":
+      case "locker_item_delivered":
+      case "locker_pickup_complete":
+      case "locker_order_cancelled":
+        navigate(`/ecolocker/orders/${notification.relatedId}`);
         break;
     }
   };
@@ -183,7 +194,8 @@ export default function NotificationsPage() {
                     notification.type === "expiring_soon" && "bg-warning/15",
                     notification.type === "badge_unlocked" && "bg-success/15",
                     notification.type === "streak_milestone" && "bg-primary/10",
-                    notification.type === "product_stale" && "bg-muted"
+                    notification.type === "product_stale" && "bg-muted",
+                    (notification.type === "locker_payment_received" || notification.type === "locker_item_delivered" || notification.type === "locker_pickup_complete" || notification.type === "locker_order_cancelled") && "bg-primary/10"
                   )}>
                     {getNotificationIcon(notification.type)}
                   </div>

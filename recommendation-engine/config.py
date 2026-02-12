@@ -1,5 +1,7 @@
 """
 Configuration for ML training and inference.
+
+configuration for machine learning.
 """
 import os
 from pathlib import Path

@@ -1,5 +1,7 @@
 """
-Tests for the training modules: data_collector, price_trainer, recommendation_trainer, train_all.
+Tests for the training modules: data_collector, price_trainer, recommendation_trainer,
+
+train all test data
 """
 
 import json

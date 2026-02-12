@@ -8,7 +8,11 @@ export type NotificationType =
   | "badge_unlocked"
   | "streak_milestone"
   | "product_stale"
-  | "listing_reserved";
+  | "listing_reserved"
+  | "locker_payment_received"
+  | "locker_item_delivered"
+  | "locker_pickup_complete"
+  | "locker_order_cancelled";
 
 // Notification preferences type
 export interface NotificationPreferences {

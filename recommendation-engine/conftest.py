@@ -1,5 +1,6 @@
 """
 Shared test fixtures for recommendation engine tests.
+
 Pytest auto-discovers this file and makes fixtures available to all test files.
 """
 

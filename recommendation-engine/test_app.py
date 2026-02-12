@@ -1,7 +1,8 @@
 """
 Comprehensive tests for the EcoPlate Recommendation Engine.
-
 Run with: pytest test_app.py -v --cov=app --cov-report=term-missing
+
+This file is python test for recommendation engine
 """
 
 import pytest

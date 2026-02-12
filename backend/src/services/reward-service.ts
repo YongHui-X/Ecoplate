@@ -4,6 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { getDetailedPointsStats } from "./gamification-service";
 
 // Generate a unique redemption code
+// Unique, not include 'I' and '1' & 'O' and '0'
 function generateRedemptionCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "EP-";
@@ -14,6 +15,7 @@ function generateRedemptionCode(): string {
 }
 
 // Get all available rewards (active and in stock)
+// checkout from rewards table, reward with active sign
 export async function getAvailableRewards() {
   return db
     .select()
@@ -23,6 +25,7 @@ export async function getAvailableRewards() {
 }
 
 // Get user's current points balance (uses computed total for consistency)
+// use 'getDetailedPointsStats' by each user to get realtime ecopoints
 export async function getUserPointsBalance(userId: number): Promise<number> {
   const stats = await getDetailedPointsStats(userId);
   return stats.computedTotalPoints;
@@ -35,15 +38,15 @@ export async function redeemReward(userId: number, rewardId: number, quantity: n
     where: eq(rewards.id, rewardId),
   });
 
-  if (!reward) {
+  if (!reward) { // check reward still works or not
     throw new Error("Reward not found");
   }
 
-  if (!reward.isActive) {
+  if (!reward.isActive) { // check reward on shelf or not
     throw new Error("Reward is not available");
   }
 
-  if (reward.stock < quantity) {
+  if (reward.stock < quantity) { // check enough rewards stock
     throw new Error("Reward is out of stock");
   }
 
@@ -62,7 +65,7 @@ export async function redeemReward(userId: number, rewardId: number, quantity: n
   // Create redemption records for each quantity
   const redemptions = [];
   for (let i = 0; i < quantity; i++) {
-    // Generate unique redemption code for each
+    // Generate unique redemption code for each (re-generate < 10 times if repeat)
     let redemptionCode = generateRedemptionCode();
     let attempts = 0;
     while (attempts < 10) {

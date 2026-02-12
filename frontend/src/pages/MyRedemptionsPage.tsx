@@ -37,14 +37,15 @@ interface Redemption {
 
 export default function MyRedemptionsPage() {
   const navigate = useNavigate();
-  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [redemptions, setRedemptions] = useState<Redemption[]>([]);   // redemption records
+  const [loading, setLoading] = useState(true);                       // loading or not
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);  // switch button ui after click copy
 
   useEffect(() => {
     fetchRedemptions();
   }, []);
 
+  //
   const fetchRedemptions = async () => {
     try {
       const data = await api.get<Redemption[]>("/rewards/my-redemptions");
@@ -56,6 +57,8 @@ export default function MyRedemptionsPage() {
     }
   };
 
+  // click to save code to 'copiedCode', ui change, switch back after 2s
+  // save code string instead of boolean, so other code not affect
   const copyToClipboard = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
@@ -66,6 +69,7 @@ export default function MyRedemptionsPage() {
     }
   };
 
+  // status: pending, collected, expired
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
@@ -94,6 +98,7 @@ export default function MyRedemptionsPage() {
     }
   };
 
+  // SG date format
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-SG", {
       year: "numeric",
