@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatPrice, formatDateTime } from "@/lib/utils";
+import LockerTabs from "../components/LockerTabs";
 
 const statusConfig: Record<
   string,
@@ -71,8 +72,11 @@ export default function LockerOrdersPage() {
   }
 
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-semibold mb-4">My Orders</h1>
+    <div>
+      <LockerTabs />
+
+      <div className="p-4">
+        <h1 className="text-xl font-semibold mb-4">My Orders</h1>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
@@ -123,6 +127,7 @@ export default function LockerOrdersPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
