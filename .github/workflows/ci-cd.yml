@@ -195,6 +195,17 @@ jobs:
         run: |
           mkdir -p combined-report/backend combined-report/frontend combined-report/recommendation
 
+          # Fix lcov paths to be relative to repo root (not component directories)
+          if [ -f backend-cov/lcov.info ]; then
+            sed -i 's|^SF:src/|SF:backend/src/|g' backend-cov/lcov.info
+          fi
+          if [ -f frontend-cov/lcov.info ]; then
+            sed -i 's|^SF:src/|SF:frontend/src/|g' frontend-cov/lcov.info
+          fi
+          if [ -f recommendation-cov/coverage.lcov ]; then
+            sed -i 's|^SF:|SF:recommendation-engine/|g' recommendation-cov/coverage.lcov
+          fi
+
           # Collect available lcov files and generate detailed HTML
           LCOV_ARGS=""
           if [ -f backend-cov/lcov.info ]; then
