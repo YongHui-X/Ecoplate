@@ -1,4 +1,4 @@
-import { db } from "../index";
+import { db } from "../db/connection";
 import { rewards, userRedemptions, userPoints } from "../db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { getDetailedPointsStats } from "./gamification-service";

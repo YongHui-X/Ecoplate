@@ -119,14 +119,9 @@ sqlite.exec(`
 
 const testDb = drizzle(sqlite, { schema });
 
-// Override the db instances
+// Override the db instance
 import { __setTestDb as setDbConnection } from "../../db/connection";
 setDbConnection(testDb);
-
-// Also override the index.ts db export (used by reward-service)
-mock.module("../../index", () => ({
-  db: testDb,
-}));
 
 // Import after db override is set up
 import {

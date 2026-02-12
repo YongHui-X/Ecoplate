@@ -46,19 +46,9 @@ mock.module("openai", () => {
   };
 });
 
-// Mock gamification service
-mock.module("../../services/gamification-service", () => ({
-  awardPoints: async () => ({ amount: 5, newTotal: 100 }),
-  POINT_VALUES: { consumed: 0, shared: 0, sold: 8, wasted: 0 },
-  getOrCreateUserPoints: async () => ({ userId: 1, totalPoints: 100 }),
-  calculatePointsForAction: () => 5,
-  computeCo2Value: () => 1.0,
-}));
-
-// Mock badge service (dynamically imported in myfridge.ts)
-mock.module("../../services/badge-service", () => ({
-  checkAndAwardBadges: async () => [],
-}));
+// Note: We don't mock gamification-service or badge-service here
+// because mock.module is global and would affect other test files.
+// Instead, we set up the required tables for the real services to run.
 
 // Mock auth middleware
 // Include all exports from auth.ts to avoid module conflict issues when tests run together
@@ -149,6 +139,69 @@ beforeAll(async () => {
       status TEXT NOT NULL DEFAULT 'PENDING_WASTE_PHOTO',
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE user_points (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      total_points INTEGER NOT NULL DEFAULT 0,
+      current_streak INTEGER NOT NULL DEFAULT 0,
+      total_co2_saved REAL NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE badges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      icon_url TEXT,
+      category TEXT NOT NULL,
+      threshold INTEGER NOT NULL DEFAULT 1,
+      points_awarded INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE user_badges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      badge_id INTEGER NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
+      earned_at INTEGER NOT NULL DEFAULT (unixepoch()),
+      UNIQUE(user_id, badge_id)
+    );
+
+    CREATE TABLE user_redemptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reward_id INTEGER NOT NULL,
+      points_spent INTEGER NOT NULL,
+      redemption_code TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      collected_at INTEGER,
+      expires_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      related_id INTEGER,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      read_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
+    CREATE TABLE notification_preferences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      expiring_products INTEGER NOT NULL DEFAULT 1,
+      badge_unlocked INTEGER NOT NULL DEFAULT 1,
+      streak_milestone INTEGER NOT NULL DEFAULT 1,
+      product_stale INTEGER NOT NULL DEFAULT 1,
+      stale_days_threshold INTEGER NOT NULL DEFAULT 7,
+      expiry_days_threshold INTEGER NOT NULL DEFAULT 3
     );
   `);
 

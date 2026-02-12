@@ -1,7 +1,9 @@
 import { Router, json, error, parseBody } from "../utils/router";
 import { z } from "zod";
 
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
+function getGoogleMapsApiKey(): string {
+  return process.env.GOOGLE_MAPS_API_KEY || "";
+}
 
 // Request schemas
 const autocompleteSchema = z.object({
@@ -47,7 +49,8 @@ export function registerMapsRoutes(router: Router) {
   // Autocomplete endpoint - proxies to Google Places Autocomplete API
   router.post("/api/v1/maps/autocomplete", async (req) => {
     try {
-      if (!GOOGLE_MAPS_API_KEY) {
+      const apiKey = getGoogleMapsApiKey();
+      if (!apiKey) {
         return error("Google Maps API key not configured", 500);
       }
 
@@ -59,7 +62,7 @@ export function registerMapsRoutes(router: Router) {
       );
       url.searchParams.set("input", data.query);
       url.searchParams.set("components", `country:${data.country}`);
-      url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
+      url.searchParams.set("key", apiKey);
 
       const response = await fetch(url.toString());
       const result = (await response.json()) as GoogleAutocompleteResponse;
@@ -93,7 +96,8 @@ export function registerMapsRoutes(router: Router) {
   // Place Details endpoint - proxies to Google Place Details API
   router.post("/api/v1/maps/place-details", async (req) => {
     try {
-      if (!GOOGLE_MAPS_API_KEY) {
+      const apiKey = getGoogleMapsApiKey();
+      if (!apiKey) {
         return error("Google Maps API key not configured", 500);
       }
 
@@ -105,7 +109,7 @@ export function registerMapsRoutes(router: Router) {
       );
       url.searchParams.set("place_id", data.placeId);
       url.searchParams.set("fields", "geometry,formatted_address");
-      url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
+      url.searchParams.set("key", apiKey);
 
       const response = await fetch(url.toString());
       const result = (await response.json()) as GooglePlaceDetailsResponse;

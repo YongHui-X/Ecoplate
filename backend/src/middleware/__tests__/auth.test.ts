@@ -203,7 +203,8 @@ describe("extractBearerToken", () => {
   });
 
   test("extracts long token correctly", () => {
-    const longToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0";
+    // Use a fake long token that doesn't look like a real JWT to avoid security scanner false positives
+    const longToken = "test-long-token-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz";
     const req = new Request("http://localhost/test", {
       headers: { Authorization: `Bearer ${longToken}` },
     });
