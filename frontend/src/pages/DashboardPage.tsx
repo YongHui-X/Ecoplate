@@ -603,9 +603,17 @@ export default function DashboardPage() {
 
           <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4 lg:p-6">
-              <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-                CO&#8322; Reduction Trend
-              </h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-sm sm:text-base font-semibold">
+                  CO&#8322; Reduction Trend
+                </h3>
+                <div className="group relative">
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                  <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    CO&#8322; emissions reduced over time by selling food on the marketplace
+                  </div>
+                </div>
+              </div>
               <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -641,9 +649,17 @@ export default function DashboardPage() {
         {/* Waste Ratio Chart */}
         <Card className="overflow-hidden">
           <CardContent className="p-3 sm:p-4 lg:p-6">
-            <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4">
-              CO&#8322; Wasted vs Consumed
-            </h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold">
+                CO&#8322; Wasted vs Consumed
+              </h3>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
+                <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  Comparison of CO&#8322; from wasted food vs consumed food over time
+                </div>
+              </div>
+            </div>
             <div className="h-48 sm:h-64 -ml-2 sm:ml-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -1077,7 +1093,7 @@ export default function DashboardPage() {
                 <div className="group relative">
                   <Info className="h-3.5 w-3.5 text-muted-foreground/50 hover:text-muted-foreground cursor-help" />
                   <div className="absolute right-0 top-5 w-48 sm:w-56 p-2 bg-popover border rounded-md shadow-lg text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                    Breakdown of food by action type (consumed, wasted, shared, sold)
+                    Breakdown of food by action type (consumed, wasted, sold)
                   </div>
                 </div>
               </div>
