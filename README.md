@@ -7,48 +7,24 @@ Our platform combines AI-powered receipt scanning for effortless food tracking, 
 EcoPlate goes beyond individual benefits—it builds community-driven sustainability networks where neighbors can share resources, rescue food, and collectively reduce waste. Whether you're scanning grocery receipts, listing near-expiry items, or tracking your environmental savings, every action contributes to a larger movement toward zero-waste living and meaningful climate action.
 
 ## System Architecture
+<img width="2071" height="1246" alt="Software Architecture" src="https://github.com/user-attachments/assets/e0d499c6-43bd-4a5b-8474-b5c163b69a4e" />
 
-```mermaid
-flowchart TB
-    subgraph Client["Client Layer"]
-        WEB["Web Browser"]
-        ANDROID["Android App"]
-    end
+## Screenshots
+Messaging system with websockets
+<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 59 PM" src="https://github.com/user-attachments/assets/888b6b55-b94b-479e-b12c-80240b8ebf2f" />
 
-    subgraph Frontend["Frontend (React + Vite)"]
-        REACT["React 19 + TypeScript"]
-        CAPACITOR["Capacitor"]
-        TAILWIND["Tailwind CSS + shadcn/ui"]
-    end
+Consumption Tracking
+<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 29 PM" src="https://github.com/user-attachments/assets/0e440e56-441f-44d4-b210-7c3db3d3de05" />
 
-    subgraph Backend["Backend (Bun)"]
-        API["REST API Server"]
-        AUTH["JWT Auth Middleware"]
-        ROUTES["Route Handlers"]
-    end
+Dashboard
+<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 51 PM" src="https://github.com/user-attachments/assets/d211ece2-4428-45e7-9d3c-a209f44827a4" />
 
-    subgraph Services["External Services"]
-        OPENAI["OpenAI API"]
-        RECOMMEND["Recommendation Engine"]
-    end
+Marketplace
+<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 44 PM" src="https://github.com/user-attachments/assets/4347a102-2834-445c-ae5f-eb79b6c79564" />
 
-    subgraph Database["Database Layer"]
-        SQLITE["SQLite"]
-        DRIZZLE["Drizzle ORM"]
-    end
+Ecopoints (Points and rewards)
+<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 35 PM" src="https://github.com/user-attachments/assets/668048fe-849b-465b-8dc3-c52d372fa5a4" />
 
-    WEB --> REACT
-    ANDROID --> CAPACITOR
-    CAPACITOR --> REACT
-    REACT --> TAILWIND
-    REACT -->|HTTP/REST| API
-    API --> AUTH
-    AUTH --> ROUTES
-    ROUTES --> DRIZZLE
-    DRIZZLE --> SQLITE
-    ROUTES -->|Receipt Scan| OPENAI
-    ROUTES -->|Product Suggestion| RECOMMEND
-```
 
 ## Features
 
@@ -75,51 +51,49 @@ flowchart TB
 ```mermaid
 flowchart TD
     START((Start)) --> AUTH{Authenticated?}
-    AUTH -->|No| LOGIN[Login/Register]
+    AUTH -- No --> LOGIN[Login/Register]
     LOGIN --> DASHBOARD
-    AUTH -->|Yes| DASHBOARD[Dashboard]
+    AUTH -- Yes --> DASHBOARD[Dashboard]
 
     DASHBOARD --> FRIDGE[MyFridge]
     DASHBOARD --> MARKET[Marketplace]
-    DASHBOARD --> ECO[EcoBoard]
+    DASHBOARD --> ECO[EcoPoints]
 
     subgraph MyFridge["MyFridge Module"]
        FRIDGE --> ADD[Add Product]
        FRIDGE --> SCAN[Scan Receipt]
-       FRIDGE --> VIEW[Track Consumption & Waste]
-   
-       SCAN -->|AI Processing| PARSE[Parse Items]
-       PARSE --> ADD
-   
-       VIEW --> CONSUME{Action?}
-       CONSUME -->|Consumed| POINTS_CONSUMED[+5 Points]
-       CONSUME -->|Shared| POINTS_SHARED[+10 Points]
-       CONSUME -->|Sold| POINTS_SOLD[+8 Points]
-       CONSUME -->|Wasted| POINTS_WASTED[-3 Points]
-    end
+       FRIDGE --> VIEW[Track Consumption and Waste]
 
+       SCAN -- AI Processing --> PARSE[Parse Items]
+       PARSE --> ADD
+
+       VIEW --> CONSUME{Action?}
+       CONSUME -- Consumed --> POINTS_CONSUMED["+5 Points"]
+       CONSUME -- Shared --> POINTS_SHARED["+10 Points"]
+       CONSUME -- Sold --> POINTS_SOLD["+8 Points"]
+       CONSUME -- Wasted --> POINTS_WASTED["-3 Points"]
     end
 
     subgraph Marketplace["Marketplace Module"]
         MARKET --> BROWSE[Browse Listings]
         MARKET --> CREATE[Create Listing]
         MARKET --> EDIT[Edit Listing]
-        MARKET --> Delete[Delete Listing]
+        MARKET --> DELETE_L[Delete Listing]
         MARKET --> MapView[Geolocation]
-        CONTACT --> MESSAGE[Message Seller]
+        BROWSE --> MESSAGE[Message Seller]
         CREATE --> PRODUCT[Get Product Recommendation]
-        
-        MARKET --> COMPLETE[Complete Listing (Sold)]
-        COMPLETE --> POINTS_SOLD[+8 Points]
+
+        MARKET --> COMPLETE[Complete Listing - Sold]
+        COMPLETE --> POINTS_SOLD
     end
 
     subgraph Gamification["Gamification Module"]
         ECO --> STATS[View Stats]
         ECO --> BADGES[View Badges]
         ECO --> LEADER[Leaderboard]
-        POINTS1 & POINTS2 & POINTS3 & POINTS4 --> STATS
+        ECO --> REWARDS[Redeem Rewards]
         STATS --> UNLOCK{Badge Unlock?}
-        UNLOCK -->|Yes| BADGES
+        UNLOCK -- Yes --> BADGES
     end
 ```
 
@@ -203,7 +177,7 @@ erDiagram
    Conversation ||--o{ Message : "contains"
    User ||--o{ Message : "writes"
    ImageListing ||--o{ Conversation : "listed in"
-   ImageListing ||--|| User : "belongs to (has)"
+   ImageListing ||--|| User : "belongs to"
 ```
 
 ## Tech Stack
