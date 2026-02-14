@@ -6,7 +6,7 @@ EcoPlate transforms how households manage food consumption by combining **OpenAI
 
 Built with **React 19**, **TypeScript**, **Bun**, **SQLite (Drizzle ORM)**, **Capacitor (Android/iOS)**, and **Tailwind CSS + shadcn/ui**. 
 
-production web (only for the month of Feb): 18.143.173.20
+Production web (only for the month of Feb): 18.143.173.20
 
 ---
 
