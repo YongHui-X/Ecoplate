@@ -12,8 +12,8 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  APP_IMAGE: ghcr.io/gdipsa-team2/ecoplate-app
-  REC_IMAGE: ghcr.io/gdipsa-team2/ecoplate-recommendation
+  APP_IMAGE: ghcr.io/${{ github.repository_owner }}/ecoplate-app
+  REC_IMAGE: ghcr.io/${{ github.repository_owner }}/ecoplate-recommendation
 
 jobs:
   # ===========================================================================
