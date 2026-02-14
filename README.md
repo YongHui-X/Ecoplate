@@ -1,53 +1,78 @@
 # EcoPlate
 
-EcoPlate is a sustainability-focused food management platform that helps reduce food waste through smart inventory tracking, community marketplace, and gamification. We address the global food waste crisis by transforming how households manage their food consumption, turning sustainability into an engaging, rewarding experience.
+> A full-stack sustainability platform that reduces household food waste through AI-powered inventory tracking, a peer-to-peer marketplace, and a gamified reward system.
 
-Our platform combines AI-powered receipt scanning for effortless food tracking, a peer-to-peer marketplace for redistributing surplus food locally, and a gamified reward system that turns eco-friendly actions into points, badges, and leaderboard achievements. By providing real-time visibility into food inventory, expiration alerts, and CO₂ emission tracking, we empower users to make informed decisions that reduce waste and environmental impact.
+EcoPlate transforms how households manage food consumption by combining **OpenAI Vision receipt scanning**, **ML-driven price recommendations**, **real-time WebSocket messaging**, and a **CO2-based gamification engine** — turning sustainable actions into points, badges, and leaderboard achievements.
 
-EcoPlate goes beyond individual benefits—it builds community-driven sustainability networks where neighbors can share resources, rescue food, and collectively reduce waste. Whether you're scanning grocery receipts, listing near-expiry items, or tracking your environmental savings, every action contributes to a larger movement toward zero-waste living and meaningful climate action.
+Built with **React 19**, **TypeScript**, **Bun**, **SQLite (Drizzle ORM)**, **Capacitor (Android/iOS)**, and **Tailwind CSS + shadcn/ui**.
+
+---
 
 ## System Architecture
+
 <img width="2071" height="1246" alt="Software Architecture" src="https://github.com/user-attachments/assets/e0d499c6-43bd-4a5b-8474-b5c163b69a4e" />
 
+---
+
 ## Screenshots
-Messaging system with websockets
-<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 59 PM" src="https://github.com/user-attachments/assets/888b6b55-b94b-479e-b12c-80240b8ebf2f" />
 
-Consumption Tracking
-<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 29 PM" src="https://github.com/user-attachments/assets/0e440e56-441f-44d4-b210-7c3db3d3de05" />
+| Messaging (WebSockets) | Consumption Tracking |
+|:-:|:-:|
+| <img width="720" alt="Messaging" src="https://github.com/user-attachments/assets/888b6b55-b94b-479e-b12c-80240b8ebf2f" /> | <img width="720" alt="Consumption Tracking" src="https://github.com/user-attachments/assets/0e440e56-441f-44d4-b210-7c3db3d3de05" /> |
 
-Dashboard
-<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 51 PM" src="https://github.com/user-attachments/assets/d211ece2-4428-45e7-9d3c-a209f44827a4" />
+| Dashboard | Marketplace |
+|:-:|:-:|
+| <img width="720" alt="Dashboard" src="https://github.com/user-attachments/assets/d211ece2-4428-45e7-9d3c-a209f44827a4" /> | <img width="720" alt="Marketplace" src="https://github.com/user-attachments/assets/4347a102-2834-445c-ae5f-eb79b6c79564" /> |
 
-Marketplace
-<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 44 PM" src="https://github.com/user-attachments/assets/4347a102-2834-445c-ae5f-eb79b6c79564" />
+| EcoPoints & Rewards |
+|:-:|
+| <img width="720" alt="EcoPoints" src="https://github.com/user-attachments/assets/668048fe-849b-465b-8dc3-c52d372fa5a4" /> |
 
-Ecopoints (Points and rewards)
-<img width="1440" height="900" alt="Screenshot 2026-02-12 at 11 14 35 PM" src="https://github.com/user-attachments/assets/668048fe-849b-465b-8dc3-c52d372fa5a4" />
+---
 
+## Key Features
 
-## Features
+### MyFridge — AI-Powered Inventory Management
+- Track food items with expiration dates and CO2 emission data
+- **Receipt scanning** via OpenAI Vision — snap a photo, items are parsed and added automatically
+- Log consumption, waste, sharing, and sales with per-action sustainability metrics
 
-### MyFridge
-- Track food items with CO2 emission data
-- Scan grocery receipts with AI (OpenAI Vision)
-- Log consumption, waste, and extract image data via OpenAI Vision
+### Marketplace — Peer-to-Peer Food Redistribution
+- List near-expiry food items for sale or free pickup
+- Browse listings with geolocation-based map view
+- **ML-powered price recommendations** for optimal listing pricing
+- **Real-time in-app messaging** between buyers and sellers via WebSockets
+- Complete transactions to earn EcoPoints tied to CO2 savings
 
-### Marketplace
-- List near-expiry food items for sale or free
-- Browse and reserve listings from others
-- Complete actions to earn sustainability points
-- AI-powered product recommendations
-- In-app messaging between buyers and sellers
+### EcoPoints & Badges — Gamification Engine
+- Earn points calculated from **CO2 savings** (CO2 value x 1.5, minimum 3 points per action)
+- **16 unlockable badges** across 4 categories: Milestones, Waste Reduction, Sharing, and Streaks
+- Daily streak tracking with milestone notifications (3, 7, 14, 30+ days)
+- Community leaderboard ranked by lifetime points
+- Redeem points for rewards
 
-### EcoBoard & EcoPoints
-- Earn points for sustainable actions
-- Track streaks and sustainability metrics
-- Unlock badges for achievements
-- View CO2 savings and waste reduction rate
-- Community leaderboard
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Runtime** | [Bun](https://bun.sh) |
+| **Database** | SQLite via `bun:sqlite` |
+| **ORM** | [Drizzle ORM](https://orm.drizzle.team) |
+| **Backend** | Bun native HTTP server + WebSockets |
+| **Frontend** | React 19 + TypeScript |
+| **Build Tool** | [Vite](https://vitejs.dev) |
+| **Styling** | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
+| **Mobile** | [Capacitor](https://capacitorjs.com) (Android & iOS) |
+| **AI/ML** | OpenAI Vision API, Python recommendation engine |
+| **Auth** | JWT (jose library) |
+| **Validation** | [Zod](https://zod.dev) |
+
+---
 
 ## User Flow
+
 ```mermaid
 flowchart TD
     START((Start)) --> AUTH{Authenticated?}
@@ -97,26 +122,59 @@ flowchart TD
     end
 ```
 
+---
+
 ## Database Schema
 
-<img width="4947" height="2689" alt="Team02_AD_CA - ERD" src="https://github.com/user-attachments/assets/f04b8b4c-e6cf-40bb-9810-cf306cacaea0" />
+<img width="4947" height="2689" alt="ERD Diagram" src="https://github.com/user-attachments/assets/f04b8b4c-e6cf-40bb-9810-cf306cacaea0" />
 
-## Tech Stack
+---
 
-| Layer | Technology                                                                   |
-|-------|------------------------------------------------------------------------------|
-| Runtime | [Bun](https://bun.sh)                                                        |
-| Database | SQLite (via `bun:sqlite`)                                                    |
-| ORM | [Drizzle ORM](https://orm.drizzle.team)                                      |
-| Backend | Bun native HTTP server                                                       |
-| Frontend | React 19 + TypeScript                                                        |
-| Build Tool | [Vite](https://vitejs.dev)                                                   |
-| Styling | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
-| Mobile | [Capacitor](https://capacitorjs.com) (iOS & Android)                         |
-| Auth | JWT (jose library)                                                           |
-| Validation | [Zod](https://zod.dev)                                                       |
+## API Endpoints
 
-## API Authentication Flow
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/auth/register` | Register new user |
+| POST | `/api/v1/auth/login` | Login |
+| POST | `/api/v1/auth/refresh` | Refresh access token |
+| POST | `/api/v1/auth/logout` | Logout |
+
+### MyFridge
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/myfridge/products` | List all products |
+| POST | `/api/v1/myfridge/products` | Add product |
+| GET | `/api/v1/myfridge/products/:id` | Get product |
+| PATCH | `/api/v1/myfridge/products/:id` | Update product |
+| DELETE | `/api/v1/myfridge/products/:id` | Delete product |
+| POST | `/api/v1/myfridge/products/:id/consume` | Log consumption |
+| POST | `/api/v1/myfridge/receipt/scan` | Scan receipt (AI) |
+
+### Marketplace
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/marketplace/listings` | Browse active listings |
+| GET | `/api/v1/marketplace/listings/nearby` | Get nearby listings (geolocation) |
+| GET | `/api/v1/marketplace/my-listings` | Get user's own listings |
+| GET | `/api/v1/marketplace/listings/:id` | Get listing details |
+| POST | `/api/v1/marketplace/listings` | Create new listing |
+| PATCH | `/api/v1/marketplace/listings/:id` | Update listing |
+| DELETE | `/api/v1/marketplace/listings/:id` | Delete listing |
+| POST | `/api/v1/marketplace/listings/:id/complete` | Mark as sold/completed |
+
+### Gamification
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/gamification/dashboard` | Dashboard summary |
+| GET | `/api/v1/gamification/points` | Points breakdown & history |
+| GET | `/api/v1/gamification/badges` | All badges with progress |
+| GET | `/api/v1/gamification/metrics` | Sustainability metrics |
+| GET | `/api/v1/gamification/leaderboard` | Community leaderboard |
+
+---
+
+## Authentication Flow
 
 ```mermaid
 sequenceDiagram
@@ -174,278 +232,130 @@ sequenceDiagram
     F->>U: Success + points awarded
 ```
 
+---
+
 ## Project Structure
 
 ```
+ecoplate/
 ├── backend/
 │   ├── src/
-│   │   ├── index.ts           # Main server entry
-│   │   ├── routes/            # API route handlers
-│   │   │   ├── auth.ts        # Authentication endpoints
-│   │   │   ├── myfridge.ts    # Fridge management endpoints
-│   │   │   ├── marketplace.ts # Marketplace endpoints
-│   │   │   └── gamification.ts# Gamification endpoints
-│   │   ├── middleware/        # Auth middleware
+│   │   ├── index.ts              # Server entry point
+│   │   ├── routes/               # API route handlers
+│   │   │   ├── auth.ts           # Authentication
+│   │   │   ├── myfridge.ts       # Fridge management
+│   │   │   ├── marketplace.ts    # Marketplace
+│   │   │   └── gamification.ts   # EcoPoints & Badges
+│   │   ├── services/             # Business logic
+│   │   │   ├── gamification-service.ts
+│   │   │   └── badge-service.ts
+│   │   ├── middleware/           # Auth middleware
 │   │   ├── db/
-│   │   │   ├── schema.ts      # Drizzle ORM schema
-│   │   │   ├── migrations/    # Database migrations
-│   │   │   └── seed.ts        # Seed data
-│   │   └── utils/             # Utilities
-│   ├── public/                # Built frontend assets
-│   └── package.json
-│   └── .env                  # Web env variables
+│   │   │   ├── schema.ts        # Drizzle ORM schema
+│   │   │   ├── migrations/      # Database migrations
+│   │   │   └── seed.ts          # Seed data
+│   │   └── utils/
+│   └── public/                  # Built frontend assets
 ├── frontend/
 │   ├── src/
-│   │   ├── components/        # React components
-│   │   ├── pages/             # Page components
-│   │   ├── contexts/          # React contexts
-│   │   ├── services/          # API client + Capacitor utils
-│   │   ├── hooks/             # Custom hooks
-│   │   └── lib/               # Utilities
-│   ├── android/               # Android native project (after cap add)
-│   ├── capacitor.config.ts    # Capacitor configuration
-│   ├── vite.config.ts
-│   └── package.json
-│   └── .env.mobile            # Mobile env variables
-├── scripts/                   # Start/stop/build scripts
-├── package.json               # Root workspace
-└── .env.example               # Environment template
+│   │   ├── components/          # React components
+│   │   ├── pages/               # Page components
+│   │   ├── contexts/            # React contexts
+│   │   ├── services/            # API client + Capacitor utils
+│   │   ├── hooks/               # Custom hooks
+│   │   └── lib/                 # Utilities
+│   ├── android/                 # Android native project
+│   └── capacitor.config.ts      # Capacitor config
 ├── recommendation-engine/
-│   ├── app.py                # Recommendation engine (Flask or FastAPI)
-│   ├── Dockerfile            # Dockerfile for deployment
-│   └── requirements.txt      # Python dependencies
-│   └── .env.ml               # ML env variables
+│   ├── app.py                   # ML recommendation service
+│   ├── Dockerfile               # Container deployment
+│   └── requirements.txt         # Python dependencies
+└── scripts/                     # Build & deployment scripts
 ```
 
-## Prerequisites
+---
 
-- [Bun](https://bun.sh) v1.0 or higher
-
-## Quick Start
-
-### Using Scripts
-
-**Windows (PowerShell):**
-```powershell
-# Start both frontend and backend
-.\scripts\start-all.ps1
-
-# Stop all servers
-.\scripts\stop-all.ps1
-```
-
-**Mac/Linux:**
-```bash
-# Start both frontend and backend
-./scripts/start-all.sh
-
-# Stop all servers
-./scripts/stop-all.sh
-```
-
-### Manual Setup
-
-1. **Install dependencies:**
-   ```bash
-   bun install
-   ```
-
-2. **Set up environment:**
-   ```bash
-   cp .env.ml .env.ml
-   ```
-
-3. **Run database migrations:**
-   ```bash
-   bun run db:migrate
-   bun run db:seed
-   ```
-
-4. **Start development servers:**
-   ```bash
-   # Terminal 1: Backend
-   bun run dev:backend
-
-   # Terminal 2: Frontend
-   bun run dev:frontend
-   ```
-
-5. **Open the app:**
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:3000
-
-## Production Build
-
-**Windows:**
-```powershell
-.\scripts\build.ps1
-```
-
-**Mac/Linux:**
-```bash
-./scripts/build.sh
-```
-
-Then start the production server:
-```bash
-cd backend
-bun run src/index.ts
-```
-
-The server will serve both the API and the built frontend on http://localhost:3000.
-
-## Mobile Apps (Android)
-
-The app uses [Capacitor](https://capacitorjs.com) to build native Android apps.
+## Getting Started
 
 ### Prerequisites
+- [Bun](https://bun.sh) v1.0+
+- (Optional) Android Studio with SDK 33+ for mobile builds
 
-- **Android**: Android Studio with SDK 33+
+### Quick Start
 
-### Building for Android
-
-**Windows/Mac/Linux:**
 ```bash
-./scripts/build-android.sh
-# or on Windows:
-.\scripts\build-android.ps1
+# Install dependencies
+bun install
+
+# Set up environment
+cp .env.example .env
+
+# Run migrations and seed
+bun run db:migrate && bun run db:seed
+
+# Start development servers
+bun run dev:backend    # Terminal 1 → http://localhost:3000
+bun run dev:frontend   # Terminal 2 → http://localhost:5173
 ```
 
-Then open in Android Studio:
+Or use the convenience scripts:
+
 ```bash
+# Mac/Linux
+./scripts/start-all.sh
+
+# Windows (PowerShell)
+.\scripts\start-all.ps1
+```
+
+### Production Build
+
+```bash
+# Mac/Linux
+./scripts/build.sh
+
+# Windows
+.\scripts\build.ps1
+
+# Serve
+cd backend && bun run src/index.ts  # → http://localhost:3000
+```
+
+### Android Build
+
+```bash
+./scripts/build-android.sh     # or .\scripts\build-android.ps1
 cd frontend && bunx cap open android
 ```
 
-Or build APK from command line:
-```bash
-cd frontend/android && ./gradlew assembleDebug
-```
+APK output: `frontend/android/app/build/outputs/apk/debug/app-debug.apk`
 
-APK location: `frontend/android/app/build/outputs/apk/debug/app-debug.apk`
+> **Note:** Capacitor 6.x + Android Gradle Plugin 9.0+ compatibility patches are applied automatically via `bun install`. See `docs/android-build-patching.md` for details.
 
-### Known Issues & Fixes
-
-Our project automatically handles Capacitor 6.x + Android Gradle Plugin 9.0+ compatibility. The ProGuard configuration is fixed via:
-1. **Gradle build override** (primary) - Configured in `frontend/android/build.gradle`
-2. **patch-package** (fallback) - For complex patches
-3. **Postinstall script** (safety net) - Runs after `bun install`
-
-**For new team members:** Just run `bun install` and the fixes apply automatically.
-
-**For troubleshooting:** See `docs/android-build-patching.md` for detailed documentation.
-
-### Optional - Building for iOS (macOS only)
-
-```bash
-./scripts/build-ios.sh
-```
-
-Then open in Xcode:
-```bash
-cd frontend && bunx cap open ios
-```
-
-Or open directly: `frontend/ios/App/App.xcworkspace`
-
-### Mobile Configuration
-
-Edit `frontend/.env.mobile` to set the production API URL:
-```
-VITE_API_URL=https://api.ecoplate.app/api/v1
-```
-
-For development, the app connects to `localhost`. For production builds, update the API URL and rebuild.
-
-### Capacitor Commands
-
-```bash
-cd frontend
-
-# Sync web assets to native projects
-bun run cap:sync
-
-# Open native IDE
-bun run cap:open:ios      # Opens Xcode
-bun run cap:open:android  # Opens Android Studio
-
-# Build for mobile
-bun run build:mobile      # Build and sync both platforms
-bun run build:ios         # Build and copy to iOS
-bun run build:android     # Build and copy to Android
-```
+---
 
 ## Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `PORT` | Server port (default: 3000) | No |
-| `JWT_SECRET` | Secret key for JWT signing | Yes (for production) |
+| `JWT_SECRET` | Secret key for JWT signing | Yes (production) |
 | `OPENAI_API_KEY` | OpenAI API key for receipt scanning | No |
 
-## API Endpoints
-
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Register new user |
-| POST | `/api/v1/auth/login` | Login |
-| POST | `/api/v1/auth/refresh` | Refresh access token |
-| POST | `/api/v1/auth/logout` | Logout |
-
-### MyFridge
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/myfridge/products` | List all products |
-| POST | `/api/v1/myfridge/products` | Add product |
-| GET | `/api/v1/myfridge/products/:id` | Get product |
-| PATCH | `/api/v1/myfridge/products/:id` | Update product |
-| DELETE | `/api/v1/myfridge/products/:id` | Delete product |
-| POST | `/api/v1/myfridge/products/:id/consume` | Log consumption |
-| POST | `/api/v1/myfridge/receipt/scan` | Scan receipt (AI) |
-
-### Marketplace
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/marketplace/listings` | Browse active listings |
-| GET | `/api/v1/marketplace/listings/nearby` | Get nearby map listings |
-| GET | `/api/v1/marketplace/my-listings` | Get user's own listings |
-| GET | `/api/v1/marketplace/listings/:id` | Get single listing details |
-| POST | `/api/v1/marketplace/listings` | Create new listing |
-| PATCH | `/api/v1/marketplace/listings/:id` | Update existing listing |
-| DELETE | `/api/v1/marketplace/listings/:id` | Delete listing |
-| POST | `/api/v1/marketplace/listings/:id/complete` | Mark as sold/completed |
-
-### Gamification
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/gamification/dashboard` | Get dashboard data |
-| GET | `/api/v1/gamification/points` | Get points details |
-| GET | `/api/v1/gamification/badges` | Get all badges |
-| GET | `/api/v1/gamification/metrics` | Get sustainability metrics |
-| GET | `/api/v1/gamification/leaderboard` | Get leaderboard |
-
-## Scripts Reference
-
-| Script | Description |
-|--------|-------------|
-| `start-backend.ps1` / `.sh` | Start backend server with dependencies |
-| `stop-backend.ps1` / `.sh` | Stop backend server |
-| `start-frontend.ps1` / `.sh` | Start frontend dev server with dependencies |
-| `stop-frontend.ps1` / `.sh` | Stop frontend dev server |
-| `start-all.ps1` / `.sh` | Start all servers (backend, frontend, recommendation) |
-| `stop-all.ps1` / `.sh` | Stop all servers |
-| `build.ps1` / `.sh` | Build web app for production |
-| `build-android.ps1` / `.sh` | Build Android app |
-| `build-ios.sh` | Build iOS app (macOS only) |
+---
 
 ## Database
 
-The application uses SQLite stored at `backend/ecoplate.db`. The schema includes:
+SQLite database stored at `backend/ecoplate.db`:
 
-- **Users**: users
-- **MyFridge**: products, product_interaction
-- **Marketplace**: marketplace_listings, image_listing, conversation, message
-- **Gamification**: user_points, badges, user_badges
+| Domain | Tables |
+|--------|--------|
+| **Users** | `users` |
+| **MyFridge** | `products`, `product_interaction` |
+| **Marketplace** | `marketplace_listings`, `image_listing`, `conversation`, `message` |
+| **Gamification** | `user_points`, `badges`, `user_badges`, `product_sustainability_metrics` |
+
+---
 
 ## License
 
