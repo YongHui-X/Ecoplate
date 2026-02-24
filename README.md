@@ -1,6 +1,6 @@
 # EcoPlate
 
-> A full-stack sustainability platform that reduces household food waste through AI-powered inventory tracking, a peer-to-peer marketplace, and a gamified reward system.
+> A full-stack sustainability platform that reduces household food waste through AI powered inventory tracking, a peer to peer marketplace, and a gamified reward system.
 
 EcoPlate transforms how households manage food consumption by combining **OpenAI Vision receipt scanning**, **ML price recommendations**, **real-time WebSocket messaging**, and a **CO2 gamification engine**, turning sustainable actions into points, badges, and leaderboard achievements.
 

@@ -1098,7 +1098,6 @@ jobs:
     needs: [build-and-push, set-env, scan-app-image, scan-rec-image]
     if: needs.set-env.outputs.deploy_env == 'staging' && needs.set-env.outputs.has_staging_key == 'true'
     runs-on: ubuntu-latest
-    environment: staging
     steps:
       - uses: actions/checkout@v4
 
@@ -1133,7 +1132,6 @@ jobs:
     needs: [build-and-push, set-env, scan-app-image, scan-rec-image]
     if: needs.set-env.outputs.deploy_env == 'production' && needs.set-env.outputs.has_production_key == 'true'
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - uses: actions/checkout@v4
 

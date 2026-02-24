@@ -100,8 +100,8 @@ function addSecurityHeaders(response: Response, isApi: boolean = false, nonce?: 
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   // Permissions policy - allow geolocation for self (needed for map features)
   headers.set("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
-  // Cross-Origin isolation headers
-  headers.set("Cross-Origin-Resource-Policy", "same-origin");
+  // Cross-Origin Resource Policy - allow cross-origin for Capacitor mobile app
+  headers.set("Cross-Origin-Resource-Policy", "cross-origin");
 
   if (isApi) {
     // API-specific headers
@@ -113,7 +113,7 @@ function addSecurityHeaders(response: Response, isApi: boolean = false, nonce?: 
     const scriptSrc = nonce ? `'self' 'nonce-${nonce}' https://maps.googleapis.com` : "'self' https://maps.googleapis.com";
     // Note: 'unsafe-inline' for styles is required because Google Maps dynamically injects inline styles
     const styleSrc = `'self' 'unsafe-inline' https://fonts.googleapis.com`;
-    headers.set("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc}; style-src ${styleSrc}; img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com; connect-src 'self' https://maps.googleapis.com; font-src 'self' https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'`);
+    headers.set("Content-Security-Policy", `default-src 'self'; script-src ${scriptSrc}; style-src ${styleSrc}; img-src 'self' data: blob: http://18.143.173.20 https://18.143.173.20 https://maps.googleapis.com https://maps.gstatic.com; connect-src 'self' http://18.143.173.20 https://18.143.173.20 https://maps.googleapis.com; font-src 'self' https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'`);
   }
 
   return new Response(response.body, {
@@ -138,12 +138,17 @@ async function serveStatic(path: string): Promise<Response | null> {
   const publicDir = resolve(join(import.meta.dir, "../public"));
 
   // Handle uploads directory (stored in public/uploads/)
+  // CORS headers added for Capacitor mobile app (loads from https://localhost)
   if (path.startsWith("/uploads/")) {
     const uploadPath = safePath(publicDir, path);
     if (!uploadPath || !existsSync(uploadPath)) return null;
     const file = Bun.file(uploadPath);
     return new Response(file, {
-      headers: { "Content-Type": getMimeType(uploadPath) },
+      headers: {
+        "Content-Type": getMimeType(uploadPath),
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=86400",
+      },
     });
   }
 
