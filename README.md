@@ -6,7 +6,9 @@ EcoPlate transforms how households manage food consumption by combining **OpenAI
 
 Built with **React 19**, **TypeScript**, **Bun**, **SQLite (Drizzle ORM)**, **Capacitor (Android/iOS)**, and **Tailwind CSS + shadcn/ui**. 
 
-Production web (only for the month of Feb): 18.143.173.20
+🌐 **Live Demo:** [ecoplate-backend-production-6601.up.railway.app](https://ecoplate-backend-production-6601.up.railway.app)
+
+> Previously deployed on AWS EC2. Migrated to Railway for long-term free hosting.
 
 ## System Architecture
 
