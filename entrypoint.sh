@@ -3,7 +3,7 @@ set -e
 
 DB_PATH="${DATABASE_PATH:-/app/data/ecoplate.db}"
 
-# Always reset database on deployment (fresh migrate + seed)
+# Always reset database on deployment (fresh migrate + seed).
 echo "[entrypoint] Resetting database..."
 rm -f "$DB_PATH"
 
