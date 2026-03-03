@@ -7,6 +7,8 @@ DB_PATH="${DATABASE_PATH:-/app/data/ecoplate.db}"
 echo "[entrypoint] Resetting database..."
 rm -f "$DB_PATH"
 
+cd /app/backend
+
 echo "[entrypoint] Running database migrations..."
 bun run src/db/migrate.ts
 
