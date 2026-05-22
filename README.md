@@ -6,7 +6,7 @@ EcoPlate transforms how households manage food consumption by combining **OpenAI
 
 Built with **React 19**, **TypeScript**, **Bun**, **SQLite (Drizzle ORM)**, **Capacitor (Android/iOS)**, and **Tailwind CSS + shadcn/ui**. 
 
-Deployed on AWS EC2 with full CI/CD with railway as experiment.
+Deployed on AWS EC2 with CI/CD.
 
 ## System Architecture
 
