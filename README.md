@@ -4,9 +4,9 @@
 
 EcoPlate transforms how households manage food consumption by combining **OpenAI Vision receipt scanning**, **ML price recommendations**, **real-time WebSocket messaging**, and a **CO2 gamification engine**, turning sustainable actions into points, badges, and leaderboard achievements.
 
-Built with **React 19**, **TypeScript**, **Bun**, **SQLite (Drizzle ORM)**, **Capacitor (Android/iOS)**, and **Tailwind CSS + shadcn/ui**. 
+Built with **React 19**, **TypeScript**, **Bun**, **SQLite (Drizzle ORM)**, **Capacitor (Android/iOS)**, and **Tailwind CSS + shadcn/ui**.
 
-Deployed on AWS EC2 with CI/CD.
+Originally deployed on **AWS EC2** as per screenshots, then migrated to **Railway** to reduce hosting cost and simplify deployment operations.
 
 ## System Architecture
 
@@ -256,7 +256,7 @@ ecoplate/
 │   ├── app.py                   # ML recommendation service
 │   ├── Dockerfile               # Container deployment
 │   └── requirements.txt         # Python dependencies
-└── scripts/                     # Build & deployment scripts
+└── deploy/                      # Legacy AWS/EC2 deployment files
 ```
 
 ## Getting Started
@@ -304,6 +304,14 @@ Or use the convenience scripts:
 # Serve
 cd backend && bun run src/index.ts  # → http://localhost:3000
 ```
+
+## Deployment
+
+EcoPlate is currently deployed on **Railway** using the root `Dockerfile`, which builds the Vite frontend and serves the compiled assets from the Bun backend in a single container.
+
+Railway provides the runtime `PORT` automatically. Production secrets such as `JWT_SECRET`, `OPENAI_API_KEY`, and `VITE_GOOGLE_MAPS_API_KEY` should be configured in the Railway service variables.
+
+The previous AWS EC2 deployment assets are kept under `deploy/` for reference, but Railway is the current hosting target because it is simpler to operate and more cost efficient for this project.
 
 ### Android Build
 
