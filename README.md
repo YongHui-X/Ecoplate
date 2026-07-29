@@ -123,7 +123,7 @@ flowchart TD
 
 ## Database Schema
 
-<img width="4947" height="2689" alt="ERD Diagram" src="docs\usecase\images\Team02_AD_CA%20-%20ERD.png" />
+<img width="4947" height="2689" alt="ERD Diagram" src="docs/usecase/images/Team02_AD_CA%20-%20ERD.png" />
 
 ## API Endpoints
 
