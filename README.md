@@ -2,7 +2,7 @@
 
 > A full stack sustainability platform that reduces household food waste through AI powered inventory tracking, a peer to peer marketplace, and a gamified reward system.
 
-EcoPlate transforms how households manage food consumption by combining **OpenAI Vision receipt scanning**, **ML price recommendations**, **real-time WebSocket messaging**, and a **CO2 gamification engine**, turning sustainable actions into points, badges, and leaderboard achievements.
+EcoPlate transforms how households manage food consumption by combining **OpenAI Vision receipt scanning**, **ML price recommendations**, a marketplace for users to list near expiry food items for sale or free pickup with **real-time WebSocket messaging**, and a **CO2 gamification engine**, turning sustainable actions into points, badges, and leaderboard achievements.
 
 Built with **React 19**, **TypeScript**, **Bun**, **SQLite (Drizzle ORM)**, **Capacitor (Android/iOS)**, and **Tailwind CSS + shadcn/ui**.
 
@@ -11,8 +11,10 @@ Originally deployed on **AWS EC2** as per screenshots, then migrated to **Railwa
 ## System Architecture
 
 <img width="2071" height="1246" alt="Software Architecture" src="https://github.com/user-attachments/assets/e0d499c6-43bd-4a5b-8474-b5c163b69a4e" />
-DevSecOps Diagram
-<img width="9192" height="5217" alt="DevSecOps_Diagram" src="https://github.com/user-attachments/assets/effa5cb8-1315-4143-a1f6-c4864c90f31d" />
+
+## DevSecOps Diagram
+<img width="9192" height="5217" alt="DevSecOps_Diagram" src="docs\usecase\images\DevSecOps_Diagram.png" />
+
 
 ## Screenshots
 
@@ -118,7 +120,7 @@ flowchart TD
 
 ## Database Schema
 
-<img width="4947" height="2689" alt="ERD Diagram" src="https://github.com/user-attachments/assets/f04b8b4c-e6cf-40bb-9810-cf306cacaea0" />
+<img width="4947" height="2689" alt="ERD Diagram" src="docs\usecase\images\Team02_AD_CA - ERD.png" />
 
 ## API Endpoints
 
