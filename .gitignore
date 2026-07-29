@@ -69,6 +69,10 @@ recommendation-engine/reports/*.log
 
 # Misc
 docs/
+!docs/
+!docs/usecase/
+!docs/usecase/images/
+!docs/usecase/images/*.png
 PRDs/
 *.pem
 .vercel
