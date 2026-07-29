@@ -13,31 +13,33 @@ Originally deployed on **AWS EC2** as per screenshots, then migrated to **Railwa
 <img width="2071" height="1246" alt="Software Architecture" src="https://github.com/user-attachments/assets/e0d499c6-43bd-4a5b-8474-b5c163b69a4e" />
 
 ## DevSecOps Diagram
-<img width="9192" height="5217" alt="DevSecOps_Diagram" src="docs\usecase\images\DevSecOps_Diagram.png" />
 
+<img width="9192" height="5217" alt="DevSecOps_Diagram" src="docs/usecase/images/DevSecOps_Diagram.png" />
 
 ## Screenshots
 
-| Messaging (WebSockets) | Consumption Tracking |
-|:-:|:-:|
+|                                                  Messaging (WebSockets)                                                   |                                                         Consumption Tracking                                                         |
+| :-----------------------------------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------------------------------------------: |
 | <img width="720" alt="Messaging" src="https://github.com/user-attachments/assets/888b6b55-b94b-479e-b12c-80240b8ebf2f" /> | <img width="720" alt="Consumption Tracking" src="https://github.com/user-attachments/assets/0e440e56-441f-44d4-b210-7c3db3d3de05" /> |
 
-| Dashboard | Marketplace |
-|:-:|:-:|
+|                                                         Dashboard                                                         |                                                         Marketplace                                                         |
+| :-----------------------------------------------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------------------------------: |
 | <img width="720" alt="Dashboard" src="https://github.com/user-attachments/assets/d211ece2-4428-45e7-9d3c-a209f44827a4" /> | <img width="720" alt="Marketplace" src="https://github.com/user-attachments/assets/4347a102-2834-445c-ae5f-eb79b6c79564" /> |
 
-| EcoPoints & Rewards |
-|:-:|
+|                                                    EcoPoints & Rewards                                                    |
+| :-----------------------------------------------------------------------------------------------------------------------: |
 | <img width="720" alt="EcoPoints" src="https://github.com/user-attachments/assets/668048fe-849b-465b-8dc3-c52d372fa5a4" /> |
 
 ## Key Features
 
 ### MyFridge: AI Powered Inventory Management
+
 - Track food items with expiration dates and CO2 emission data
 - **Receipt scanning** via OpenAI Vision: snap a photo, items are parsed and added automatically
 - Log consumption, waste, sharing, and sales with sustainability metrics per action
 
 ### Marketplace: Peer to Peer Food Redistribution
+
 - List near expiry food items for sale or free pickup
 - Browse listings with geolocation based map view
 - **ML powered price recommendations** for optimal listing pricing
@@ -45,6 +47,7 @@ Originally deployed on **AWS EC2** as per screenshots, then migrated to **Railwa
 - Complete transactions to earn EcoPoints tied to CO2 savings
 
 ### EcoPoints & Badges: Gamification Engine
+
 - Earn points calculated from **CO2 savings** (CO2 value x 1.5, minimum 3 points per action)
 - **16 unlockable badges** across 4 categories: Milestones, Waste Reduction, Sharing, and Streaks
 - Daily streak tracking with milestone notifications (3, 7, 14, 30 days and beyond)
@@ -53,19 +56,19 @@ Originally deployed on **AWS EC2** as per screenshots, then migrated to **Railwa
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **Runtime** | [Bun](https://bun.sh) |
-| **Database** | SQLite via `bun:sqlite` |
-| **ORM** | [Drizzle ORM](https://orm.drizzle.team) |
-| **Backend** | Bun native HTTP server + WebSockets |
-| **Frontend** | React 19 + TypeScript |
-| **Build Tool** | [Vite](https://vitejs.dev) |
-| **Styling** | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
-| **Mobile** | [Capacitor](https://capacitorjs.com) (Android & iOS) |
-| **AI/ML** | OpenAI Vision API, Python recommendation engine |
-| **Auth** | JWT (jose library) |
-| **Validation** | [Zod](https://zod.dev) |
+| Layer          | Technology                                                                   |
+| -------------- | ---------------------------------------------------------------------------- |
+| **Runtime**    | [Bun](https://bun.sh)                                                        |
+| **Database**   | SQLite via `bun:sqlite`                                                      |
+| **ORM**        | [Drizzle ORM](https://orm.drizzle.team)                                      |
+| **Backend**    | Bun native HTTP server + WebSockets                                          |
+| **Frontend**   | React 19 + TypeScript                                                        |
+| **Build Tool** | [Vite](https://vitejs.dev)                                                   |
+| **Styling**    | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
+| **Mobile**     | [Capacitor](https://capacitorjs.com) (Android & iOS)                         |
+| **AI/ML**      | OpenAI Vision API, Python recommendation engine                              |
+| **Auth**       | JWT (jose library)                                                           |
+| **Validation** | [Zod](https://zod.dev)                                                       |
 
 ## User Flow
 
@@ -120,49 +123,53 @@ flowchart TD
 
 ## Database Schema
 
-<img width="4947" height="2689" alt="ERD Diagram" src="docs\usecase\images\Team02_AD_CA - ERD.png" />
+<img width="4947" height="2689" alt="ERD Diagram" src="docs/usecase/images/Team02_AD_CA%20-%20ERD.png" />
 
 ## API Endpoints
 
 ### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Register new user |
-| POST | `/api/v1/auth/login` | Login |
-| POST | `/api/v1/auth/refresh` | Refresh access token |
-| POST | `/api/v1/auth/logout` | Logout |
+
+| Method | Endpoint                | Description          |
+| ------ | ----------------------- | -------------------- |
+| POST   | `/api/v1/auth/register` | Register new user    |
+| POST   | `/api/v1/auth/login`    | Login                |
+| POST   | `/api/v1/auth/refresh`  | Refresh access token |
+| POST   | `/api/v1/auth/logout`   | Logout               |
 
 ### MyFridge
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/myfridge/products` | List all products |
-| POST | `/api/v1/myfridge/products` | Add product |
-| GET | `/api/v1/myfridge/products/:id` | Get product |
-| PATCH | `/api/v1/myfridge/products/:id` | Update product |
-| DELETE | `/api/v1/myfridge/products/:id` | Delete product |
-| POST | `/api/v1/myfridge/products/:id/consume` | Log consumption |
-| POST | `/api/v1/myfridge/receipt/scan` | Scan receipt (AI) |
+
+| Method | Endpoint                                | Description       |
+| ------ | --------------------------------------- | ----------------- |
+| GET    | `/api/v1/myfridge/products`             | List all products |
+| POST   | `/api/v1/myfridge/products`             | Add product       |
+| GET    | `/api/v1/myfridge/products/:id`         | Get product       |
+| PATCH  | `/api/v1/myfridge/products/:id`         | Update product    |
+| DELETE | `/api/v1/myfridge/products/:id`         | Delete product    |
+| POST   | `/api/v1/myfridge/products/:id/consume` | Log consumption   |
+| POST   | `/api/v1/myfridge/receipt/scan`         | Scan receipt (AI) |
 
 ### Marketplace
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/marketplace/listings` | Browse active listings |
-| GET | `/api/v1/marketplace/listings/nearby` | Get nearby listings (geolocation) |
-| GET | `/api/v1/marketplace/my-listings` | Get user's own listings |
-| GET | `/api/v1/marketplace/listings/:id` | Get listing details |
-| POST | `/api/v1/marketplace/listings` | Create new listing |
-| PATCH | `/api/v1/marketplace/listings/:id` | Update listing |
-| DELETE | `/api/v1/marketplace/listings/:id` | Delete listing |
-| POST | `/api/v1/marketplace/listings/:id/complete` | Mark as sold/completed |
+
+| Method | Endpoint                                    | Description                       |
+| ------ | ------------------------------------------- | --------------------------------- |
+| GET    | `/api/v1/marketplace/listings`              | Browse active listings            |
+| GET    | `/api/v1/marketplace/listings/nearby`       | Get nearby listings (geolocation) |
+| GET    | `/api/v1/marketplace/my-listings`           | Get user's own listings           |
+| GET    | `/api/v1/marketplace/listings/:id`          | Get listing details               |
+| POST   | `/api/v1/marketplace/listings`              | Create new listing                |
+| PATCH  | `/api/v1/marketplace/listings/:id`          | Update listing                    |
+| DELETE | `/api/v1/marketplace/listings/:id`          | Delete listing                    |
+| POST   | `/api/v1/marketplace/listings/:id/complete` | Mark as sold/completed            |
 
 ### Gamification
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/gamification/dashboard` | Dashboard summary |
-| GET | `/api/v1/gamification/points` | Points breakdown & history |
-| GET | `/api/v1/gamification/badges` | All badges with progress |
-| GET | `/api/v1/gamification/metrics` | Sustainability metrics |
-| GET | `/api/v1/gamification/leaderboard` | Community leaderboard |
+
+| Method | Endpoint                           | Description                |
+| ------ | ---------------------------------- | -------------------------- |
+| GET    | `/api/v1/gamification/dashboard`   | Dashboard summary          |
+| GET    | `/api/v1/gamification/points`      | Points breakdown & history |
+| GET    | `/api/v1/gamification/badges`      | All badges with progress   |
+| GET    | `/api/v1/gamification/metrics`     | Sustainability metrics     |
+| GET    | `/api/v1/gamification/leaderboard` | Community leaderboard      |
 
 ## Authentication Flow
 
@@ -264,6 +271,7 @@ ecoplate/
 ## Getting Started
 
 ### Prerequisites
+
 - [Bun](https://bun.sh) v1.0+
 - (Optional) Android Studio with SDK 33+ for mobile builds
 
@@ -328,21 +336,21 @@ APK output: `frontend/android/app/build/outputs/apk/debug/app-debug.apk`
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `PORT` | Server port (default: 3000) | No |
-| `JWT_SECRET` | Secret key for JWT signing | Yes (production) |
-| `OPENAI_API_KEY` | OpenAI API key for receipt scanning | No |
+| Variable         | Description                         | Required         |
+| ---------------- | ----------------------------------- | ---------------- |
+| `PORT`           | Server port (default: 3000)         | No               |
+| `JWT_SECRET`     | Secret key for JWT signing          | Yes (production) |
+| `OPENAI_API_KEY` | OpenAI API key for receipt scanning | No               |
 
 ## Database
 
 SQLite database stored at `backend/ecoplate.db`:
 
-| Domain | Tables |
-|--------|--------|
-| **Users** | `users` |
-| **MyFridge** | `products`, `product_interaction` |
-| **Marketplace** | `marketplace_listings`, `image_listing`, `conversation`, `message` |
+| Domain           | Tables                                                                   |
+| ---------------- | ------------------------------------------------------------------------ |
+| **Users**        | `users`                                                                  |
+| **MyFridge**     | `products`, `product_interaction`                                        |
+| **Marketplace**  | `marketplace_listings`, `image_listing`, `conversation`, `message`       |
 | **Gamification** | `user_points`, `badges`, `user_badges`, `product_sustainability_metrics` |
 
 ## License
